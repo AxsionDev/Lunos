@@ -192,6 +192,10 @@ export const Info = Schema.Struct({
   sync: Schema.optional(ConfigSync.Info).annotate({
     description: "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }",
   }),
+  remote_control: Schema.optional(Schema.Boolean).annotate({
+    description:
+      "Remote control from app.lunos.tech (/remote on, XCOD-338): false keeps it off; an organisation locks it off with $locked. sync: false turns it off too",
+  }),
   subagent: Schema.optional(ConfigSubagent.Info).annotate({
     description:
       "Subagents: whether Build delegates to them, background runs, how many run at once, their model, and their names and animals in the TUI",

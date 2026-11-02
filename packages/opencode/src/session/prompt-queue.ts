@@ -206,7 +206,7 @@ async function pendingQuestion(sessionID: string, directory: string) {
  * `session.prompt` with `origin: "monitor"`: the session, how it was delivered and whether another
  * process forwarded it; never the text.
  */
-export async function submit(input: Omit<Entry, "id"> & { interrupt?: boolean; via?: "local" | "peer" }) {
+export async function submit(input: Omit<Entry, "id"> & { interrupt?: boolean; via?: "local" | "peer" | "remote" }) {
   start()
   const activity = SessionLive.get(input.sessionID)
   const busy = !!activity.status || activity.permissions > 0 || activity.questions > 0

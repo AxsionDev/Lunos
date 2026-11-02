@@ -74,6 +74,25 @@ function lockedRules() {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
 
+/**
+ * XCOD-338: where the next answer to a request comes from, when not from this machine's own windows.
+ * Remote control marks the request just before it answers through the permission route, and the
+ * decision's audit line says `via: "remote"`. Process-local, and taken once.
+ */
+const vias = new Map<string, { via: "remote"; at: number }>()
+
+export function markVia(requestID: string, via: "remote") {
+  const now = Date.now()
+  for (const [id, item] of vias) if (now - item.at > 60_000) vias.delete(id)
+  vias.set(requestID, { via, at: now })
+}
+
+function takeVia(requestID: string) {
+  const item = vias.get(requestID)
+  vias.delete(requestID)
+  return item?.via
+}
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -168,11 +187,13 @@ const layer = Layer.effect(
       if (!existing) return yield* new PermissionV1.NotFoundError({ requestID: input.requestID })
 
       pending.delete(input.requestID)
+      const via = takeVia(input.requestID)
       AuditLog.emit("permission.decision", {
         session: existing.info.sessionID,
         permission: existing.info.permission,
         patterns: existing.info.patterns,
         decision: input.reply === "reject" ? "denied" : input.reply === "always" ? "allowed always" : "allowed once",
+        ...(via ? { via } : {}),
       })
       yield* events.publish(Event.Replied, {
         sessionID: existing.info.sessionID,

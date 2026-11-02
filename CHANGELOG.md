@@ -23,6 +23,14 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Follow and steer a session from your phone.** Run `/remote on` in a session, and open the link it
+  gives you at app.lunos.tech, signed in to your Lunos account: watch the live transcript, answer the
+  session's approvals and questions, send or queue prompts, and stop it, from a phone or another
+  computer. The work stays on your computer, under its own policy; Lunos keeps one outgoing connection
+  to Lunos Cloud (EU) and opens no port. Only your account can see or control it, every remote approval
+  is recorded in your audit log as coming from remote, `/remote off` or one tap on the web ends it at
+  once, and it ends by itself after 12 hours. Off by default, and off wherever your organisation keeps
+  session sync off. See docs/remote-control.md. <!-- XCOD-338 -->
 - **Dictate your prompt, transcribed on your computer.** Hold `ctrl+space` in the TUI, or the mic button
   in the desktop app, and speak: whisper.cpp turns it into text in the prompt for you to edit. The audio
   never leaves your computer and is never written to disk; the speech model downloads once, with your

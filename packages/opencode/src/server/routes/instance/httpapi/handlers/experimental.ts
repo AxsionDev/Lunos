@@ -24,6 +24,7 @@ import {
   ConsoleSwitchPayload,
   ExternalConfigCommandPayload,
   SessionEnqueuePayload,
+  SessionRemotePayload,
   SessionTakeoverPayload,
   BudgetStatusQuery,
   ProjectGroupCreatePayload,
@@ -55,6 +56,7 @@ import { SessionPeers } from "@/session/peers"
 import { SessionPeerControl } from "@/session/peer-control"
 import { SessionOverview } from "@/session/overview"
 import { SessionPromptQueue } from "@/session/prompt-queue"
+import { CloudRemote } from "@/cloud/remote"
 import { SessionBulk } from "@/session/bulk"
 import { SessionShare } from "@/share/session"
 import { ExternalRegistry } from "@/external/registry"
@@ -873,6 +875,34 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
         catch: (error) => new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
       })
     })
+    // XCOD-338: /remote on|off.
+    const sessionRemote = Effect.fn("ExperimentalHttpApi.sessionRemote")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
+      return CloudRemote.status(ctx.params.sessionID)
+    })
+    const sessionRemoteSet = Effect.fn("ExperimentalHttpApi.sessionRemoteSet")(function* (ctx: {
+      params: { sessionID: string }
+      payload: typeof SessionRemotePayload.Type
+    }) {
+      const sessionID = SessionID.make(ctx.params.sessionID)
+      if (!ctx.payload.on) return yield* Effect.promise(() => CloudRemote.disable(sessionID))
+      const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.fail(notFound("No such session."))))
+      yield* notDrivenElsewhere(sessionID)
+      const agent = yield* agentOf(info)
+      const cfg = yield* config.get()
+      return yield* Effect.tryPromise({
+        try: () =>
+          CloudRemote.enable({
+            sessionID,
+            directory: info.directory,
+            config: cfg as CloudRemote.RemoteConfig,
+            title: info.title,
+            ...(agent ? { agent } : {}),
+          }),
+        catch: (error) => new InvalidRequestError({ message: error instanceof Error ? error.message : String(error) }),
+      })
+    })
     const sessionQueued = Effect.fn("ExperimentalHttpApi.sessionQueued")(function* (ctx: {
       params: { sessionID: string }
     }) {
@@ -952,6 +982,8 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       .handle("sessionEnqueue", sessionEnqueue)
       .handle("sessionTakeover", sessionTakeover)
       .handle("sessionQueued", sessionQueued)
+      .handle("sessionRemote", sessionRemote)
+      .handle("sessionRemoteSet", sessionRemoteSet)
       .handle("peerPrompt", peerPrompt)
       .handle("resource", resource)
   }),

@@ -2373,6 +2373,7 @@ export type Config = {
   cloud?: CloudConfig
   auth?: AuthConfig
   sync?: SyncConfig
+  remote_control?: boolean
   subagent?: SubagentConfig
   verify?: VerifyConfig
   dev_cycle?: DevCycleConfig
@@ -3179,6 +3180,13 @@ export type SessionTakeoverResult = {
   discarded: number
   delivery?: "now" | "queued" | "interrupted" | "answered"
   position?: number
+}
+
+export type SessionRemoteStatus = {
+  on: boolean
+  link?: string
+  url?: string
+  expiresAt?: number
 }
 
 export type SessionQueued = {
@@ -10877,7 +10885,7 @@ export type ExperimentalSessionEnqueueData = {
   body?: {
     text: string
     interrupt?: boolean
-    via?: "local" | "peer"
+    via?: "local" | "peer" | "remote"
     model?: {
       providerID: string
       modelID: string
@@ -10962,6 +10970,79 @@ export type ExperimentalSessionTakeoverResponses = {
 
 export type ExperimentalSessionTakeoverResponse =
   ExperimentalSessionTakeoverResponses[keyof ExperimentalSessionTakeoverResponses]
+
+export type ExperimentalSessionRemoteData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session/{sessionID}/remote"
+}
+
+export type ExperimentalSessionRemoteErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionRemoteError = ExperimentalSessionRemoteErrors[keyof ExperimentalSessionRemoteErrors]
+
+export type ExperimentalSessionRemoteResponses = {
+  /**
+   * Whether the session is remote
+   */
+  200: SessionRemoteStatus
+}
+
+export type ExperimentalSessionRemoteResponse =
+  ExperimentalSessionRemoteResponses[keyof ExperimentalSessionRemoteResponses]
+
+export type ExperimentalSessionRemoteSetData = {
+  body?: {
+    on: boolean
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/experimental/session/{sessionID}/remote"
+}
+
+export type ExperimentalSessionRemoteSetErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type ExperimentalSessionRemoteSetError =
+  ExperimentalSessionRemoteSetErrors[keyof ExperimentalSessionRemoteSetErrors]
+
+export type ExperimentalSessionRemoteSetResponses = {
+  /**
+   * Whether the session is remote now
+   */
+  200: SessionRemoteStatus
+}
+
+export type ExperimentalSessionRemoteSetResponse =
+  ExperimentalSessionRemoteSetResponses[keyof ExperimentalSessionRemoteSetResponses]
 
 export type ExperimentalSessionQueuedData = {
   body?: never

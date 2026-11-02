@@ -136,6 +136,10 @@ import type {
   ExperimentalSessionOverviewResponses,
   ExperimentalSessionQueuedErrors,
   ExperimentalSessionQueuedResponses,
+  ExperimentalSessionRemoteErrors,
+  ExperimentalSessionRemoteResponses,
+  ExperimentalSessionRemoteSetErrors,
+  ExperimentalSessionRemoteSetResponses,
   ExperimentalSessionTakeoverErrors,
   ExperimentalSessionTakeoverResponses,
   ExperimentalWorkspaceAdapterListErrors,
@@ -1092,7 +1096,7 @@ export class Session extends HeyApiClient {
       workspace?: string
       text?: string
       interrupt?: boolean
-      via?: "local" | "peer"
+      via?: "local" | "peer" | "remote"
       model?: {
         providerID: string
         modelID: string
@@ -1178,6 +1182,85 @@ export class Session extends HeyApiClient {
       ThrowOnError
     >({
       url: "/experimental/session/{sessionID}/takeover",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Whether a session can be controlled from app.lunos.tech
+   *
+   * XCOD-338: on, with the link and its URL and expiry, or off.
+   */
+  public remote<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      ExperimentalSessionRemoteResponses,
+      ExperimentalSessionRemoteErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/remote",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Turn remote control of a session on or off
+   *
+   * XCOD-338: on makes the session available at app.lunos.tech to the signed-in Lunos account, through one outgoing connection to Lunos Cloud (no port is opened), for at most 12 hours; off ends it at once. Refused (with the reason) when offline, signed out, the device's sync is off, the residency policy or the organisation's policy (remote_control: false or sync: false, locked) doesn't allow it. Audited as remote.on, remote.off and remote.denied.
+   */
+  public remoteSet<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      on?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "on" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      ExperimentalSessionRemoteSetResponses,
+      ExperimentalSessionRemoteSetErrors,
+      ThrowOnError
+    >({
+      url: "/experimental/session/{sessionID}/remote",
       ...options,
       ...params,
       headers: {

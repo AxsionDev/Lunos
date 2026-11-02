@@ -31,6 +31,7 @@ import { tint, useTheme } from "../../context/theme"
 import { EmptyBorder, SplitBorder } from "../../ui/border"
 import { useTuiPaths, useTuiTerminalEnvironment } from "../../context/runtime"
 import { useClipboard } from "../../context/clipboard"
+import { parseRemote, remoteControl } from "../remote-control"
 import { Spinner } from "../spinner"
 import { WorkingTip } from "../tips"
 import { useSDK } from "../../context/sdk"
@@ -1301,6 +1302,18 @@ export function Prompt(props: PromptProps) {
     // here (/logout, /account); any prompt one sends is refused by the session loop.
     if (account && !(await account.check()) && !(account.disabled() && store.prompt.input.trim().startsWith("/"))) {
       if (account.disabled()) toast.show({ variant: "error", message: disabledNotice(), duration: 8000 })
+      return false
+    }
+    // XCOD-338: `/remote`, `/remote on` and `/remote off` act on this session here, never as a prompt.
+    const remote = parseRemote(store.prompt.input)
+    if (remote) {
+      input.clear()
+      setStore("prompt", { input: "", parts: [] })
+      if (!props.sessionID) {
+        toast.show({ message: "Start a session first; /remote makes that session remote.", variant: "info" })
+        return false
+      }
+      await remoteControl({ dialog, sdk, toast, clipboard, sessionID: props.sessionID, want: remote })
       return false
     }
     // XCOD-94: bare /memory opens the memory browser, before any session is created.

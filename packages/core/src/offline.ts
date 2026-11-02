@@ -317,6 +317,15 @@ export const CALLS: Call[] = [
       '`lunos sync off` (this device), `"sync": false` (this directory, or everywhere when your organisation locks it)',
   },
   {
+    id: "remote-control",
+    what: "Remote control of a session from app.lunos.tech (one outgoing connection; no port is opened)",
+    hosts: "cloud.lunos.tech (or `cloud.endpoint` in global or managed config)",
+    when: "only while you have turned it on for a session with `/remote`, for at most 12 hours",
+    offline: "blocked",
+    alsoOffBy:
+      '`/remote` again (off), `"remote_control": false` or `"sync": false` (this directory, or everywhere when your organisation locks it), sync off for this device',
+  },
+  {
     // XCOD-336: the model only; recording and transcription never use the network.
     id: "voice-model",
     what: "Voice input: whisper.cpp speech model download (SHA-256 checked)",

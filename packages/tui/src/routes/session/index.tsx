@@ -88,6 +88,7 @@ import { collapseToolOutput } from "../../util/collapse-tool-output"
 import { usePluginRuntime } from "../../plugin/runtime"
 import { DialogRetryAction } from "../../component/dialog-retry-action"
 import { shareToConsole } from "../../component/dialog-share-console"
+import { remoteControl } from "../../component/remote-control"
 import { getRevertDiffFiles } from "../../util/revert-diff"
 import { OPENCODE_BASE_MODE, useBindings, useCommandShortcut, useOpencodeKeymap } from "../../keymap"
 import { usePathFormatter } from "../../context/path-format"
@@ -589,6 +590,19 @@ export function Session() {
             })
           })
         dialog.clear()
+      },
+    },
+    {
+      // XCOD-338: follow and steer this session from app.lunos.tech (a phone, another computer).
+      title: "Remote control (app.lunos.tech)",
+      value: "session.remote",
+      category: "Session",
+      slash: {
+        name: "remote",
+      },
+      run: async () => {
+        dialog.clear()
+        await remoteControl({ dialog, sdk, toast, clipboard, sessionID: route.sessionID, want: "toggle" })
       },
     },
     {

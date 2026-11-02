@@ -2461,6 +2461,10 @@
           "$ref": "#/$defs/SyncConfig",
           "description": "Session sync to your Lunos space: false to stop it for this directory, or { project, exclude }"
         },
+        "remote_control": {
+          "type": "boolean",
+          "description": "Remote control from app.lunos.tech (/remote on, XCOD-338): false keeps it off; an organisation locks it off with $locked. sync: false turns it off too"
+        },
         "subagent": {
           "$ref": "#/$defs/SubagentConfig",
           "description": "Subagents: whether Build delegates to them, background runs, how many run at once, their model, and their names and animals in the TUI"

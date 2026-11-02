@@ -26,6 +26,12 @@ export const EVENTS = [
   // Session sync (lunos-web spec 2026-10-13 §3): session id, device id, seq, bytes, endpoint; the gate that refused. Never content.
   "sync.upload",
   "sync.denied",
+  // XCOD-338: remote control. on/off (session, link, reason), a gate that refused it (session, gate),
+  // and each command from the web (session, link, kind, request, reply, ok). Never prompt text or answers.
+  "remote.on",
+  "remote.off",
+  "remote.denied",
+  "remote.command",
   "tool.run",
   "permission.decision",
   "mcp.connect",

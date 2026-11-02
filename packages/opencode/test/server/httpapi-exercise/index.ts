@@ -849,6 +849,24 @@ const scenarios: Scenario[] = [
       headers: ctx.headers(),
     }))
     .json(200, object, "status"),
+  // XCOD-338: remote control is off until turned on; turning it off when it is off is a no-op.
+  http.protected
+    .get("/experimental/session/{sessionID}/remote", "experimental.session.remote")
+    .seeded((ctx) => ctx.session({ title: "Remote status" }))
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/remote", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, object, "status"),
+  http.protected
+    .post("/experimental/session/{sessionID}/remote", "experimental.session.remoteSet")
+    .seeded((ctx) => ctx.session({ title: "Remote off" }))
+    .at((ctx) => ({
+      path: route("/experimental/session/{sessionID}/remote", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { on: false },
+    }))
+    .json(200, object, "status"),
   // XCOD-234: a session no other Lunos process runs is a 404 for every peer action.
   ...(
     [
