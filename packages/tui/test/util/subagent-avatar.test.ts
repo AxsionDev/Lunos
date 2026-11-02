@@ -3,6 +3,7 @@ import {
   ANIMALS,
   assignAvatars,
   avatar,
+  isolationText,
   blink,
   BODY_COLORS,
   elapsed,
@@ -270,5 +271,17 @@ describe("subagentsOf", () => {
     expect(tokens(940)).toBe("940")
     expect(tokens(12_345)).toBe("12.3k")
     expect(tokens(2_000_000)).toBe("2M")
+  })
+})
+
+describe("isolationText (XCOD-332)", () => {
+  test("shows the worktree, then the diff size and merge or conflict state", () => {
+    expect(isolationText(undefined)).toBeUndefined()
+    expect(isolationText({ isolation: { state: "running", branch: "lunos/ses/step" } })).toBe("worktree lunos/ses/step")
+    expect(isolationText({ isolation: { state: "merged", files: 3, additions: 10, deletions: 2 } })).toBe(
+      "merged · 3 files +10 -2",
+    )
+    expect(isolationText({ isolation: { state: "conflict", conflicts: ["src/a.ts"] } })).toBe("conflict: src/a.ts")
+    expect(isolationText({ isolation: { state: "discarded" } })).toBe("worktree discarded")
   })
 })
