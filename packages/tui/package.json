@@ -46,6 +46,7 @@
     "./util/sandbox": "./src/util/sandbox.ts",
     "./util/account": "./src/util/account.ts",
     "./util/budget-toast": "./src/util/budget-toast.ts",
+    "./util/workflows": "./src/util/workflows.ts",
     "./logo": "./src/logo.ts",
     "./ui/dialog": "./src/ui/dialog.tsx",
     "./ui/spinner": "./src/ui/spinner.ts",

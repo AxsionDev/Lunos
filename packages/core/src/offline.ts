@@ -147,6 +147,14 @@ export const CALLS: Call[] = [
     offline: "tool",
   },
   {
+    id: "osv",
+    what: "Security review: known-vulnerability lookup for changed dependencies (XCOD-334)",
+    hosts: "api.osv.dev",
+    when: "`/security-review` and `lunos security-review`, only when the change touches a manifest or lockfile",
+    offline: "blocked",
+    alsoOffBy: "`--no-osv`",
+  },
+  {
     id: "model-provider",
     what: "Model provider API, including its login and model list",
     hosts: "the provider you configure",

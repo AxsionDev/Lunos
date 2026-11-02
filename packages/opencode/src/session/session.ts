@@ -689,6 +689,10 @@ const layer: Layer.Layer<
         if (hasInstance) yield* cancelBackgroundJobs(background, sessionID)
         // XCOD-288: dev servers and watchers the agent started in this session stop with it.
         yield* Effect.promise(() => BackgroundShell.stopSession(sessionID))
+        // XCOD-332: a subagent's worktree and `lunos/*` branch go with its session.
+        yield* Effect.promise(() =>
+          import("./isolation").then((isolation) => isolation.forget(sessionID)).catch(() => undefined),
+        )
         const kids = yield* children(sessionID)
         for (const child of kids) {
           yield* remove(child.id)

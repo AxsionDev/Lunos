@@ -233,6 +233,8 @@ const DEFAULTS: Record<string, unknown> = {
   "subagent.background": true,
   "subagent.delegate": true,
   "subagent.max_parallel": 3,
+  // XCOD-332: each writing subagent in its own git worktree (shared outside git repositories).
+  "subagent.isolation": "worktree",
   "subagent.fun_names": true,
   "subagent.mascots": true,
   // XCOD-303: Dynamic workflows on by default.

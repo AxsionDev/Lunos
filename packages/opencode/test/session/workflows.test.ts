@@ -1,6 +1,7 @@
 // XCOD-303: the Dynamic workflows switch, its precedence, and the main agent's tool gate.
 import { describe, expect, test } from "bun:test"
 import { DynamicWorkflows } from "@/session/workflows"
+import { workflowsLabel } from "@opencode-ai/tui/util/workflows"
 import { Permission } from "@/permission"
 import { AuditLog } from "@/audit/log"
 import { Audit } from "@opencode-ai/core/audit"
@@ -126,6 +127,60 @@ describe("DynamicWorkflows.setting / decide", () => {
     expect(DynamicWorkflows.sessionValue(meta)).toBe(false)
     expect(DynamicWorkflows.sessionValue(DynamicWorkflows.withSessionValue(meta, undefined))).toBeUndefined()
   })
+})
+
+// XCOD-330: the footer, the turn's notice and /workflows agree in every off case.
+describe("the footer agrees with the server", () => {
+  const cases = [
+    { name: "on", config: {}, agent: build, subagents: [general, explore] },
+    { name: "subagent_depth 0", config: { subagent_depth: 0 }, agent: build, subagents: [general] },
+    {
+      name: "task denied",
+      config: {},
+      agent: { name: "build", permission: Permission.merge(allow, Permission.fromConfig({ task: "deny" })) },
+      subagents: [general],
+    },
+    {
+      name: "task denied by the session",
+      config: {},
+      agent: build,
+      session: Permission.fromConfig({ task: "deny" }),
+      subagents: [general],
+    },
+    { name: "every subagent has edit off", config: {}, agent: build, subagents: [explore] },
+    {
+      name: "the only writer may not be dispatched",
+      config: {},
+      agent: {
+        name: "build",
+        permission: Permission.merge(allow, Permission.fromConfig({ task: { general: "deny" } })),
+      },
+      subagents: [general, explore],
+    },
+    { name: "turned off in config", config: { workflows: { dynamic: false } }, agent: build, subagents: [explore] },
+  ]
+  for (const item of cases)
+    test(item.name, () => {
+      const decision = DynamicWorkflows.decide({
+        config: item.config,
+        agent: item.agent,
+        session: { permission: item.session },
+        subagents: item.subagents,
+      })
+      const label = workflowsLabel({
+        agent: item.agent.name,
+        mode: "primary",
+        config: item.config,
+        metadata: undefined,
+        permission: item.agent.permission,
+        session: item.session,
+        subagents: item.subagents,
+      })!
+      expect(label.startsWith(`Dynamic workflows: ${decision.on ? "on" : "off"}`)).toBe(true)
+      // Off for want of a writing subagent: the footer gives a reason, and the notice gives the same one in full.
+      const notice = DynamicWorkflows.notice(decision)
+      expect(label.includes(" · ") && !decision.on).toBe(notice !== undefined)
+    })
 })
 
 describe("DynamicWorkflows.gate", () => {
