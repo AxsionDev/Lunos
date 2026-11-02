@@ -25,6 +25,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import * as Stream from "effect/Stream"
 import { Command } from "../command"
+import { SecurityReview } from "@/security/review"
 import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
 import { ConfigPolicy } from "@/config/policy"
@@ -2110,6 +2111,13 @@ const layer = Layer.effect(
         )
         let index = 0
         template = template.replace(bashRegex, () => results[index++])
+      }
+      // XCOD-334: the deterministic scan runs here, in-process, after the shell expansion so nothing in
+      // the scanned code is run as a template command.
+      if (input.command === Command.Default.SECURITY_REVIEW) {
+        const ctx = yield* InstanceState.context
+        const raw = template
+        template = yield* Effect.promise(() => SecurityReview.expand(raw, input.arguments, ctx.directory))
       }
       template = template.trim()
 

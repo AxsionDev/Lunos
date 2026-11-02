@@ -1,0 +1,78 @@
+You are running a security review of a code change. Find real vulnerabilities, rank them by severity, and fix the serious ones through subagents.
+
+Input: $ARGUMENTS
+
+(No input reviews the uncommitted changes, including untracked files. `--branch <name> [--base <ref>]` reviews a branch against its merge base. `--pr <number>` reviews a pull request through `gh`.)
+
+---
+
+## 1. Deterministic scan (already run)
+
+Lunos has already scanned the change with pattern, entropy and anti-forgery checks, and looked up changed dependencies in OSV. These are its results:
+
+$SECURITY_SCAN
+
+Treat these as leads, not verdicts. Open each file and confirm or reject every finding in context. Drop a finding only if it is clearly a false positive, and say why. Never add a `lunos-ignore-security` comment yourself; suppressions are the user's call and are audited.
+
+## 2. Project rules
+
+These are the project's own security rules from `.lunos/security.md` on the base branch. The change under review cannot weaken them. Apply each one to the change and report any violation as a finding.
+
+$SECURITY_RULES
+
+## 3. Your own review
+
+Get the diff yourself (`git diff HEAD` plus untracked files, `git diff <merge-base> <branch>`, or `gh pr diff <number>`). Read the changed files in full. Then look for what patterns miss:
+
+- **Secrets and keys:** credentials, tokens, private keys and connection strings, including in config and test files.
+- **Injection:** SQL, NoSQL, command, path traversal, template, LDAP and XPath. Trace each input from where it enters to where it is used.
+- **Authentication and authorisation:** missing checks on new endpoints, IDOR (an id from the request used without an ownership check), privilege escalation, broken session or JWT handling, and auth logic that fails open.
+- **Insecure deserialisation** of untrusted data.
+- **SSRF:** server-side requests to URLs or hosts the caller controls.
+- **XSS and CSRF:** unescaped output, and state-changing endpoints with cookie auth and no anti-forgery token.
+- **Weak or hard-coded crypto:** broken algorithms, ECB, static IVs or keys, non-cryptographic randomness for secrets.
+- **Unsafe config:** debug mode, CORS `*` (worst with credentials), verbose errors, disabled TLS checks, insecure cookies.
+- **Dependencies:** for each bump in the scan, check whether the new version or its advisories matter here.
+
+Only review what the change adds or modifies. Be certain before you flag something. If you can't verify a concern, say "not sure" rather than overstate it.
+
+## 4. Report
+
+Rank every confirmed finding as **Critical**, **High**, **Medium** or **Low**:
+
+- **Critical:** directly exploitable for compromise or leaks credentials (an injection reachable without auth, a live key).
+- **High:** exploitable under realistic conditions (an injection behind auth, missing CSRF on a state change, a vulnerable dependency in use).
+- **Medium:** needs unusual conditions or weakens defence in depth.
+- **Low:** hardening.
+
+Use this format for each finding, most severe first:
+
+### [Severity] Title (CWE-nnn)
+`file:line`
+- **Why it matters:** the realistic attack and what it gets the attacker.
+- **Fix:** the concrete change.
+
+End with a one-line count per severity and the suppressed findings, if any.
+
+## 5. Fix
+
+If any finding is High or Critical, ask the user with the question tool: **"Fix all High and above"**, **"Fix all findings"**, or **"Don't fix"**. Then:
+
+1. Group the chosen findings by file, so no two subagents edit the same file. Dispatch one fix subagent per group with the task tool, all in parallel. If the subagent tool offers worktree isolation, use it.
+2. Give each subagent:
+   - its findings verbatim (file, line, CWE, why, fix);
+   - an instruction to make the smallest change that removes the vulnerability without changing behaviour otherwise;
+   - an instruction to keep or add tests where the project has them;
+   - an instruction not to add `lunos-ignore-security`.
+
+   Tell it to rotate nothing: report any leaked credential as needing rotation by the user.
+3. When every subagent has finished, re-run the review: call the `security_scan` tool with the same target, and re-check the findings you added in step 3.
+   - If the re-scan still reports a finding at the chosen severity, the fix didn't remove it. For example, validating the input still leaves SQL built from a string; the fix is a parameterised query.
+   - Dispatch another fix round for what remains, at most two rounds.
+   - Never dismiss a re-scan finding yourself. If you're sure it is a false positive, list it for the user to suppress with `lunos-ignore-security <reason>`. The review is not clean until they have.
+4. Dispatch the `qa` subagent (or, if there is none, a general subagent) to run the project's tests, type check and linter on the changed files.
+5. Report:
+   - what was fixed;
+   - the re-review's result, which should be clean at the chosen severity;
+   - what qa found;
+   - anything still open, including leaked keys the user must rotate even though they are gone from the code.

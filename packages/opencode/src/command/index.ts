@@ -9,6 +9,7 @@ import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
+import PROMPT_SECURITY_REVIEW from "./template/security-review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
 
 type State = {
@@ -46,6 +47,7 @@ export function hints(template: string) {
 export const Default = {
   INIT: "init",
   REVIEW: "review",
+  SECURITY_REVIEW: "security-review",
   MEMORY: "memory",
   WORKFLOWS: "workflows",
 } as const
@@ -87,6 +89,15 @@ const layer = Layer.effect(
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      }
+      // XCOD-334: SessionPrompt.command runs the deterministic scan and fills in its results. Not a
+      // subtask: the main agent asks before fixing and dispatches the fix subagents itself.
+      commands[Default.SECURITY_REVIEW] = {
+        name: Default.SECURITY_REVIEW,
+        description: "security review of changes [--branch <name> | --pr <number>], defaults to uncommitted",
+        source: "command",
+        template: PROMPT_SECURITY_REVIEW,
+        hints: hints(PROMPT_SECURITY_REVIEW),
       }
 
       // Handled by SessionPrompt.command itself: it switches memory for the session and never
