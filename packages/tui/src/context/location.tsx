@@ -12,3 +12,8 @@ export function useLocation() {
   if (!value) throw new Error("Location context must be used within a LocationProvider")
   return value
 }
+
+/** XCOD-335: the location when there is one; dialogs are mounted outside the session's provider. */
+export function useOptionalLocation(): Accessor<LocationRef | undefined> {
+  return useContext(context) ?? (() => undefined)
+}

@@ -109,6 +109,27 @@ describe("settings registry", () => {
   })
 })
 
+describe("status line (XCOD-335)", () => {
+  test("Appearance › Status line, applied without a restart, Default unless chosen", () => {
+    const preset = ConfigSettings.find("tui.statusline.preset")!
+    expect(preset.category).toBe("Appearance")
+    expect(preset.sub).toBe("Status line")
+    expect(preset.kind).toBe("enum")
+    expect(preset.values).toEqual(["default", "minimal", "cost", "git", "agents"])
+    expect(preset.restart).toBe(false)
+    expect(ConfigSettings.find("tui.statusline.template")!.restart).toBe(false)
+    expect(ConfigSettings.find("tui.statusline.command")!.sub).toBe("Status line")
+    expect(ConfigSettings.find("tui.theme")!.sub).toBe("Theme")
+    expect(ConfigSettings.find("tui.mouse")!.restart).toBe(true)
+  })
+
+  test("a project can choose a preset or template, not a command", () => {
+    expect(ConfigSettings.projectRefusal("tui.statusline.preset", "cost")).toBeUndefined()
+    expect(ConfigSettings.projectRefusal("tui.statusline.template", "{model}")).toBeUndefined()
+    expect(ConfigSettings.projectRefusal("tui.statusline.command", "x.sh")).toContain("can't be set in project config")
+  })
+})
+
 describe("settings set", () => {
   // XCOD-264: a reference loads as what it refers to; the check that a value survives the schema
   // compared the loaded value with the reference, so no {env:} reference could ever be saved.

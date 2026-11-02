@@ -80,7 +80,16 @@ const asked = (id: string, sessionID: string) => ({
 
 /** The session `ses_a` (with a subagent session `ses_child`) open in the prompt. `state` keeps kv.json between mounts. */
 async function mount(
-  input: { config?: Record<string, unknown>; state?: string; width?: number; external?: "claude" | "codex" } = {},
+  input: {
+    config?: Record<string, unknown>
+    state?: string
+    width?: number
+    external?: "claude" | "codex"
+    /** tui.json (XCOD-335: the status line). */
+    tui?: Record<string, unknown>
+    /** What /experimental/budget answers (XCOD-335). */
+    budget?: () => unknown
+  } = {},
 ) {
   const calls: Call[] = []
   const tmp = await tmpdir()
@@ -103,6 +112,7 @@ async function mount(
     if (url.pathname === "/config" && method === "GET") return json(input.config ?? {})
     if (url.pathname === "/config/providers") return json({ providers: [PROVIDER], default: { fake: "fake-1" } })
     if (url.pathname === "/agent") return json(AGENTS)
+    if (url.pathname === "/experimental/budget" && input.budget) return json(input.budget())
     if (url.pathname === "/permission" && method === "GET") return json([])
     if (url.pathname === "/question" && method === "GET") return json([])
     if (/^\/session\/[^/]+$/.test(url.pathname) && method === "GET") {
@@ -132,7 +142,7 @@ async function mount(
     { ThemeProvider },
     { LocalProvider, useLocal },
     { PromptStashProvider },
-    { DialogProvider },
+    { DialogProvider, useDialog },
     { FrecencyProvider },
     { PromptHistoryProvider },
     { PromptRefProvider, usePromptRef },
@@ -171,7 +181,9 @@ async function mount(
 
   let toast!: ReturnType<typeof useToast>
   let local!: ReturnType<typeof useLocal>
+  let dialog!: ReturnType<typeof useDialog>
   function View() {
+    dialog = useDialog()
     const sync = useSync()
     const tuiConfig = useTuiConfig()
     const promptRef = usePromptRef()
@@ -205,7 +217,7 @@ async function mount(
   function Harness() {
     const renderer = useRenderer()
     const keymap = createDefaultOpenTuiKeymap(renderer)
-    const config = createTuiResolvedConfig({ leader_timeout: 1000 })
+    const config = createTuiResolvedConfig({ leader_timeout: 1000, ...input.tui })
     onCleanup(registerOpencodeKeymap(keymap, renderer, config))
     return (
       <TestTuiContexts directory={tmp.path} paths={{ home: tmp.path, state, worktree: tmp.path }}>
@@ -273,6 +285,16 @@ async function mount(
     calls,
     state,
     local: () => local,
+    /** /settings, on one of its sections (XCOD-335: Appearance › Status line). */
+    async settings(area: string, sub: string) {
+      const { DialogSettings } = await import("../../src/component/dialog-settings")
+      dialog.replace(() => <DialogSettings tab="settings" area={area} sub={sub} />)
+      await settle()
+    },
+    async down() {
+      app.mockInput.pressArrow("down")
+      await settle()
+    },
     toast: () => toast.currentToast?.message,
     /** The indicator line: `Workflow · Approval · model provider`. */
     indicator: () =>
@@ -287,6 +309,42 @@ async function mount(
         directory,
         project: "proj_test",
         payload: { id: `evt_${id}`, type: "session.updated", properties: { info: session(id, parentID) } },
+      } as any)
+    },
+    /** A turn ends: the session's cost so far and the context its last reply used (XCOD-335). */
+    turn(n: number, cost: number, tokens: number) {
+      events.emit({
+        directory,
+        project: "proj_test",
+        payload: {
+          id: `evt_cost_${n}`,
+          type: "session.updated",
+          properties: { info: { ...sessions[0], cost, time: { created: 1, updated: 1 + n } } },
+        },
+      } as any)
+      events.emit({
+        directory,
+        project: "proj_test",
+        payload: {
+          id: `evt_msg_${n}`,
+          type: "message.updated",
+          properties: {
+            info: {
+              id: `msg_${String(n).padStart(4, "0")}`,
+              sessionID: "ses_a",
+              role: "assistant",
+              time: { created: 1 + n, completed: 2 + n },
+              parentID: "msg_user",
+              modelID: "fake-1",
+              providerID: "fake",
+              mode: "build",
+              agent: "build",
+              path: { cwd: directory, root: directory },
+              cost,
+              tokens: { input: tokens - 10, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+            },
+          },
+        },
       } as any)
     },
     ask(id: string, sessionID: string) {
@@ -495,6 +553,117 @@ describe("edges", () => {
       await ui.cleanup()
     }
   })
+})
+
+// XCOD-335: the line under the prompt, from tui.statusline.
+describe("status line", () => {
+  const line = (ui: { frame: () => string }, pattern: RegExp) =>
+    ui
+      .frame()
+      .split("\n")
+      .find((row) => pattern.test(row)) ?? ""
+
+  test("the Cost preset shows cost, budget left and context %, and follows every turn", async () => {
+    let spent = 10
+    const ui = await mount({
+      tui: { statusline: { preset: "cost" } },
+      budget: () => ({
+        project: { id: "proj_test", name: "Test" },
+        line: `€${spent} of €50`,
+        budgets: [
+          {
+            id: "b1",
+            scope: "project",
+            name: "Test",
+            locked: false,
+            currency: "EUR",
+            amount: 50,
+            spent,
+            remaining: 50 - spent,
+            percent: (spent / 50) * 100,
+            unknown: 0,
+            on_limit: "warn",
+            period: { key: "2026-11", label: "November" },
+          },
+        ],
+      }),
+    })
+    try {
+      ui.turn(1, 0.5, 300)
+      await wait(() => line(ui, /ctx 30%/).includes("$0.50 · €40.00 left · ctx 30%"))
+      spent = 42
+      ui.turn(2, 1.25, 950)
+      await wait(() => line(ui, /ctx 95%/).includes("$1.25 · €8.00 left · ctx 95%"))
+      // The line replaced the keys, as the usage line always has.
+      expect(line(ui, /ctx 95%/)).not.toContain("approval")
+    } finally {
+      await ui.cleanup()
+    }
+  })
+
+  test("the settings preview is the line the prompt draws, and previews a preset as it's highlighted", async () => {
+    const ui = await mount({ tui: { statusline: { preset: "minimal" } } })
+    try {
+      ui.turn(1, 0.5, 300)
+      await wait(() => line(ui, /ctx 30%/) !== "")
+      const footer = line(ui, /ctx 30%/).match(/Alpha One · ctx 30%/)?.[0]
+      expect(footer).toBe("Alpha One · ctx 30%")
+      await ui.settings("Appearance", "Status line")
+      const previewed = (label: string) => {
+        const rows = ui.frame().split("\n")
+        return rows[rows.findIndex((row) => row.includes(label)) + 1] ?? ""
+      }
+      await wait(() => ui.frame().includes("Preview:"))
+      expect(previewed("Preview:").trim()).toBe(footer!)
+      // Moving through the presets previews each one.
+      await ui.down()
+      await ui.down()
+      await wait(() => /Preview \(\w+\):/.test(ui.frame()))
+      const label = ui.frame().match(/Preview \((\w+)\):/)![1]
+      const expected: Record<string, RegExp> = {
+        Default: /300 \(30%\) · \$0\.50/,
+        Minimal: /Alpha One · ctx 30%/,
+        Cost: /\$0\.50 · ctx 30%/,
+      }
+      expect(previewed(`Preview (${label}):`)).toMatch(expected[label]!)
+    } finally {
+      await ui.cleanup()
+    }
+  })
+
+  test("Default is the line it has always been", async () => {
+    const ui = await mount()
+    try {
+      ui.turn(1, 0.5, 300)
+      await wait(() => line(ui, /300 \(30%\)/).includes("300 (30%) · $0.50 · Dynamic workflows"))
+    } finally {
+      await ui.cleanup()
+    }
+  })
+
+  test.skipIf(process.platform === "win32")(
+    "a script's line is shown; a slow one never holds up the prompt and the last good line stays",
+    async () => {
+      const tmp = await tmpdir()
+      const flag = path.join(tmp.path, "ran")
+      // Good the first time; from then on, slower than the timeout.
+      const script = `if [ -e ${flag} ]; then sleep 2; else touch ${flag}; echo "from my script"; fi`
+      const ui = await mount({ tui: { statusline: { command: script } } })
+      try {
+        await wait(() => line(ui, /from my script/) !== "")
+        ui.turn(1, 0.5, 300)
+        // The prompt still takes typing while the script hangs.
+        const started = Date.now()
+        await ui.send("hello")
+        expect(Date.now() - started).toBeLessThan(1000)
+        await Bun.sleep(1500)
+        expect(line(ui, /from my script/)).not.toBe("")
+      } finally {
+        await ui.cleanup()
+        await tmp[Symbol.asyncDispose]()
+      }
+    },
+  )
 })
 
 describe("resolveApproval", () => {

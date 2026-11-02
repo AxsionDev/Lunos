@@ -80,6 +80,16 @@ function dropUnknownKeybinds(input: Record<string, unknown>) {
   }
 }
 
+/**
+ * XCOD-335: a status line command runs on every change of the session, so only your own tui.json
+ * (or OPENCODE_TUI_CONFIG) can name one. A repository's tui.json can still choose a preset or a template.
+ */
+export function withoutForeignCommand(data: Info, personal: boolean): Info {
+  if (personal || !data.statusline?.command) return data
+  const { command: _command, ...statusline } = data.statusline
+  return { ...data, statusline }
+}
+
 const loadState = Effect.fn("TuiConfig.loadState")(function* (ctx: { directory: string }) {
   const afs = yield* FSUtil.Service
   let appliedOrder = 0
@@ -146,9 +156,14 @@ const loadState = Effect.fn("TuiConfig.loadState")(function* (ctx: { directory: 
       return yield* load(text, filepath)
     })
 
-  const mergeFile = (acc: Acc, file: string) =>
+  const mergeFile = (acc: Acc, file: string, personal = false) =>
     Effect.gen(function* () {
-      const data = yield* loadFile(file)
+      const loaded = yield* loadFile(file)
+      const data = withoutForeignCommand(loaded, personal)
+      if (data !== loaded)
+        yield* Effect.logWarning("ignoring statusline.command from a project tui config; set it in your own tui.json", {
+          path: file,
+        })
       if (Object.keys(data).length) {
         appliedOrder += 1
         yield* Effect.logInfo("applying tui config", { path: file, order: appliedOrder })
@@ -182,13 +197,13 @@ const loadState = Effect.fn("TuiConfig.loadState")(function* (ctx: { directory: 
 
   // 1. Global tui config (lowest precedence).
   for (const file of ConfigPaths.fileInDirectory(Global.Path.config, "tui")) {
-    yield* mergeFile(acc, file)
+    yield* mergeFile(acc, file, true)
   }
 
   // 2. Explicit OPENCODE_TUI_CONFIG override, if set.
   if (Flag.OPENCODE_TUI_CONFIG) {
     const configFile = Flag.OPENCODE_TUI_CONFIG
-    yield* mergeFile(acc, configFile)
+    yield* mergeFile(acc, configFile, true)
     yield* Effect.logDebug("loaded custom tui config", { path: configFile })
   }
 

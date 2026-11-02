@@ -21,6 +21,16 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Choose what the line under the prompt shows.** Settings › Appearance › Status line offers five
+  presets (Default, Minimal, Cost, Git and Agents), each previewed as you move through them, or write
+  your own template from fields such as model, approval, branch, context %, session cost, budget left
+  and running subagents. Or have a script of your own print the line: it gets the session as JSON,
+  runs at most once a second, is stopped after 300 ms, and a slow or failing script never holds up the
+  TUI. Budget and context turn to the warning colour as they run low, and a project can have its own
+  line. See "Status line" in the TUI docs.
+
 ## [1.18.57] - 2026-10-29
 
 ### Added
