@@ -218,6 +218,41 @@ const call = (
       .pipe(Effect.exit)
   })
 
+/**
+ * Runs `effect` with process.env.CI set to `value` (undefined: unset), restored afterwards.
+ * Budget.unattended treats CI as "nobody can be asked", and CI runners set it, so a test of the
+ * interactive path must not inherit it from the machine it runs on.
+ */
+const withCI = <A, E, R>(value: string | undefined, effect: Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const before = process.env.CI
+      if (value === undefined) delete process.env.CI
+      else process.env.CI = value
+      return before
+    }),
+    () => effect,
+    (before) =>
+      Effect.sync(() => {
+        if (before === undefined) delete process.env.CI
+        else process.env.CI = before
+      }),
+  )
+
+/** A question service that records what it was asked and answers "Keep my version". */
+function keepMine(asked: string[]): Question.Interface {
+  return {
+    ask: (input) =>
+      Effect.sync(() => {
+        asked.push(...input.questions.map((item) => item.question))
+        return [["Keep my version"]]
+      }),
+    reply: () => Effect.void,
+    reject: () => Effect.void,
+    list: () => Effect.succeed([]),
+  }
+}
+
 /** Ops whose subagent "edits" through its binding, as its tools would. */
 function ops(
   handlers: Record<
@@ -384,29 +419,23 @@ describe("tool.task worktree isolation (XCOD-332)", () => {
         const dir = yield* setup()
         const { chat, assistant } = yield* seed()
         const asked: string[] = []
-        const question: Question.Interface = {
-          ask: (input) =>
-            Effect.sync(() => {
-              asked.push(...input.questions.map((item) => item.question))
-              return [["Keep my version"]]
+        // An interactive user: whatever the machine running the test says about CI.
+        const exit = yield* withCI(
+          undefined,
+          call(
+            ops({
+              general: async (_, binding) => {
+                await Bun.write(path.join(binding!.to.root, "src/a.ts"), "export const a = 2\n")
+                await Bun.write(path.join(binding!.to.root, "src/other.ts"), "export const other = 1\n")
+                await Bun.write(path.join(dir, "src/a.ts"), "export const a = 3\n")
+                return {}
+              },
+              merge: async () => ({ error: true }),
             }),
-          reply: () => Effect.void,
-          reject: () => Effect.void,
-          list: () => Effect.succeed([]),
-        }
-        const exit = yield* call(
-          ops({
-            general: async (_, binding) => {
-              await Bun.write(path.join(binding!.to.root, "src/a.ts"), "export const a = 2\n")
-              await Bun.write(path.join(binding!.to.root, "src/other.ts"), "export const other = 1\n")
-              await Bun.write(path.join(dir, "src/a.ts"), "export const a = 3\n")
-              return {}
-            },
-            merge: async () => ({ error: true }),
-          }),
-          chat,
-          assistant,
-          question,
+            chat,
+            assistant,
+            keepMine(asked),
+          ),
         )
         if (Exit.isFailure(exit)) throw Cause.squash(exit.cause)
         expect(asked).toHaveLength(1)
@@ -415,6 +444,39 @@ describe("tool.task worktree isolation (XCOD-332)", () => {
         expect(asked[0]).toContain("export const a = 2")
         expect(yield* read(path.join(dir, "src/a.ts"))).toBe("export const a = 3\n")
         expect(yield* read(path.join(dir, "src/other.ts"))).toBe("export const other = 1\n")
+        expect(yield* lunosBranches(dir)).toEqual([])
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "in CI nobody is asked, even with a question service: nothing is merged and the patch is saved",
+    () =>
+      Effect.gen(function* () {
+        const dir = yield* setup()
+        const { chat, assistant } = yield* seed()
+        const asked: string[] = []
+        const exit = yield* withCI(
+          "true",
+          call(
+            ops({
+              general: async (_, binding) => {
+                await Bun.write(path.join(binding!.to.root, "src/a.ts"), "export const a = 2\n")
+                await Bun.write(path.join(dir, "src/a.ts"), "export const a = 3\n")
+                return {}
+              },
+              merge: async () => ({ error: true }),
+            }),
+            chat,
+            assistant,
+            keepMine(asked),
+          ),
+        )
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isSuccess(exit)) throw new Error("unreachable")
+        expect(asked).toEqual([])
+        expect((Cause.squash(exit.cause) as Error).message).toContain("Merge conflict in src/a.ts")
+        expect(yield* read(path.join(dir, "src/a.ts"))).toBe("export const a = 3\n")
         expect(yield* lunosBranches(dir)).toEqual([])
       }),
     { git: true },
