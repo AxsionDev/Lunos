@@ -189,6 +189,8 @@ export const ALLOWED: ReadonlySet<string> = new Set([
   "memory_remember",
   "plan_enter",
   "plan_exit",
+  // XCOD-334: read-only; /security-review re-runs it after its fix subagents finish.
+  "security_scan",
 ])
 
 /**
