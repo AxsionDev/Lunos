@@ -7,15 +7,11 @@
   "hunks": 1,
   "cases": [
     {
-      "accept": [
-        false
-      ],
+      "accept": [false],
       "expected": ""
     },
     {
-      "accept": [
-        true
-      ],
+      "accept": [true],
       "expected": "new line 1\nnew line 2\n"
     }
   ]

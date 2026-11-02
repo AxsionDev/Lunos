@@ -7,31 +7,19 @@
   "hunks": 2,
   "cases": [
     {
-      "accept": [
-        false,
-        false
-      ],
+      "accept": [false, false],
       "expected": "first\nmiddle\nlast"
     },
     {
-      "accept": [
-        true,
-        false
-      ],
+      "accept": [true, false],
       "expected": "FIRST\nmiddle\nlast"
     },
     {
-      "accept": [
-        false,
-        true
-      ],
+      "accept": [false, true],
       "expected": "first\nmiddle\nlast changed"
     },
     {
-      "accept": [
-        true,
-        true
-      ],
+      "accept": [true, true],
       "expected": "FIRST\nmiddle\nlast changed"
     }
   ]

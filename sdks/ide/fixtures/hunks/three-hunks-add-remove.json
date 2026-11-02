@@ -7,67 +7,35 @@
   "hunks": 3,
   "cases": [
     {
-      "accept": [
-        false,
-        false,
-        false
-      ],
+      "accept": [false, false, false],
       "expected": "a\nb\nc\nd\ne\nf\ng\nh\ni\n"
     },
     {
-      "accept": [
-        true,
-        false,
-        false
-      ],
+      "accept": [true, false, false],
       "expected": "a\nB\nc\nd\ne\nf\ng\nh\ni\n"
     },
     {
-      "accept": [
-        false,
-        true,
-        false
-      ],
+      "accept": [false, true, false],
       "expected": "a\nb\nc\nd\nd2\ne\nf\ng\nh\ni\n"
     },
     {
-      "accept": [
-        true,
-        true,
-        false
-      ],
+      "accept": [true, true, false],
       "expected": "a\nB\nc\nd\nd2\ne\nf\ng\nh\ni\n"
     },
     {
-      "accept": [
-        false,
-        false,
-        true
-      ],
+      "accept": [false, false, true],
       "expected": "a\nb\nc\nd\ne\nf\nh\ni\n"
     },
     {
-      "accept": [
-        true,
-        false,
-        true
-      ],
+      "accept": [true, false, true],
       "expected": "a\nB\nc\nd\ne\nf\nh\ni\n"
     },
     {
-      "accept": [
-        false,
-        true,
-        true
-      ],
+      "accept": [false, true, true],
       "expected": "a\nb\nc\nd\nd2\ne\nf\nh\ni\n"
     },
     {
-      "accept": [
-        true,
-        true,
-        true
-      ],
+      "accept": [true, true, true],
       "expected": "a\nB\nc\nd\nd2\ne\nf\nh\ni\n"
     }
   ]

@@ -7,31 +7,19 @@
   "hunks": 2,
   "cases": [
     {
-      "accept": [
-        false,
-        false
-      ],
+      "accept": [false, false],
       "expected": "one\r\ntwo\r\nthree\r\nfour\r\nfive\r\n"
     },
     {
-      "accept": [
-        true,
-        false
-      ],
+      "accept": [true, false],
       "expected": "one\r\nTWO\r\nthree\r\nfour\r\nfive\r\n"
     },
     {
-      "accept": [
-        false,
-        true
-      ],
+      "accept": [false, true],
       "expected": "one\r\ntwo\r\nthree\r\nfour\r\nFIVE\r\n"
     },
     {
-      "accept": [
-        true,
-        true
-      ],
+      "accept": [true, true],
       "expected": "one\r\nTWO\r\nthree\r\nfour\r\nFIVE\r\n"
     }
   ]
