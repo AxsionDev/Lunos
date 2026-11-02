@@ -21,6 +21,15 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-02
+
+### Fixed
+
+- **The footer no longer says Dynamic workflows are on when they can't run.** When a permission rule
+  denies the task tool, or every subagent the agent may dispatch has edit turned off, the footer now
+  reads "Dynamic workflows: off" with the reason ("task denied", "no subagent can edit", or
+  "subagent_depth 0"), matching the notice on the turn and what `/workflows` says. <!-- XCOD-330 -->
+
 ## [1.18.57] - 2026-10-29
 
 ### Added
