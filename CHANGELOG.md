@@ -21,6 +21,19 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Lunos can check your app in a real browser.** Turn on browser control in /settings › Permissions ›
+  Browser & computer, and the qa agent opens the app Build just started, clicks through the change
+  and reports what it saw. It reads pages as text, so it works with text-only EU models. It uses a
+  separate Lunos browser profile, or your own Chrome, Edge or Brave through the Lunos extension
+  (`lunos browser pair`), which connects on 127.0.0.1 only. It asks before it acts on each site, and
+  before anything that submits, sends, buys, downloads or deletes, even in Auto-approve. Banking,
+  payment and password-manager sites are refused. It never types passwords, card numbers or keys,
+  and never solves CAPTCHAs. Instructions planted on a page are shown to you, not followed. Stop it
+  at once with the on-page Stop or Ctrl+Alt+Esc. Every action is in the audit log, and screenshots
+  aren't kept. Off by default; an organisation can turn it off. See docs/browser-control.md.
+
 ## [1.18.57] - 2026-10-29
 
 ### Added

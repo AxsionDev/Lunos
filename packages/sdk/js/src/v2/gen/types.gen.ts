@@ -1845,6 +1845,19 @@ export type ExternalConfig = {
   }
 }
 
+export type BrowserConfig = {
+  enabled?: boolean
+  mode?: "lunos" | "extension"
+  allow?: Array<string>
+  deny?: Array<string>
+  deny_categories?: Array<"banking" | "payment" | "password_manager" | "system_settings">
+  stop_key?: string
+  headless?: boolean
+  executable?: string
+  port?: number
+  screenshots?: boolean
+}
+
 export type CloudConfig = {
   issuer?: string
   client_id?: string
@@ -2337,6 +2350,7 @@ export type Config = {
   }
   default_agent?: string
   external?: ExternalConfig
+  browser?: BrowserConfig
   cloud?: CloudConfig
   auth?: AuthConfig
   sync?: SyncConfig

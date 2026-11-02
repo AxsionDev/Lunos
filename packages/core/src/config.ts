@@ -32,6 +32,7 @@ import { ConfigCloud } from "./config/cloud"
 import { ConfigAuth } from "./config/auth"
 import { ConfigSync } from "./config/sync"
 import { ConfigExternal } from "./config/external"
+import { ConfigBrowser } from "./config/browser"
 import { ConfigMemory } from "./config/memory"
 import { ConfigSandbox } from "./config/sandbox"
 import { ConfigBudget } from "./config/budget"
@@ -133,6 +134,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   external: ConfigExternal.Info.pipe(Schema.optional).annotate({
     description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
+  }),
+  browser: ConfigBrowser.Info.pipe(Schema.optional).annotate({
+    description:
+      "Browser control (XCOD-327): the agent operates a browser, off by default, asking per site, with a stop key and an audit trail",
   }),
   cloud: ConfigCloud.Info.pipe(Schema.optional).annotate({
     description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",

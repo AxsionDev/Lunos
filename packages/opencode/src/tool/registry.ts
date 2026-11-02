@@ -18,6 +18,8 @@ import { SubagentModel } from "../agent/subagent-model"
 import { Database } from "@opencode-ai/core/database/database"
 import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
+import { BrowserTool } from "./browser"
+import { ConfigBrowser } from "@opencode-ai/core/config/browser"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
 import { SkillTool } from "./skill"
@@ -117,6 +119,7 @@ const layer = Layer.effect(
     const lsptool = yield* LspTool
     const plan = yield* PlanExitTool
     const webfetch = yield* WebFetchTool
+    const browser = yield* BrowserTool
     const websearch = yield* WebSearchTool
     const externalAgent = yield* ExternalAgentTool
     const shell = yield* ShellTool
@@ -232,6 +235,7 @@ const layer = Layer.effect(
           write: Tool.init(writetool),
           task: Tool.init(task),
           fetch: Tool.init(webfetch),
+          browser: Tool.init(browser),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
           skill: Tool.init(skilltool),
@@ -260,6 +264,8 @@ const layer = Layer.effect(
             tool.task,
             // Offline mode (XCOD-121) doesn't offer the tools that reach the internet.
             ...(Offline.enabled() ? [] : [tool.fetch]),
+            // XCOD-327: offered only while browser control is on in the live config (tools() below).
+            ...(Offline.enabled() ? [] : [tool.browser]),
             tool.todo,
             ...(Offline.enabled() ? [] : [tool.search]),
             tool.skill,
@@ -317,8 +323,12 @@ const layer = Layer.effect(
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
       const searchable = yield* resources.searchable(input.sessionID ?? "").pipe(Effect.orElseSucceed(() => false))
+      // XCOD-327: off by default, and absent while the organisation's policy (a locked
+      // `browser.enabled`) or the user's setting has it off.
+      const browsing = ConfigBrowser.enabled((yield* config.get()).browser)
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === ProjectResourcesSearchTool.id) return searchable
+        if (tool.id === BrowserTool.id) return browsing
 
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
@@ -498,6 +508,7 @@ export const node = LayerNode.make({
     Database.node,
     Ripgrep.node,
     Resource.node,
+    Permission.node,
   ],
 })
 

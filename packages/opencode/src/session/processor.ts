@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { ControlEphemeral } from "@/control/ephemeral"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Image } from "@/image/image"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -403,7 +404,16 @@ const layer = Layer.effect(
                 : Effect.succeed(Exit.succeed<SessionV1.FilePart>(attachment)),
             )
             const omitted = normalized.filter(Exit.isFailure).length
-            const attachments = normalized.filter(Exit.isSuccess).map((item) => item.value)
+            // XCOD-327: media a tool marks ephemeral (browser screenshots) is held in memory for the
+            // next model request and never written to the session.
+            const ephemeral = rawOutput.metadata?.["ephemeralMedia"] === true
+            const attachments = normalized
+              .filter(Exit.isSuccess)
+              .map((item) =>
+                ephemeral && item.value.url.startsWith("data:")
+                  ? { ...item.value, url: ControlEphemeral.put(item.value.url) }
+                  : item.value,
+              )
             const output = {
               ...rawOutput,
               output:

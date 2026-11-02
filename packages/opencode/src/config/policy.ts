@@ -91,6 +91,15 @@ export const KNOWN = [
   "workflows.dynamic",
   // XCOD-326: the main agent's reads per turn (plus `agent.<name>.dynamic`).
   "workflows.main_reads",
+  // XCOD-327: an organisation can turn browser control off (lock `browser.enabled` to false), or fix
+  // its mode and site lists.
+  "browser",
+  "browser.enabled",
+  "browser.mode",
+  "browser.allow",
+  "browser.deny",
+  "browser.deny_categories",
+  "browser.screenshots",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */

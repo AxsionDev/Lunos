@@ -121,6 +121,15 @@ export const EVENTS = [
   // XCOD-326: a tool the main agent may not use while Dynamic workflows are on (edit, write,
   // apply_patch, bash, …), attempted and refused. Tool, agent and session; never the arguments.
   "workflows.main_tool_refused",
+  // XCOD-327: browser control. One `browser.action` per action the agent took or was refused
+  // (action, host, how it was approved), a site refused before any approval was asked
+  // (`browser.denied`), control stopped by the user (`browser.stop`), and instructions found on a
+  // page and shown to the user rather than followed (`browser.injection`). Never page text, typed
+  // text or screenshots. XCOD-339 adds `computer.*` the same way.
+  "browser.action",
+  "browser.denied",
+  "browser.stop",
+  "browser.injection",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 
