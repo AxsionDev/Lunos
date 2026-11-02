@@ -11,6 +11,8 @@
     <RootNamespace>Lunos.VisualStudio</RootNamespace>
     <AssemblyName>Lunos.VisualStudio</AssemblyName>
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <!-- SDK-style projects aren't detected as VSIX projects by the VSSDK targets: ask for the container explicitly. -->
+    <CreateVsixContainer>true</CreateVsixContainer>
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
     <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
     <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>

@@ -80,6 +80,10 @@ jobs:
       - name: Build the VSIX
         run: msbuild src/Lunos.VisualStudio/Lunos.VisualStudio.csproj /restore /p:Configuration=Release /p:DeployExtension=false /v:minimal
 
+      - name: List the build output
+        if: always()
+        run: Get-ChildItem -Recurse src/Lunos.VisualStudio/bin/Release | Select-Object FullName, Length
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: lunos-visualstudio
