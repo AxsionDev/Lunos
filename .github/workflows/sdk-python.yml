@@ -1,0 +1,94 @@
+name: sdk-python
+
+# XCOD-337: the Python SDK (packages/sdk/python). Lint, type check, check the generated code
+# matches the OpenAPI spec, and run the tests against Lunos from this checkout on macOS, Linux and
+# Windows, on the oldest and newest Python it supports. The end-to-end tests start real servers
+# with a scripted model, so they need no secrets. publish-sdk-python.yml calls this before it
+# publishes anything.
+
+on:
+  pull_request:
+    paths:
+      - "packages/sdk/python/**"
+      - "packages/sdk/openapi.json"
+      - "packages/opencode/src/server/**"
+      - "packages/opencode/src/session/**"
+      - "packages/opencode/src/agent/**"
+      - "packages/opencode/src/cli/cmd/agent-run.ts"
+      - "packages/opencode/src/cli/cmd/run.ts"
+      - ".github/workflows/sdk-python.yml"
+  push:
+    branches: [dev]
+    paths:
+      - "packages/sdk/python/**"
+      - "packages/sdk/openapi.json"
+      - ".github/workflows/sdk-python.yml"
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: packages/sdk/python
+    shell: bash
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+      - run: uv sync --group codegen
+      - name: Generated code matches packages/sdk/openapi.json
+        run: uv run python script/generate.py --check
+      - run: uv run ruff check src tests script examples
+      - run: uv run ruff format --check src tests script examples
+      - run: uv run pyright
+      - name: Build and check the distributions
+        run: |
+          uv build
+          uvx twine check --strict dist/*
+      - name: API reference
+        run: uv run --group docs pdoc lunos -o build/api
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sdk-python-api-reference
+          path: packages/sdk/python/build/api
+
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-2025]
+        python: ["3.10", "3.13"]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@lunos.tech"
+          git config --global user.name "lunos"
+      - name: Tests (unit, and end to end against this checkout's Lunos)
+        run: |
+          # A Windows path (D:/a/...) on Windows, where bun doesn't understand Git Bash's /d/a/...
+          opencode=$(cd ../../opencode && (pwd -W 2>/dev/null || pwd))
+          export LUNOS_COMMAND="bun run $opencode/src/index.ts"
+          uv run --python ${{ matrix.python }} pytest -v
+        env:
+          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "true"
