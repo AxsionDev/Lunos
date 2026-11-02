@@ -43043,6 +43043,26 @@
     "tips": {
       "type": "boolean",
       "description": "false turns off the tips on the home screen and under the working indicator. /tips still lists them (default: true)"
+    },
+    "statusline": {
+      "type": "object",
+      "properties": {
+        "preset": {
+          "type": "string",
+          "enum": ["default", "minimal", "cost", "git", "agents"],
+          "description": "A built-in line: default (context, cost, budget, workflows), minimal (model, context %), cost (cost, budget left, context %), git (branch, changed files, ahead/behind) or agents (subagents working, waiting, done)"
+        },
+        "template": {
+          "type": "string",
+          "description": "Your own line, e.g. \"{workflow} · {approval} · {model} · {branch} · ctx {context_pct}% · {cost_session} · {budget_left} · {subagents_running}\". A part whose fields are all empty is left out. Wins over preset"
+        },
+        "command": {
+          "type": "string",
+          "description": "A command that gets the session state as JSON on stdin and prints one line. Runs at most once a second, is stopped after 300 ms, and the last good line stays if it fails. Wins over template and preset. Only read from your own tui.json"
+        }
+      },
+      "additionalProperties": false,
+      "description": "What the line under the prompt shows"
     }
   },
   "additionalProperties": false,

@@ -737,6 +737,52 @@ opencode pr <number>
 
 ---
 
+### security-review
+
+Review changes for security problems. It reports, ranked by severity:
+
+- leaked secrets and keys;
+- injection: SQL, command, path traversal and template;
+- authentication and authorisation mistakes;
+- insecure deserialisation;
+- SSRF;
+- XSS and CSRF, including missing anti-forgery validation;
+- weak or hard-coded crypto;
+- unsafe configuration, such as debug mode or CORS `*`;
+- dependency bumps with known vulnerabilities, looked up in [OSV](https://osv.dev).
+
+Each finding gives a CWE id, the file and line, why it matters and how to fix it. Use it in CI or a pre-commit hook. Inside a session, `/security-review` runs the same scan, has the model review the change in depth, and, if you ask, dispatches subagents to fix findings of High severity and above. It then re-runs the scan and has the code checked.
+
+```bash
+lunos security-review                       # uncommitted changes, including untracked files
+lunos security-review --branch feature-x    # a branch against its merge base
+lunos security-review --pr 42 --sarif out.sarif
+```
+
+#### Flags
+
+| Flag        | Description                                                             |
+| ----------- | ----------------------------------------------------------------------- |
+| `--branch`  | Review this branch against its merge base                               |
+| `--base`    | With `--branch`: the branch it merges into (default: the remote's)      |
+| `--pr`      | Review this pull request (needs `gh`)                                   |
+| `--sarif`   | Also write SARIF 2.1.0 for GitHub, GitLab or Azure DevOps code scanning |
+| `--format`  | `text` (default) or `json`                                              |
+| `--no-osv`  | Don't look dependencies up in OSV (always off with `LUNOS_OFFLINE=1`)   |
+| `--fail-on` | Lowest severity that fails the run (default `high`)                     |
+
+Exit codes:
+
+- `0`: nothing at or above `--fail-on` is left.
+- `1`: a finding at or above `--fail-on` is left.
+- `2`: the review couldn't run.
+
+To suppress a false positive, put `// lunos-ignore-security <reason>` (or `#`) on the line or on the line above it. A suppression with no reason is ignored. Every suppression that is honoured is recorded in the [audit log](https://github.com/AxsionDev/Lunos/blob/dev/docs/audit-log.md) as `security.suppressed`.
+
+You can add project rules in `.lunos/security.md`, for example "all controllers need `[Authorize]`". The rules are read from the base branch, so a change can't weaken them.
+
+---
+
 ### db
 
 Database tools.

@@ -27,7 +27,7 @@ export const SUBTABS: Record<string, readonly string[]> = {
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
   Memory: ["Overview", "Settings", "Advanced"],
   "Marketplace & plugins": ["Marketplaces", "Plugins", "Policy"],
-  Appearance: ["Theme", "Layout"],
+  Appearance: ["Theme", "Layout", "Status line"],
   "Notifications & sounds": ["Sounds", "Notifications"],
   Tools: ["LSP", "Formatters", "MCP", "Commands", "Skills", "Hooks", "Shell", "References"],
 }

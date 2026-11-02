@@ -15,6 +15,7 @@ import PROMPT_COMPACTION from "./prompt/compaction.txt"
 import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_PLANNER from "./prompt/planner.txt"
 import PROMPT_QA from "./prompt/qa.txt"
+import PROMPT_MERGE from "./prompt/merge.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { Permission } from "@/permission"
@@ -110,6 +111,14 @@ type State = Omit<Interface, "generate">
 export class Service extends Context.Service<Service, Interface>()("@opencode/Agent") {}
 
 export const use = serviceUse(Service)
+
+/**
+ * Subagents the main agent may dispatch: not a primary agent, and not one the task tool runs by
+ * itself (XCOD-332's built-in `merge`).
+ */
+export function dispatchable(agent: Pick<Info, "mode" | "name" | "native">) {
+  return agent.mode !== "primary" && !(agent.native && agent.name === "merge")
+}
 
 const layer = Layer.effect(
   Service,
@@ -408,6 +417,26 @@ const layer = Layer.effect(
             options: {},
             mode: "subagent",
             native: true,
+          },
+          // XCOD-332: resolves a conflict between a subagent's worktree and the user's tree, in that
+          // worktree. Dispatched by the task tool itself, never by the main agent.
+          merge: {
+            name: "merge",
+            description: "Resolves merge conflicts between a subagent's worktree and your working tree.",
+            permission: Permission.merge(
+              defaults,
+              Permission.fromConfig({
+                todowrite: "deny",
+                task: "deny",
+                question: "deny",
+              }),
+              user,
+            ),
+            prompt: PROMPT_MERGE,
+            options: {},
+            mode: "subagent",
+            native: true,
+            hidden: true,
           },
           compaction: {
             name: "compaction",

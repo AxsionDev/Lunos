@@ -25,6 +25,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import * as Stream from "effect/Stream"
 import { Command } from "../command"
+import { SecurityReview } from "@/security/review"
 import { pathToFileURL, fileURLToPath } from "url"
 import { Config } from "@/config/config"
 import { ConfigPolicy } from "@/config/policy"
@@ -1379,7 +1380,7 @@ const layer = Layer.effect(
         config: cfg,
         agent,
         session: { ...input.session, metadata: (yield* sessions.get(input.sessionID).pipe(Effect.orDie)).metadata },
-        subagents: (yield* agents.list()).filter((item) => item.mode !== "primary"),
+        subagents: (yield* agents.list()).filter((item) => Agent.dispatchable(item)),
       }).on
       // Continuations count against the step limit like any step; at the limit the turn stops.
       const stop = AutoContinue.classify({
@@ -1604,7 +1605,7 @@ const layer = Layer.effect(
           const isLastStep = step >= maxSteps
           // XCOD-287: Build's nudge to split development work across subagents.
           const stepConfig = yield* config.get()
-          const subagents = (yield* agents.list()).filter((item) => item.mode !== "primary")
+          const subagents = (yield* agents.list()).filter((item) => Agent.dispatchable(item))
           const stepBackground = backgroundEnabled(flags.experimentalBackgroundSubagents, stepConfig)
           // XCOD-303: Dynamic workflows, read every step so `/workflows on|off` applies to the next one.
           const decision = DynamicWorkflows.decide({
@@ -2054,7 +2055,7 @@ const layer = Layer.effect(
                   after.by === "session" ? after.on : undefined,
                 ),
               },
-              subagents: (yield* agents.list()).filter((item) => item.mode !== "primary"),
+              subagents: (yield* agents.list()).filter((item) => Agent.dispatchable(item)),
             })
           : after
         const status = `${refusal}Dynamic workflows: ${after.on ? "on" : "off"} (${after.reason}).${
@@ -2110,6 +2111,13 @@ const layer = Layer.effect(
         )
         let index = 0
         template = template.replace(bashRegex, () => results[index++])
+      }
+      // XCOD-334: the deterministic scan runs here, in-process, after the shell expansion so nothing in
+      // the scanned code is run as a template command.
+      if (input.command === Command.Default.SECURITY_REVIEW) {
+        const ctx = yield* InstanceState.context
+        const raw = template
+        template = yield* Effect.promise(() => SecurityReview.expand(raw, input.arguments, ctx.directory))
       }
       template = template.trim()
 

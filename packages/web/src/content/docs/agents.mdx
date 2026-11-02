@@ -68,6 +68,22 @@ The main agent oversees and doesn't do the work itself:
 }
 ```
 
+##### Subagents in their own worktrees
+
+In a git repository, each subagent that can write (`general`, `builder` and your own subagents with `edit` on) works in its own git worktree, on a branch `lunos/<session>/<step>` made from your current HEAD plus your uncommitted changes. Parallel subagents can't overwrite each other, and a subagent that fails leaves nothing behind in your working tree. Read-only subagents (`explore`, `qa`) run in your tree as before.
+
+When a subagent finishes, its changes are merged into your working tree (never committed, and never into your index, branches or stashes), one at a time, and the main agent has `qa` check the result:
+
+- `package.json` is merged key by key, and the lockfile is regenerated (`bun`, `npm`, `pnpm` or `yarn`, lockfile only, no scripts).
+- Changes that only add lines to the same file are combined.
+- Anything else goes to a `merge` subagent with both versions. If it can't resolve the conflict, you're asked which version to keep, with both shown; if nobody can be asked (`lunos run`), nothing is merged and the subagent's changes are saved as a patch.
+
+Worktrees live outside your repository, share its object store (so they're quick to create) and get your `node_modules` linked in; files listed in a `.worktreeinclude` file (`.env` and the like) are copied in. They and their branches are removed after the merge, when the session is deleted and on exit, and whatever a crash left behind is removed the next time Lunos starts. Subagents share your working tree, as before, outside git repositories, in a repository without a commit, inside the sandbox, or with:
+
+```json title="opencode.json"
+{ "subagent": { "isolation": "shared" } }
+```
+
 A task that fits in one step still goes to one subagent, which costs a little extra. A step is re-dispatched at most 3 times before you're asked how to go on, and once a budget with `on_limit: stop` is used up no new subagent starts. Every subagent inherits the session's permissions, residency rules, sandbox and hooks.
 
 To have the main agent do the work itself, as before, type `/workflows off` (for this session; `/workflows on` turns it back on) or set:

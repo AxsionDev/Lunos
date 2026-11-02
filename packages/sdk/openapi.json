@@ -26945,6 +26945,10 @@
             "type": "integer",
             "exclusiveMinimum": 0
           },
+          "isolation": {
+            "type": "string",
+            "enum": ["worktree", "shared"]
+          },
           "fun_names": {
             "type": "boolean"
           },

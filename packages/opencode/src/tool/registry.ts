@@ -8,6 +8,7 @@ import { ShellTool } from "./shell"
 import { ProcessTool } from "./process"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
+import { SecurityScanTool } from "./security_scan"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
 import { TaskTool, withBackground, withModelParameter } from "./task"
@@ -122,6 +123,7 @@ const layer = Layer.effect(
     const shell = yield* ShellTool
     const processTool = yield* ProcessTool
     const globtool = yield* GlobTool
+    const securityScan = yield* SecurityScanTool
     const writetool = yield* WriteTool
     const edit = yield* EditTool
     const greptool = yield* GrepTool
@@ -227,6 +229,7 @@ const layer = Layer.effect(
           process: Tool.init(processTool),
           read: Tool.init(read),
           glob: Tool.init(globtool),
+          securityScan: Tool.init(securityScan),
           grep: Tool.init(greptool),
           edit: Tool.init(edit),
           write: Tool.init(writetool),
@@ -266,6 +269,8 @@ const layer = Layer.effect(
             // XCOD-300: offered only while the project has searchable resources (tools() below).
             tool.resources,
             tool.patch,
+            // XCOD-334: /security-review's re-review after fixes; read-only.
+            tool.securityScan,
             ...(tool.execute ? [tool.execute] : []),
             // XCOD-204: opt-in, and never offline (it sends the task to the tool's vendor).
             ...(cfg.external?.delegate === true && cfg.external.enabled !== false && !Offline.enabled()
@@ -290,7 +295,7 @@ const layer = Layer.effect(
     })
 
     const describeTask = Effect.fn("ToolRegistry.describeTask")(function* (agent: Agent.Info) {
-      const items = (yield* agents.list()).filter((item) => item.mode !== "primary")
+      const items = (yield* agents.list()).filter((item) => Agent.dispatchable(item))
       const filtered = items.filter(
         (item) => Permission.evaluate("task", item.name, agent.permission).action !== "deny",
       )

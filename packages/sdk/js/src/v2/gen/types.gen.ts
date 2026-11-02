@@ -1877,6 +1877,7 @@ export type SubagentConfig = {
   background?: boolean
   delegate?: boolean
   max_parallel?: number
+  isolation?: "worktree" | "shared"
   fun_names?: boolean
   mascots?: boolean
   model?: string

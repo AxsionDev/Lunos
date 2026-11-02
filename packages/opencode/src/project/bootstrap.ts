@@ -11,6 +11,7 @@ import { CloudSync } from "@/cloud/sync"
 import { Effect, Layer } from "effect"
 import { Config } from "@/config/config"
 import { Service } from "./bootstrap-service"
+import { Global } from "@opencode-ai/core/global"
 
 export { Service } from "./bootstrap-service"
 export type { Interface } from "./bootstrap-service"
@@ -36,6 +37,17 @@ const layer = Layer.effect(
       yield* Effect.logInfo("bootstrapping", { directory: ctx.directory })
       // everything depends on config so eager load it for nice traces
       yield* config.get()
+      // XCOD-332: subagent worktrees and `lunos/*` branches a crashed Lunos left behind. Never the
+      // user's own branches or stashes, nor another running Lunos's worktrees.
+      if (ctx.project.vcs === "git")
+        yield* Effect.promise(async () => {
+          const { SubagentIsolation } = await import("@/session/isolation")
+          const root = await SubagentIsolation.toplevel(ctx.directory)
+          await SubagentIsolation.sweep({ root, dataDir: Global.Path.data })
+        }).pipe(
+          Effect.catchCause((cause) => Effect.logWarning("subagent worktree sweep failed", { cause })),
+          Effect.withSpan("InstanceBootstrap.sweepWorktrees"),
+        )
       // Plugin can mutate config so it has to be initialized before anything else.
       yield* plugin.init()
       // Each service self-manages its own slow work via Effect.forkScoped against

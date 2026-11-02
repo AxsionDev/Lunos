@@ -78,6 +78,7 @@ export const KNOWN = [
   "subagent.background",
   "subagent.delegate",
   "subagent.max_parallel",
+  "subagent.isolation",
   "subagent.fun_names",
   "subagent.mascots",
   // XCOD-288: the commands the Build agent verifies its work with (plus `agent.<name>.verify`).

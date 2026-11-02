@@ -1,0 +1,5 @@
+Runs Lunos's deterministic security scan over a change: secrets (credential shapes and entropy), injection (SQL, command, path traversal, template), auth mistakes, insecure deserialisation, SSRF, XSS, CSRF and missing anti-forgery validation, weak or hard-coded crypto, unsafe config (debug, CORS *), and dependency bumps checked against OSV. Read-only.
+
+Returns each finding with severity (Critical, High, Medium, Low), file and line, why it matters, the fix and a CWE id, plus findings suppressed with `lunos-ignore-security <reason>`.
+
+Use it to re-review after fixing findings from /security-review. With no arguments it scans uncommitted changes (staged, unstaged and untracked); pass `branch` or `pr` to scan those instead.

@@ -28,6 +28,32 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   never leaves your computer and is never written to disk; the speech model downloads once, with your
   consent, checked against its SHA-256. Organisations can turn it off with `voice.enabled`. See
   docs/voice-input.md. <!-- XCOD-336 -->
+- **Choose what the line under the prompt shows.** Settings › Appearance › Status line offers five
+  presets (Default, Minimal, Cost, Git and Agents), each previewed as you move through them, or write
+  your own template from fields such as model, approval, branch, context %, session cost, budget left
+  and running subagents. Or have a script of your own print the line: it gets the session as JSON,
+  runs at most once a second, is stopped after 300 ms, and a slow or failing script never holds up the
+  TUI. Budget and context turn to the warning colour as they run low, and a project can have its own
+  line. See "Status line" in the TUI docs.
+
+### Changed
+
+- **Parallel subagents no longer overwrite each other.** In a git repository, each subagent that
+  writes now works in its own copy of your repository (a git worktree), and its changes are merged
+  into your working tree when it finishes: `package.json` is merged and the lockfile regenerated,
+  additions to the same file are combined, and a real conflict goes to a merge subagent and then to
+  you, with both versions shown. A subagent that fails leaves nothing behind, and no worktree or
+  branch outlives the session. Set `"subagent": { "isolation": "shared" }` to have subagents share
+  your working tree as before. <!-- XCOD-332 -->
+
+## [1.19.0] - 2026-11-02
+
+### Fixed
+
+- **The footer no longer says Dynamic workflows are on when they can't run.** When a permission rule
+  denies the task tool, or every subagent the agent may dispatch has edit turned off, the footer now
+  reads "Dynamic workflows: off" with the reason ("task denied", "no subagent can edit", or
+  "subagent_depth 0"), matching the notice on the turn and what `/workflows` says. <!-- XCOD-330 -->
 
 ## [1.18.57] - 2026-10-29
 
