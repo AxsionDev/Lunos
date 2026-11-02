@@ -354,6 +354,10 @@ export function Prompt(props: PromptProps) {
       config: sync.data.config as Parameters<typeof workflowsLabel>[0]["config"],
       metadata: session?.metadata as Record<string, unknown> | undefined,
       child: !!session?.parentID,
+      // XCOD-330: what the server checks before it runs a Dynamic workflow, so an "on" that can't run says off.
+      permission: local.mode.current()?.permission,
+      session: session?.permission,
+      subagents: sync.data.agent.filter((item) => item.mode !== "primary"),
       narrow: dimensions().width < 120,
     })
   })

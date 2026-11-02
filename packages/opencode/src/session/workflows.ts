@@ -3,7 +3,7 @@ export * as DynamicWorkflows from "./workflows"
 import path from "path"
 import type { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { ConfigPolicy } from "@/config/policy"
-import { Permission } from "@/permission"
+import { WorkflowsBlocker } from "@opencode-ai/core/workflows-blocker"
 import { AuditLog } from "@/audit/log"
 
 /**
@@ -89,19 +89,13 @@ export function canDispatchWriter(input: {
   return !blocker(input)
 }
 
-/** Why no subagent that can edit may be dispatched, or undefined when one may. */
+/** Why no subagent that can edit may be dispatched, or undefined when one may (shared with the TUI's footer). */
 function blocker(input: {
   agent: { permission: PermissionV1.Ruleset }
   session?: PermissionV1.Ruleset
   subagents: readonly { name: string; permission: PermissionV1.Ruleset }[]
 }) {
-  const ruleset = Permission.merge(input.agent.permission, input.session ?? [])
-  const dispatchable = input.subagents.filter(
-    (subagent) => Permission.evaluate("task", subagent.name, ruleset).action !== "deny",
-  )
-  if (!dispatchable.length) return "task" as const
-  if (dispatchable.every((subagent) => Permission.disabled(["edit"], subagent.permission).has("edit")))
-    return "edit" as const
+  return WorkflowsBlocker.subagents(input)
 }
 
 /** Whether this turn runs as a Dynamic workflow. */
@@ -128,25 +122,20 @@ export function decide(input: {
       reason: `"agent": { "${input.agent.name}": { "dynamic": false } }`,
     }
   const depth = input.config.subagent_depth ?? 1
-  const why =
-    depth < 1
-      ? ("depth" as const)
-      : blocker({ agent: input.agent, session: input.session.permission, subagents: input.subagents })
+  // XCOD-330: the same check the TUI's footer makes, so the footer, this notice and /workflows agree.
+  const why = WorkflowsBlocker.blocker({
+    depth,
+    agent: input.agent,
+    session: input.session.permission,
+    subagents: input.subagents,
+  })
   if (why)
     return {
       on: false,
       by: "subagents",
       locked: base.locked,
-      reason: {
-        depth: `"subagent_depth" is ${depth}, so no subagent can be dispatched`,
-        task: `a permission rule denies the task tool to the ${input.agent.name} agent, so no subagent can be dispatched`,
-        edit: "every subagent it may dispatch has edit turned off, so none can do the work",
-      }[why],
-      fix: {
-        depth: `set "subagent_depth" to 1 or more`,
-        task: `allow "task" for a subagent that can edit, such as general, in "permission"`,
-        edit: `allow "edit" for a subagent, such as general, or add a subagent that can edit`,
-      }[why],
+      reason: WorkflowsBlocker.reason(why, { agent: input.agent.name, depth }),
+      fix: WorkflowsBlocker.fix(why),
     }
   return base
 }
