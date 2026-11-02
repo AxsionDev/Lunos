@@ -148,7 +148,10 @@ export async function create(input: { root: string; dataDir: string; session: st
   const parent = home(input.dataDir, input.root)
   await fs.mkdir(parent, { recursive: true })
   const taken = async (candidate: { directory: string; branch: string }) =>
-    (await fs.stat(candidate.directory).then(() => true).catch(() => false)) ||
+    (await fs
+      .stat(candidate.directory)
+      .then(() => true)
+      .catch(() => false)) ||
     (await git(["show-ref", "--verify", "--quiet", `refs/heads/${candidate.branch}`], { cwd: input.root })).code === 0
   const pick = async (n: number): Promise<{ directory: string; branch: string }> => {
     const candidate = {
@@ -162,11 +165,22 @@ export async function create(input: { root: string; dataDir: string; session: st
   const add = async (n: number, attempts: number): Promise<{ directory: string; branch: string }> => {
     const target = await pick(n)
     const out = await git(
-      ["worktree", "add", "--lock", "--reason", `${LOCK_REASON}${process.pid}`, "-b", target.branch, target.directory, base],
+      [
+        "worktree",
+        "add",
+        "--lock",
+        "--reason",
+        `${LOCK_REASON}${process.pid}`,
+        "-b",
+        target.branch,
+        target.directory,
+        base,
+      ],
       { cwd: input.root },
     )
     if (out.code === 0) return target
-    if (attempts <= 0 || !/already exists/.test(out.stderr)) throw new Error(`git worktree add failed: ${out.stderr.trim()}`)
+    if (attempts <= 0 || !/already exists/.test(out.stderr))
+      throw new Error(`git worktree add failed: ${out.stderr.trim()}`)
     return add(n + 1, attempts - 1)
   }
   const target = await serial(input.root, () => add(0, 5))
@@ -307,8 +321,7 @@ export async function merge(
   const touched = (await must(["diff", "--name-only", ours, tree], { cwd: handle.root })).split("\n").filter(Boolean)
   const manifests = [...touched, ...conflicted].some((file) => path.basename(file) === "package.json")
   const lockConflict = conflicted.some((file) => LOCKFILES.includes(path.basename(file)))
-  const regenerated =
-    (manifests || lockConflict) && opts.regenerate ? await opts.regenerate(handle.root) : undefined
+  const regenerated = (manifests || lockConflict) && opts.regenerate ? await opts.regenerate(handle.root) : undefined
   return { state: "merged", resolved: conflicted, ...changes, ...(regenerated ? { regenerated } : {}) }
 }
 
@@ -561,7 +574,8 @@ function real(input: string) {
  */
 export async function lockfileCommand(root: string) {
   const has = (name: string) => Bun.file(path.join(root, name)).exists()
-  if ((await has("bun.lock")) || (await has("bun.lockb"))) return ["bun", "install", "--lockfile-only", "--ignore-scripts"]
+  if ((await has("bun.lock")) || (await has("bun.lockb")))
+    return ["bun", "install", "--lockfile-only", "--ignore-scripts"]
   if (await has("pnpm-lock.yaml")) return ["pnpm", "install", "--lockfile-only", "--ignore-scripts"]
   if (await has("yarn.lock")) return ["yarn", "install", "--mode=update-lockfile"]
   if ((await has("package-lock.json")) || (await has("npm-shrinkwrap.json")))
@@ -624,7 +638,18 @@ export function lookup(sessionID: string) {
 }
 
 /** The tools that read, write or run in the working tree: the ones the worktree applies to. */
-export const TOOLS = new Set(["read", "write", "edit", "multiedit", "apply_patch", "glob", "grep", "list", "bash", "lsp"])
+export const TOOLS = new Set([
+  "read",
+  "write",
+  "edit",
+  "multiedit",
+  "apply_patch",
+  "glob",
+  "grep",
+  "list",
+  "bash",
+  "lsp",
+])
 const PATH_ONLY = new Set(["read", "write", "edit", "multiedit"])
 
 /**
@@ -650,7 +675,8 @@ function hookExit() {
   process.once("exit", () => {
     const handles = new Map([...bound.values()].map((item) => [item.handle.directory, item.handle]))
     for (const handle of handles.values()) {
-      const run = (args: string[]) => Bun.spawnSync(["git", ...args], { cwd: handle.root, stdout: "ignore", stderr: "ignore" })
+      const run = (args: string[]) =>
+        Bun.spawnSync(["git", ...args], { cwd: handle.root, stdout: "ignore", stderr: "ignore" })
       run(["worktree", "unlock", handle.directory])
       run(["worktree", "remove", "--force", "--force", handle.directory])
       run(["branch", "-D", handle.branch])

@@ -84,11 +84,8 @@ describe("XCOD-332 tools of a session bound to a worktree", () => {
           yield* isolated("write", sessionID, { filePath: path.join(dir, "b.txt"), content: "new\n" }, (args) =>
             write.execute(args as never, ctx),
           )
-          yield* isolated(
-            "edit",
-            sessionID,
-            { filePath: "a.txt", oldString: "one", newString: "two" },
-            (args) => edit.execute(args as never, ctx),
+          yield* isolated("edit", sessionID, { filePath: "a.txt", oldString: "one", newString: "two" }, (args) =>
+            edit.execute(args as never, ctx),
           )
           yield* isolated(
             "bash",

@@ -170,9 +170,13 @@ function reply(
   }
 }
 
-
 const git = (cwd: string, ...args: string[]) => Effect.promise(() => SubagentIsolation.git(args, { cwd }))
-const read = (file: string) => Effect.promise(() => Bun.file(file).text().catch(() => undefined))
+const read = (file: string) =>
+  Effect.promise(() =>
+    Bun.file(file)
+      .text()
+      .catch(() => undefined),
+  )
 
 /** A repository with `src/a.ts` committed, as the user's tree. */
 const setup = Effect.fn("TaskIsolationTest.setup")(function* () {
@@ -195,7 +199,7 @@ const call = (
   question?: Question.Interface,
 ) =>
   Effect.gen(function* () {
-    const tool = yield* (question ? TaskTool.pipe(Effect.provideService(Question.Service, question)) : TaskTool)
+    const tool = yield* question ? TaskTool.pipe(Effect.provideService(Question.Service, question)) : TaskTool
     const def = yield* tool.init()
     return yield* def
       .execute(
@@ -215,7 +219,15 @@ const call = (
   })
 
 /** Ops whose subagent "edits" through its binding, as its tools would. */
-function ops(handlers: Record<string, (input: SessionPrompt.PromptInput, binding: SubagentIsolation.Binding | undefined) => Promise<{ text?: string; error?: boolean }>>): TaskPromptOps {
+function ops(
+  handlers: Record<
+    string,
+    (
+      input: SessionPrompt.PromptInput,
+      binding: SubagentIsolation.Binding | undefined,
+    ) => Promise<{ text?: string; error?: boolean }>
+  >,
+): TaskPromptOps {
   return {
     cancel: () => Effect.void,
     resolvePromptParts: (template) => Effect.succeed([{ type: "text" as const, text: template }]),
@@ -245,9 +257,13 @@ describe("tool.task worktree isolation (XCOD-332)", () => {
           ops({
             general: async (input, binding) => {
               if (!binding) throw new Error("expected a worktree")
-              expect(input.parts.some((part) => part.type === "text" && part.text.includes("isolated git worktree"))).toBe(true)
+              expect(
+                input.parts.some((part) => part.type === "text" && part.text.includes("isolated git worktree")),
+              ).toBe(true)
               await Bun.write(path.join(binding.to.root, "src/b.ts"), "export const b = 2\n")
-              during = await Bun.file(path.join(dir, "src/b.ts")).text().catch(() => undefined)
+              during = await Bun.file(path.join(dir, "src/b.ts"))
+                .text()
+                .catch(() => undefined)
               return { text: `added ${path.join(binding.to.root, "src/b.ts")}` }
             },
           }),
