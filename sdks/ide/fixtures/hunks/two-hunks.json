@@ -1,0 +1,38 @@
+{
+  "name": "two-hunks",
+  "file": "src/two-hunks.txt",
+  "before": "using System;\n\nclass Calc {\n  int Add(int a, int b) { return a + b; }\n\n  int Sub(int a, int b) { return a - b; }\n\n  int Mul(int a, int b) { return a * b; }\n}\n",
+  "after": "using System;\n\nclass Calc {\n  int Add(int a, int b) => a + b;\n\n  int Sub(int a, int b) { return a - b; }\n\n  int Mul(int a, int b) => a * b;\n}\n",
+  "patch": "Index: src/two-hunks.txt\n===================================================================\n--- src/two-hunks.txt\t\n+++ src/two-hunks.txt\t\n@@ -1,9 +1,9 @@\n using System;\n \n class Calc {\n-  int Add(int a, int b) { return a + b; }\n+  int Add(int a, int b) => a + b;\n \n   int Sub(int a, int b) { return a - b; }\n \n-  int Mul(int a, int b) { return a * b; }\n+  int Mul(int a, int b) => a * b;\n }\n",
+  "hunks": 2,
+  "cases": [
+    {
+      "accept": [
+        false,
+        false
+      ],
+      "expected": "using System;\n\nclass Calc {\n  int Add(int a, int b) { return a + b; }\n\n  int Sub(int a, int b) { return a - b; }\n\n  int Mul(int a, int b) { return a * b; }\n}\n"
+    },
+    {
+      "accept": [
+        true,
+        false
+      ],
+      "expected": "using System;\n\nclass Calc {\n  int Add(int a, int b) => a + b;\n\n  int Sub(int a, int b) { return a - b; }\n\n  int Mul(int a, int b) { return a * b; }\n}\n"
+    },
+    {
+      "accept": [
+        false,
+        true
+      ],
+      "expected": "using System;\n\nclass Calc {\n  int Add(int a, int b) { return a + b; }\n\n  int Sub(int a, int b) { return a - b; }\n\n  int Mul(int a, int b) => a * b;\n}\n"
+    },
+    {
+      "accept": [
+        true,
+        true
+      ],
+      "expected": "using System;\n\nclass Calc {\n  int Add(int a, int b) => a + b;\n\n  int Sub(int a, int b) { return a - b; }\n\n  int Mul(int a, int b) => a * b;\n}\n"
+    }
+  ]
+}

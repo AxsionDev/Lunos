@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- XCOD-333: the Lunos extension for Visual Studio 2022 (17.x), an in-process VSSDK AsyncPackage.
+       In-process because it uses the VS diff viewer (IVsDifferenceService), the Error List and editor
+       selections, which VisualStudio.Extensibility (out-of-process) doesn't cover yet. Windows only:
+       built by .github/workflows/visualstudio.yml. The logic lives in Lunos.Core, tested on any OS. -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Lunos.VisualStudio</RootNamespace>
+    <AssemblyName>Lunos.VisualStudio</AssemblyName>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <StartAction>Program</StartAction>
+    <StartProgram>$(DevEnvDir)devenv.exe</StartProgram>
+    <StartArguments>/rootsuffix Exp</StartArguments>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Design" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Lunos.Core\Lunos.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest" SubType="Designer" />
+    <VSCTCompile Include="LunosPackage.vsct" ResourceName="Menus.ctmenu" />
+    <Content Include="Resources\lunos.png" IncludeInVSIX="true" />
+    <Content Include="Resources\LICENSE.txt" IncludeInVSIX="true" />
+  </ItemGroup>
+</Project>

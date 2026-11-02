@@ -1,0 +1,45 @@
+<idea-plugin>
+    <id>tech.lunos.ide</id>
+    <name>Lunos</name>
+    <vendor url="https://lunos.tech">Axsion</vendor>
+    <description><![CDATA[
+    <p>Lunos, the EU-sovereign, self-hostable AI coding agent, inside IntelliJ IDEA, Rider and the
+    other IntelliJ-based IDEs.</p>
+    <ul>
+      <li>A chat panel with a session picker, the model and the approval mode.</li>
+      <li>Right-click <b>Ask Lunos about Selection</b>: the open file and selected lines go with the prompt.</li>
+      <li>Lunos's edits open in the IDE's diff viewer; accept or reject each hunk.</li>
+      <li>Send the file's problems (inspections) as context.</li>
+      <li>The same sessions as the Lunos TUI: open the TUI in the IDE's terminal on the same session,
+      and answer approvals in either.</li>
+      <li>Subagents and their state, e.g. with Dynamic workflows on.</li>
+    </ul>
+    <p>Needs the Lunos CLI (<code>npm i -g lunos-ai</code>). Lunos is not affiliated with JetBrains.</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends optional="true" config-file="lunos-terminal.xml">org.jetbrains.plugins.terminal</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Lunos" anchor="right" icon="/icons/lunos.svg"
+                    factoryClass="tech.lunos.ide.ui.LunosToolWindowFactory"/>
+        <notificationGroup id="Lunos" displayType="BALLOON"/>
+        <applicationConfigurable parentId="tools" instance="tech.lunos.ide.ui.LunosConfigurable"
+                                 id="tech.lunos.ide.settings" displayName="Lunos"/>
+    </extensions>
+
+    <actions>
+        <action id="Lunos.AskAboutSelection" class="tech.lunos.ide.ui.AskAboutSelectionAction"
+                text="Ask Lunos about Selection" description="Ask Lunos with the selected lines and the open file as context"
+                icon="/icons/lunos.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control alt L"/>
+        </action>
+        <action id="Lunos.SendProblems" class="tech.lunos.ide.ui.SendProblemsAction"
+                text="Send Problems to Lunos" description="Send this file's errors and warnings (inspections) to Lunos as context">
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="Lunos.AskAboutSelection"/>
+        </action>
+        <action id="Lunos.ReviewChanges" class="tech.lunos.ide.ui.ReviewChangesAction"
+                text="Review Lunos Changes" description="Accept or reject Lunos's last edits hunk by hunk"/>
+    </actions>
+</idea-plugin>
