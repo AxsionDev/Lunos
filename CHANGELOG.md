@@ -23,6 +23,15 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Lunos in JetBrains IDEs and Visual Studio (preview).** There are now plugins for IntelliJ IDEA,
+  Rider and Visual Studio 2022, built from `sdks/jetbrains` and `sdks/visualstudio`. They aren't on
+  the marketplaces yet. Each one gives you a chat panel and a session picker, and lists the same
+  sessions as the TUI's `/sessions`. Right-click "Ask Lunos about Selection" sends the open file and
+  the selected lines with your question. Lunos's edits open in the IDE's diff viewer, where you
+  accept or reject each hunk. You can send the IDE's errors and warnings as context. The panel shows
+  subagents and their state, and you can answer approvals there or in a TUI opened on the same
+  session. <!-- XCOD-333 -->
+
 - **Choose what the line under the prompt shows.** Settings › Appearance › Status line offers five
   presets (Default, Minimal, Cost, Git and Agents), each previewed as you move through them, or write
   your own template from fields such as model, approval, branch, context %, session cost, budget left
@@ -39,6 +48,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   you, with both versions shown. A subagent that fails leaves nothing behind, and no worktree or
   branch outlives the session. Set `"subagent": { "isolation": "shared" }` to have subagents share
   your working tree as before. <!-- XCOD-332 -->
+
 ## [1.19.0] - 2026-11-02
 
 ### Fixed
