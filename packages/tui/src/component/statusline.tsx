@@ -56,6 +56,9 @@ const FORMAT: Format = {
 }
 
 const MAX_NEST = 3
+
+/** The folder each session's line runs in, as its LocationProvider says. */
+const [folders, setFolders] = createSignal<Record<string, string>>({})
 const GIT_INTERVAL_MS = 5000
 
 /** Everything a status line can show, for one session (or none, on home). */
@@ -71,7 +74,17 @@ export function useStatuslineFields(input: {
   const sandbox = useSandbox()
   const dimensions = useTerminalDimensions()
   const budget = useBudget(input.sessionID)
-  const directory = () => location()?.directory ?? paths.cwd
+  // Dialogs (the /settings preview) sit outside the session's LocationProvider: they take the
+  // folder the session's own line published, so both run the same script in the same place.
+  const directory = () => {
+    const id = input.sessionID()
+    return location()?.directory ?? (id ? folders()[id] : undefined) ?? paths.cwd
+  }
+  createEffect(() => {
+    const id = input.sessionID()
+    const own = location()?.directory
+    if (id && own && folders()[id] !== own) setFolders((all) => ({ ...all, [id]: own }))
+  })
 
   // `git status` only while the line shows dirty/ahead/behind, never on the render path.
   const [git, setGit] = createSignal<ReturnType<typeof parseGitStatus>>()
@@ -266,14 +279,13 @@ export function useStatusline(input: {
       return current.kind !== "command" && needsGitStatus(current.template)
     },
   })
-  const paths = useTuiPaths()
-  const location = useOptionalLocation()
   const script = useScript(
     () => {
       const current = from()
       return current.kind === "command" ? current.command : undefined
     },
-    () => location()?.directory ?? paths.cwd,
+    // A memo, so the script's runner is only replaced when the folder itself changes.
+    createMemo(() => fields().directory ?? ""),
     fields,
   )
   const isDefault = createMemo(() => {

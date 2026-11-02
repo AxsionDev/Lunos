@@ -631,6 +631,21 @@ describe("status line", () => {
     }
   })
 
+  test("at 80 columns Default stays whole, with the budget, and the directory gives way", async () => {
+    const ui = await mount({
+      width: 80,
+      budget: () => ({ project: { id: "proj_test", name: "Test" }, line: "€10.00 of €50.00 this month", budgets: [] }),
+    })
+    try {
+      ui.turn(1, 0.5, 300)
+      await wait(() =>
+        line(ui, /300 \(30%\)/).includes("300 (30%) · $0.50 · €10.00 of €50.00 this month · Dynamic workflows: on"),
+      )
+    } finally {
+      await ui.cleanup()
+    }
+  })
+
   test("Default is the line it has always been", async () => {
     const ui = await mount()
     try {

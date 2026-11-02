@@ -220,7 +220,8 @@ const loadState = Effect.fn("TuiConfig.loadState")(function* (ctx: { directory: 
   for (const dir of dirs) {
     if (!dir.endsWith(".opencode") && dir !== Flag.OPENCODE_CONFIG_DIR) continue
     for (const file of ConfigPaths.fileInDirectory(dir, "tui")) {
-      yield* mergeFile(acc, file)
+      // OPENCODE_CONFIG_DIR is yours, as the global config is (XCOD-335: its status line command counts).
+      yield* mergeFile(acc, file, dir === Flag.OPENCODE_CONFIG_DIR)
     }
   }
 

@@ -2413,7 +2413,7 @@ export function Prompt(props: PromptProps) {
                       <box
                         flexShrink={1}
                         minWidth={0}
-                        maxWidth={Math.max(20, dimensions().width - 30)}
+                        maxWidth={statusline.isDefault() ? undefined : Math.max(20, dimensions().width - 30)}
                         overflow="hidden"
                       >
                         <StatuslineView segments={statusline.segments()} accent={accent()} />

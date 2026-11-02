@@ -290,7 +290,10 @@ export type RunResult = { ok: true; output: string } | { ok: false; reason: "tim
  * Runs `argv` with `input` on stdin, and gives up after `timeout` ms: the process (and, on POSIX,
  * everything it started) is killed and the result is a timeout. Never waits on the child past that.
  */
-export function run(argv: string[], input: { stdin?: string; cwd?: string; timeout: number }): Promise<RunResult> {
+export function run(
+  argv: string[],
+  input: { stdin?: string; cwd?: string; timeout: number; signal?: AbortSignal },
+): Promise<RunResult> {
   const posix = process.platform !== "win32"
   const proc = (() => {
     try {
@@ -309,14 +312,20 @@ export function run(argv: string[], input: { stdin?: string; cwd?: string; timeo
   })()
   if (!proc) return Promise.resolve({ ok: false, reason: "spawn" })
   return new Promise<RunResult>((resolve) => {
-    const timer = setTimeout(() => {
+    const stop = () => {
       kill(proc.pid, posix)
       resolve({ ok: false, reason: "timeout" })
-    }, input.timeout)
+    }
+    const timer = setTimeout(stop, input.timeout)
+    // Stopped early (the TUI closing): nothing it started is left behind.
+    input.signal?.addEventListener("abort", stop, { once: true })
     Promise.all([new Response(proc.stdout).text(), proc.exited])
       .then(([output, code]) => resolve(code === 0 ? { ok: true, output } : { ok: false, reason: "exit" }))
       .catch(() => resolve({ ok: false, reason: "exit" }))
-      .finally(() => clearTimeout(timer))
+      .finally(() => {
+        clearTimeout(timer)
+        input.signal?.removeEventListener("abort", stop)
+      })
   })
 }
 
@@ -358,6 +367,7 @@ export function createScriptRunner(input: {
     timer: undefined as ReturnType<typeof setTimeout> | undefined,
     disposed: false,
     line: undefined as string | undefined,
+    abort: new AbortController(),
   }
 
   const gap = () => (state.failures >= BACKOFF_AFTER ? BACKOFF_MS : interval)
@@ -375,7 +385,7 @@ export function createScriptRunner(input: {
     state.pending = undefined
     state.running = true
     state.lastStart = Date.now()
-    void run(shell(input.command), { stdin, cwd: input.cwd, timeout }).then((result) => {
+    void run(shell(input.command), { stdin, cwd: input.cwd, timeout, signal: state.abort.signal }).then((result) => {
       state.running = false
       if (state.disposed) return
       if (result.ok) {
@@ -402,6 +412,7 @@ export function createScriptRunner(input: {
       state.disposed = true
       if (state.timer) clearTimeout(state.timer)
       state.timer = undefined
+      state.abort.abort()
     },
   }
 }

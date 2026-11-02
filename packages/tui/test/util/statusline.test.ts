@@ -185,6 +185,33 @@ describe.skipIf(!posix)("script runner", () => {
     expect(Date.now() - started).toBeLessThan(1000)
   })
 
+  test("a timeout kills what the script started too, and so does closing", async () => {
+    const dir = await import("os").then((os) => os.tmpdir())
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0)
+        return true
+      } catch {
+        return false
+      }
+    }
+    const pidfile = `${dir}/statusline-child-${process.pid}-${Date.now()}`
+    const script = `sleep 30 & echo $! > ${pidfile}; wait`
+    expect(await run(shell(script), { timeout: 200 })).toEqual({ ok: false, reason: "timeout" })
+    await Bun.sleep(100)
+    expect(alive(Number((await Bun.file(pidfile).text()).trim()))).toBe(false)
+
+    const runner = createScriptRunner({ command: script, timeout: 10_000, onLine: () => {} })
+    runner.update("{}")
+    await Bun.sleep(300)
+    const child = Number((await Bun.file(pidfile).text()).trim())
+    expect(alive(child)).toBe(true)
+    runner.dispose()
+    await Bun.sleep(100)
+    expect(alive(child)).toBe(false)
+    await Bun.$`rm -f ${pidfile}`.quiet()
+  })
+
   test("a failing script is a failure", async () => {
     expect(await run(shell("echo nope; exit 1"), { timeout: 2000 })).toEqual({ ok: false, reason: "exit" })
   })
