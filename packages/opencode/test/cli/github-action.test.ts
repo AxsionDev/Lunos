@@ -4,7 +4,6 @@ import { Effect, Exit } from "effect"
 import { shareLink } from "../../src/cli/cmd/github.shared"
 import { ShareNext } from "../../src/share/share-next"
 import { extractResponseText, formatPromptTooLargeError } from "../../src/cli/cmd/github"
-import type { MessageV2 } from "../../src/session/message-v2"
 import { SessionID, MessageID, PartID } from "../../src/session/schema"
 
 // Helper to create minimal valid parts

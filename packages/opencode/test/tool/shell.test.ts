@@ -12,7 +12,6 @@ import { ProcessTool, type Parameters as ProcessParameters } from "../../src/too
 import { BackgroundShell } from "../../src/tool/shell/background"
 import { Filesystem } from "@/util/filesystem"
 import { provideInstance, testInstanceStoreLayer, tmpdirScoped } from "../fixture/fixture"
-import type { Permission } from "../../src/permission"
 import { Agent } from "../../src/agent/agent"
 import { Truncate } from "@/tool/truncate"
 import { SessionID, MessageID } from "../../src/session/schema"
