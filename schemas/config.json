@@ -942,6 +942,11 @@
           "maximum": 9007199254740991,
           "description": "At most this many subagents run at once per session; more wait their turn (default 3)"
         },
+        "isolation": {
+          "type": "string",
+          "enum": ["worktree", "shared"],
+          "description": "Where writing subagents edit: \"worktree\" gives each its own git worktree, merged back when it finishes (the default in a git repository); \"shared\" has them all edit your working tree"
+        },
         "fun_names": {
           "type": "boolean",
           "description": "Give subagents funny names in the TUI, such as \"Turbo Pickle\" (on by default; false shows \"Subagent 1\")"

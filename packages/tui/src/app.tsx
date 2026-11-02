@@ -20,6 +20,7 @@ import {
   upgradeStepText,
 } from "@opencode-ai/core/installation/version"
 import { isVersionGreater } from "./util/version"
+import { setStatuslineUpdate } from "./component/statusline"
 import { ClipboardProvider, useClipboard } from "./context/clipboard"
 import { ExitProvider, useExit } from "./context/exit"
 import { EpilogueProvider } from "./context/epilogue"
@@ -1871,6 +1872,7 @@ function App(props: {
     // Kept after the dialog is dismissed or skipped: the bottom-right notice stays until the
     // update is installed.
     setAvailableVersion(version)
+    setStatuslineUpdate(version)
 
     const skipped = kv.get("skipped_version")
     if (skipped && !isVersionGreater(version, skipped)) return

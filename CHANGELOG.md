@@ -46,6 +46,43 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   permissions. Off by default; an organisation can turn it off. Linux isn't supported yet.
   <!-- XCOD-339 -->
 
+## [1.19.0] - 2026-11-02
+
+### Added
+
+- **Check your changes for security problems before you push.** `/security-review` looks at your
+  uncommitted changes, a branch (`--branch`) or a pull request (`--pr`) for leaked secrets, injection,
+  missing auth checks and unsafe dependencies, ranks what it finds by severity, and asks before it
+  sends fixes to subagents; it then scans again. `lunos security-review` runs the same scan in CI:
+  it exits 1 on a High finding or worse, and `--sarif` writes a report your code host can show. A
+  finding you accept is silenced with `lunos-ignore-security <reason>`, and every one is recorded in
+  the audit log. <!-- XCOD-334 -->
+- **Choose what the line under the prompt shows.** Settings › Appearance › Status line offers five
+  presets (Default, Minimal, Cost, Git and Agents), each previewed as you move through them, or write
+  your own template from fields such as model, approval, branch, context %, session cost, budget left
+  and running subagents. Or have a script of your own print the line: it gets the session as JSON,
+  runs at most once a second, is stopped after 300 ms, and a slow or failing script never holds up the
+  TUI. Budget and context turn to the warning colour as they run low, and a project can have its own
+  line. See "Status line" in the TUI docs. <!-- XCOD-335 -->
+- **A Python SDK for Lunos** (`packages/sdk/python`). Not yet on PyPI. <!-- internal --> <!-- XCOD-337 -->
+
+### Changed
+
+- **Parallel subagents no longer overwrite each other.** In a git repository, each subagent that
+  writes now works in its own copy of your repository (a git worktree), and its changes are merged
+  into your working tree when it finishes: `package.json` is merged and the lockfile regenerated,
+  additions to the same file are combined, and a real conflict goes to a merge subagent and then to
+  you, with both versions shown. A subagent that fails leaves nothing behind, and no worktree or
+  branch outlives the session. Set `"subagent": { "isolation": "shared" }` to have subagents share
+  your working tree as before. <!-- XCOD-332 -->
+
+### Fixed
+
+- **The footer no longer says Dynamic workflows are on when they can't run.** When a permission rule
+  denies the task tool, or every subagent the agent may dispatch has edit turned off, the footer now
+  reads "Dynamic workflows: off" with the reason ("task denied", "no subagent can edit", or
+  "subagent_depth 0"), matching the notice on the turn and what `/workflows` says. <!-- XCOD-330 -->
+
 ## [1.18.57] - 2026-10-29
 
 ### Added
