@@ -28,13 +28,26 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   never leaves your computer and is never written to disk; the speech model downloads once, with your
   consent, checked against its SHA-256. Organisations can turn it off with `voice.enabled`. See
   docs/voice-input.md. <!-- XCOD-336 -->
+
+## [1.19.0] - 2026-11-02
+
+### Added
+
+- **Check your changes for security problems before you push.** `/security-review` looks at your
+  uncommitted changes, a branch (`--branch`) or a pull request (`--pr`) for leaked secrets, injection,
+  missing auth checks and unsafe dependencies, ranks what it finds by severity, and asks before it
+  sends fixes to subagents; it then scans again. `lunos security-review` runs the same scan in CI:
+  it exits 1 on a High finding or worse, and `--sarif` writes a report your code host can show. A
+  finding you accept is silenced with `lunos-ignore-security <reason>`, and every one is recorded in
+  the audit log. <!-- XCOD-334 -->
 - **Choose what the line under the prompt shows.** Settings › Appearance › Status line offers five
   presets (Default, Minimal, Cost, Git and Agents), each previewed as you move through them, or write
   your own template from fields such as model, approval, branch, context %, session cost, budget left
   and running subagents. Or have a script of your own print the line: it gets the session as JSON,
   runs at most once a second, is stopped after 300 ms, and a slow or failing script never holds up the
   TUI. Budget and context turn to the warning colour as they run low, and a project can have its own
-  line. See "Status line" in the TUI docs.
+  line. See "Status line" in the TUI docs. <!-- XCOD-335 -->
+- **A Python SDK for Lunos** (`packages/sdk/python`). Not yet on PyPI. <!-- internal --> <!-- XCOD-337 -->
 
 ### Changed
 
@@ -45,8 +58,6 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   you, with both versions shown. A subagent that fails leaves nothing behind, and no worktree or
   branch outlives the session. Set `"subagent": { "isolation": "shared" }` to have subagents share
   your working tree as before. <!-- XCOD-332 -->
-
-## [1.19.0] - 2026-11-02
 
 ### Fixed
 
