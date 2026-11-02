@@ -23,6 +23,14 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Added
 
+- **Lunos in JetBrains IDEs and Visual Studio (preview).** There are now plugins for IntelliJ IDEA,
+  Rider and Visual Studio 2022, built from `sdks/jetbrains` and `sdks/visualstudio`. They aren't on
+  the marketplaces yet. Each one gives you a chat panel and a session picker, and lists the same
+  sessions as the TUI's `/sessions`. Right-click "Ask Lunos about Selection" sends the open file and
+  the selected lines with your question. Lunos's edits open in the IDE's diff viewer, where you
+  accept or reject each hunk. You can send the IDE's errors and warnings as context. The panel shows
+  subagents and their state, and you can answer approvals there or in a TUI opened on the same
+  session. <!-- XCOD-333 -->
 - **Lunos can check your app in a real browser.** Turn on browser control in /settings › Permissions ›
   Browser & computer, and the qa agent opens the app Build just started, clicks through the change
   and reports what it saw. It reads pages as text, so it works with text-only EU models. It uses a
