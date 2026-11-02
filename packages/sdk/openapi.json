@@ -26850,6 +26850,54 @@
         },
         "additionalProperties": false
       },
+      "BrowserConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["lunos", "extension"]
+          },
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny_categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["banking", "payment", "password_manager", "system_settings"]
+            }
+          },
+          "stop_key": {
+            "type": "string"
+          },
+          "headless": {
+            "type": "boolean"
+          },
+          "executable": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "screenshots": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "CloudConfig": {
         "type": "object",
         "properties": {
@@ -28239,6 +28287,9 @@
           },
           "external": {
             "$ref": "#/components/schemas/ExternalConfig"
+          },
+          "browser": {
+            "$ref": "#/components/schemas/BrowserConfig"
           },
           "cloud": {
             "$ref": "#/components/schemas/CloudConfig"

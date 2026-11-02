@@ -118,8 +118,11 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
     stage: "permission" as PermissionStage,
   })
   // XCOD-285: a Claude Code / Codex approval offers the tool's own choices, in its wording.
+  // XCOD-327: browser control's approvals bring their own choices too (once / always for this site / deny).
   const choices = createMemo(() =>
-    props.request.permission === "external" ? externalChoices(props.request.metadata) : undefined,
+    props.request.permission === "external" || props.request.permission.startsWith("browser")
+      ? externalChoices(props.request.metadata)
+      : undefined,
   )
   const feedbackHint = createMemo(() => {
     const meta = props.request.metadata ?? {}
@@ -436,6 +439,27 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                 body: (
                   <box paddingLeft={1}>
                     <text fg={theme.textMuted}>{task ?? description ?? pattern}</text>
+                  </box>
+                ),
+              }
+            }
+
+            // XCOD-327: a site for browser control, or an action that is always confirmed first.
+            if (permission === "browser" || permission === "browser_confirm") {
+              const meta = props.request.metadata ?? {}
+              const title =
+                typeof meta["title"] === "string" ? meta["title"] : `Browser: ${props.request.patterns?.[0] ?? ""}`
+              const detail = typeof meta["detail"] === "string" ? meta["detail"] : ""
+              return {
+                icon: "◎",
+                title,
+                body: (
+                  <box paddingLeft={1} gap={1}>
+                    <text fg={theme.textMuted}>{detail}</text>
+                    <text fg={theme.textMuted}>
+                      Stop browser control at any time with Stop in the browser, or its stop key (Ctrl+Alt+Esc by
+                      default).
+                    </text>
                   </box>
                 ),
               }
