@@ -26,7 +26,7 @@ describe("workflowsLabel", () => {
     )
     // No subagent can be dispatched: off, as the server's notice says.
     expect(workflowsLabel({ agent: "build", config: { subagent_depth: 0 }, metadata: undefined })).toBe(
-      "Dynamic workflows: off",
+      "Dynamic workflows: off · subagent_depth 0",
     )
   })
 
@@ -43,5 +43,62 @@ describe("workflowsLabel", () => {
         metadata: off,
       }),
     ).toBe("Dynamic workflows: on · main agent orchestrating 🔒")
+  })
+})
+
+// XCOD-330: off because no subagent can do the work says so, with the reason, as the notice does.
+describe("workflowsLabel: no subagent that can edit", () => {
+  const allow = [{ permission: "*", pattern: "*", action: "allow" }]
+  const general = { name: "general", permission: allow }
+  const readOnly = {
+    name: "explore",
+    permission: [
+      { permission: "*", pattern: "*", action: "deny" },
+      { permission: "read", pattern: "*", action: "allow" },
+    ],
+  }
+  const base = { agent: "build", config: {}, metadata: undefined, permission: allow }
+
+  test("on while a subagent that can edit may be dispatched", () => {
+    expect(workflowsLabel({ ...base, subagents: [general, readOnly] })).toBe(
+      "Dynamic workflows: on · main agent orchestrating",
+    )
+  })
+
+  test("the task tool denied to the agent", () => {
+    const permission = [...allow, { permission: "task", pattern: "*", action: "deny" }]
+    expect(workflowsLabel({ ...base, permission, subagents: [general] })).toBe("Dynamic workflows: off · task denied")
+    expect(workflowsLabel({ ...base, permission, subagents: [general], narrow: true })).toBe(
+      "Dynamic workflows: off · task denied",
+    )
+  })
+
+  test("the task tool denied by the session's own rules", () => {
+    const session = [{ permission: "task", pattern: "*", action: "deny" }]
+    expect(workflowsLabel({ ...base, session, subagents: [general] })).toBe("Dynamic workflows: off · task denied")
+  })
+
+  test("every subagent it may dispatch has edit turned off", () => {
+    expect(workflowsLabel({ ...base, subagents: [readOnly] })).toBe("Dynamic workflows: off · no subagent can edit")
+    // general can edit but may not be dispatched: only explore is left.
+    const permission = [...allow, { permission: "task", pattern: "general", action: "deny" }]
+    expect(workflowsLabel({ ...base, permission, subagents: [general, readOnly] })).toBe(
+      "Dynamic workflows: off · no subagent can edit",
+    )
+  })
+
+  test("subagent_depth 0, and an organisation lock keeps its padlock", () => {
+    expect(workflowsLabel({ ...base, config: { subagent_depth: 0 }, subagents: [general] })).toBe(
+      "Dynamic workflows: off · subagent_depth 0",
+    )
+    expect(workflowsLabel({ ...base, config: { $locked: ["workflows.dynamic"] }, subagents: [readOnly] })).toBe(
+      "Dynamic workflows: off · no subagent can edit 🔒",
+    )
+  })
+
+  test("turned off by setting: no reason, nothing to fix", () => {
+    expect(workflowsLabel({ ...base, metadata: { workflows: { dynamic: false } }, subagents: [readOnly] })).toBe(
+      "Dynamic workflows: off",
+    )
   })
 })
