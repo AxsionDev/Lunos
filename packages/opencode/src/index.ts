@@ -48,6 +48,7 @@ import { DbCommand } from "./cli/cmd/db"
 import { PluginCommand } from "./cli/cmd/plug"
 import { MarketplaceCommand } from "./cli/cmd/marketplace"
 import { AuditCommand } from "./cli/cmd/audit"
+import { SecurityReviewCommand } from "./cli/cmd/security-review"
 import { MemoryCommand } from "./cli/cmd/memory"
 import { SettingsCommand } from "./cli/cmd/settings"
 import { SyncCommand } from "./cli/cmd/sync"
@@ -215,6 +216,7 @@ const cli = yargs(args)
   .command(PluginCommand)
   .command(MarketplaceCommand)
   .command(AuditCommand)
+  .command(SecurityReviewCommand)
   .command(MemoryCommand)
   .command(SettingsCommand)
   .command(SyncCommand)

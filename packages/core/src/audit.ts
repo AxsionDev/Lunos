@@ -121,6 +121,9 @@ export const EVENTS = [
   // XCOD-326: a tool the main agent may not use while Dynamic workflows are on (edit, write,
   // apply_patch, bash, …), attempted and refused. Tool, agent and session; never the arguments.
   "workflows.main_tool_refused",
+  // XCOD-334: a security-review finding suppressed by a `lunos-ignore-security <reason>` comment:
+  // rule, CWE, severity, file, line, the reason as written and the review target. Never the code.
+  "security.suppressed",
   // XCOD-327: browser control. One `browser.action` per action the agent took or was refused
   // (action, host, how it was approved), a site refused before any approval was asked
   // (`browser.denied`), control stopped by the user (`browser.stop`), and instructions found on a
@@ -149,6 +152,13 @@ export interface Options {
 export const DEFAULT_MAX_BYTES = 10 * 1024 * 1024
 export const DEFAULT_MAX_AGE_DAYS = 90
 
+/**
+ * Tokens recognisable by shape alone (OpenAI-style `sk-`, GitHub, AWS access key ids, Slack). Shared
+ * with the security review's secret check (XCOD-334), so both catch the same credentials.
+ */
+export const TOKEN_SHAPED =
+  /\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[abpr]-[A-Za-z0-9-]{10,})\b/g
+
 // Masked by default in every string field, whatever `redact` adds: key-shaped strings routinely
 // appear in command lines (`curl -H "Authorization: Bearer …"`, `export API_KEY=…`).
 const SECRETS: ReadonlyArray<readonly [RegExp, string]> = [
@@ -159,10 +169,7 @@ const SECRETS: ReadonlyArray<readonly [RegExp, string]> = [
     "$1[redacted]",
   ],
   [/(--(?:password|token|secret|api-key)[= ])\S+/gi, "$1[redacted]"],
-  [
-    /\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[abpr]-[A-Za-z0-9-]{10,})\b/g,
-    "[redacted]",
-  ],
+  [TOKEN_SHAPED, "[redacted]"],
 ]
 
 export function redact(value: string, extra: readonly string[] = []): string {

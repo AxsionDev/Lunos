@@ -214,6 +214,8 @@ const PROJECT_PREFIXES = [
   "budget.thresholds",
   "budget.currency",
   "tui.theme",
+  // XCOD-335: a project's status line preset or template (its command stays yours, below).
+  "tui.statusline",
 ]
 
 export function projectScoped(key: string) {
@@ -229,6 +231,7 @@ export function projectScoped(key: string) {
 const PERSONAL_ONLY: Record<string, string> = {
   "sandbox.allow": "extra hosts for the sandbox's network are yours to allow, not a repository's",
   "sandbox.mounts": "mounting directories from this machine is yours to choose, not a repository's",
+  "tui.statusline.command": "a command that runs on this computer is yours to choose, not a repository's",
 }
 
 export function personalOnly(key: string) {

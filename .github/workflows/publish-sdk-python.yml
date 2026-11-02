@@ -1,0 +1,160 @@
+name: publish-sdk-python
+
+# XCOD-337: publishes the Python SDK (packages/sdk/python) as `lunos` on PyPI, with signed
+# provenance. It uses PyPI trusted publishing (OIDC), so there is no token to store or leak.
+# pypa/gh-action-pypi-publish uploads a PEP 740 attestation, signed with Sigstore, for each file,
+# and GitHub records build provenance (actions/attest-build-provenance).
+#
+# The flow is: the tests on macOS, Linux and Windows, then a build, then TestPyPI, then
+# `pip install` from TestPyPI in a fresh venv as a smoke test, and only then PyPI.
+#
+# - Push a tag `sdk-python-v<version>`, e.g. sdk-python-v1.18.57: the whole flow, ending on PyPI.
+#   The version must be a Lunos version, because the SDK version tracks the server API version.
+# - Run it by hand (workflow_dispatch): the same flow up to TestPyPI and the smoke test. It
+#   publishes to PyPI only if `pypi` is checked and the ref is a sdk-python-v* tag.
+#
+# One-time setup on pypi.org and test.pypi.org (a "pending publisher" works before the project
+# exists): owner AxsionDev, repository Lunos, workflow publish-sdk-python.yml, environment `pypi`
+# (or `testpypi`). Then create the GitHub environments `pypi` and `testpypi`, and give `pypi`
+# required reviewers.
+
+on:
+  push:
+    tags:
+      - "sdk-python-v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish (default, the one in src/lunos/_version.py). TestPyPI keeps every version forever.
+        type: string
+        default: ""
+      pypi:
+        description: Also publish to PyPI (only from a sdk-python-v* tag)
+        type: boolean
+        default: false
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.repository == 'AxsionDev/Lunos'
+    uses: ./.github/workflows/sdk-python.yml
+
+  build:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        working-directory: packages/sdk/python
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+      - name: Version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          current=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/lunos/_version.py)
+          version="$current"
+          if [ "$REF_TYPE" = "tag" ]; then version="${REF_NAME#sdk-python-v}"; fi
+          if [ -n "$INPUT_VERSION" ]; then version="$INPUT_VERSION"; fi
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+|\.post[0-9]+|\.dev[0-9]+)?$'; then
+            echo "::error::$version isn't a release version"; exit 1
+          fi
+          # The SDK's API is the generated one (API_VERSION); a version from another major would lie about it.
+          if [ "${version%%.*}" != "${current%%.*}" ]; then
+            echo "::error::$version doesn't match the API the SDK was generated from ($current)"; exit 1
+          fi
+          sed -i "s/^__version__ = \".*\"$/__version__ = \"$version\"/" src/lunos/_version.py
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: packages/sdk/python/dist/*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sdk-python-dist
+          path: packages/sdk/python/dist/
+          if-no-files-found: error
+
+  testpypi:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/lunos/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sdk-python-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          attestations: true
+          skip-existing: true
+
+  smoke:
+    needs: [build, testpypi]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: "3.12"
+      - name: pip install from TestPyPI in a fresh venv
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          uv venv --seed fresh
+          if [ "$RUNNER_OS" = "Windows" ]; then py=fresh/Scripts/python; else py=fresh/bin/python; fi
+          # TestPyPI's index can lag the upload by a minute; its dependencies come from PyPI.
+          for _ in 1 2 3 4 5 6; do
+            "$py" -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "lunos==$VERSION" && break
+            sleep 20
+          done
+          "$py" -c "import lunos, lunos.types, sys; assert lunos.__version__ == sys.argv[1], lunos.__version__; print('lunos', lunos.__version__)" "$VERSION"
+
+  pypi:
+    needs: [build, smoke]
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'sdk-python-v') && (github.event_name == 'push' || inputs.pypi)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/lunos/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: sdk-python-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          attestations: true

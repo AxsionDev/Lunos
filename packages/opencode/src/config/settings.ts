@@ -129,7 +129,8 @@ export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
   Memory: ["Overview", "Settings", "Advanced"],
   "Marketplace & plugins": ["Marketplaces", "Plugins", "Policy"],
-  Appearance: ["Theme", "Layout"],
+  // XCOD-335: tui.statusline.*, with a preview of the line.
+  Appearance: ["Theme", "Layout", "Status line"],
   "Notifications & sounds": ["Sounds", "Notifications"],
   Tools: ["LSP", "Formatters", "MCP", "Commands", "Skills", "Hooks", "Shell", "References"],
 }
@@ -186,7 +187,8 @@ export function subtab(key: string, category: Category): string | undefined {
   if (!tabs) return undefined
   if (category === "Memory")
     return MEMORY_SETTINGS.some((item) => key === item || key.startsWith(item + ".")) ? "Settings" : "Advanced"
-  if (category === "Appearance") return key === "tui.theme" ? "Theme" : "Layout"
+  if (category === "Appearance")
+    return key === "tui.theme" ? "Theme" : key.startsWith("tui.statusline") ? "Status line" : "Layout"
   if (category === "Notifications & sounds") return NOTIFICATION_KEYS.includes(key) ? "Notifications" : "Sounds"
   return SUBTAB[key.split(".")[0]!] ?? tabs[0]
 }
@@ -219,7 +221,8 @@ const RESTART = [
   "sandbox",
 ]
 // XCOD-311: `tui.attention.` is read on every alert, and /settings updates the running app's copy.
-const NO_RESTART = ["tui.theme", "tui.attention."]
+// XCOD-335: and the status line is redrawn from what /settings saved.
+const NO_RESTART = ["tui.theme", "tui.attention.", "tui.statusline", "tui.statusline."]
 
 const READONLY = ["$schema", "$locked"]
 
@@ -233,6 +236,8 @@ const DEFAULTS: Record<string, unknown> = {
   "subagent.background": true,
   "subagent.delegate": true,
   "subagent.max_parallel": 3,
+  // XCOD-332: each writing subagent in its own git worktree (shared outside git repositories).
+  "subagent.isolation": "worktree",
   "subagent.fun_names": true,
   "subagent.mascots": true,
   // XCOD-303: Dynamic workflows on by default.
@@ -275,6 +280,7 @@ const DEFAULTS: Record<string, unknown> = {
   "tui.attention.sound_pack": "opencode.default",
   "tui.attention.notify_when": "blurred",
   "tui.attention.notify_subagents": false,
+  "tui.statusline.preset": "default",
   // XCOD-229: the curated list the pickers use while `recommended` isn't set.
   recommended: ModelCuration.RECOMMENDED,
   // XCOD-256: external.*'s permission defaults are filled in by `list`, which knows the legacy key.
@@ -1136,6 +1142,8 @@ const USER_ONLY: Record<string, (value: unknown) => string | undefined> = {
       : "a repository can only turn its devcontainer off; building one runs its steps on this machine",
   "sandbox.network": (value) =>
     value === "open" ? "a repository can make the sandbox's network stricter, never open it" : undefined,
+  // XCOD-335: the loader ignores a repository's status line command (config/tui.ts).
+  "tui.statusline.command": () => "a command that runs on this computer is yours to choose, not a repository's",
 }
 
 /** Why `key` = `value` can't go in project config, or undefined when it can. */
