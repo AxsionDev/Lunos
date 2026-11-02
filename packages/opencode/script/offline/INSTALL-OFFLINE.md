@@ -101,3 +101,8 @@ no web tools. It talks only to the endpoints you configure, such as your self-ho
 - **Your model:** point Lunos at your self-hosted endpoint in `opencode.json`. See "Air-gapped
   deployment" in the self-hosted deployment guide:
   https://github.com/AxsionDev/Lunos/blob/v__VERSION__/docs/deployment/self-hosted.md
+- **Voice input** (optional) can't download its speech model offline. Copy `ggml-base.bin` (or the
+  model set in `voice.model`) into `~/.local/share/opencode/voice/models/`, and `whisper-cli` into
+  `~/.local/share/opencode/voice/bin/` or onto the `PATH`. Lunos checks the model's SHA-256 before
+  loading it. Where to get them and the hashes:
+  https://github.com/AxsionDev/Lunos/blob/v__VERSION__/docs/voice-input.md

@@ -135,3 +135,21 @@ describe("agent.<name>.permission_mode (XCOD-310)", () => {
     expect(() => Schema.decodeUnknownSync(ConfigAgentV1.Info)({ permission_mode: "yolo" })).toThrow()
   })
 })
+
+// XCOD-336: an organisation turns voice input off; user config can't turn it back on.
+describe("voice (XCOD-336)", () => {
+  test("voice and voice.enabled are lockable, and the lock wins over user config", async () => {
+    const { ConfigOrgPolicy } = await import("@/config/org-policy")
+    expect(ConfigPolicy.unknownKeys(["voice", "voice.enabled"])).toEqual([])
+    const user: Record<string, unknown> = { voice: { enabled: true, model: "small" } }
+    for (const lock of ["voice", "voice.enabled"]) {
+      const next = ConfigPolicy.apply(user, { voice: { enabled: false } }, [lock]) as { voice: { enabled: boolean } }
+      expect(next.voice.enabled).toBe(false)
+    }
+    // A hosted organisation (no MDM) may turn it off too: it is a restriction.
+    expect(ConfigOrgPolicy.hostedOnly({ voice: { enabled: false }, $locked: ["voice"] })).toEqual({
+      voice: { enabled: false },
+      $locked: ["voice"],
+    })
+  })
+})

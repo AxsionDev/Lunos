@@ -418,6 +418,18 @@ export const dict = {
   "prompt.action.stop": "Zaustavi",
   "prompt.escape.again": "Esc ponovo za brisanje",
   "prompt.toast.cleared": "Upit obrisan · {{key}} za vraćanje",
+  "prompt.voice.start": "Glasovni unos: držite za govor ili kliknite za početak i zaustavljanje",
+  "prompt.voice.recording": "Slušam… pustite ili kliknite za transkripciju, Esc za otkazivanje",
+  "prompt.voice.transcribing": "Transkripcija na ovom računaru…",
+  "prompt.voice.missing": "Glasovni unos zahtijeva whisper.cpp (whisper-cli) na ovom računaru",
+  "prompt.voice.micDenied": "Dozvolite Lunosu korištenje mikrofona u postavkama privatnosti sistema",
+  "prompt.voice.offline": "Offline način blokira preuzimanje govornog modela. Instalirajte model ručno",
+  "prompt.voice.download.title": "Preuzeti govorni model?",
+  "prompt.voice.download.message":
+    "Glas se transkribuje na ovom računaru modelom {{model}} iz whisper.cpp ({{size}} MB), jednom preuzetim sa huggingface.co i provjerenim SHA-256 sažetkom. Vaš glas nikad ne napušta ovaj računar.",
+  "prompt.voice.download.confirm": "Preuzmi",
+  "prompt.voice.download.progress": "Preuzimanje govornog modela… {{percent}}%",
+  "prompt.voice.error": "Glasovni unos nije uspio: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "Nepodržan prilog",
   "prompt.toast.attachmentDuplicate.title": "Ova datoteka je već učitana",

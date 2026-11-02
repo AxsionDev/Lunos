@@ -54,6 +54,7 @@ import { createSessionTabs } from "@/pages/session/helpers"
 import { createTextFragment, getCursorPosition, setCursorPosition, setRangeEdge } from "./prompt-input/editor-dom"
 import { createPromptAttachments } from "./prompt-input/attachments"
 import { ACCEPTED_FILE_TYPES, pickAttachmentFiles } from "./prompt-input/files"
+import { PromptVoiceButton } from "./prompt-input/voice"
 import {
   canNavigateHistoryAtCursor,
   navigatePromptHistory,
@@ -1659,6 +1660,19 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               </span>
             </Show>
             <div class="flex items-center gap-1 pointer-events-auto">
+              {/* XCOD-336: desktop only; the transcript goes into the prompt for editing. */}
+              <PromptVoiceButton
+                disabled={store.mode !== "normal"}
+                insert={(text) => {
+                  const before = prompt
+                    .current()
+                    .map((part) => ("content" in part ? part.content : ""))
+                    .join("")
+                  const content = (before && !/\s$/.test(before) ? " " : "") + text
+                  addPart({ type: "text", content, start: 0, end: 0 })
+                }}
+                submit={() => editorRef.closest("form")?.requestSubmit()}
+              />
               <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
                 <IconButton
                   data-action="prompt-submit"

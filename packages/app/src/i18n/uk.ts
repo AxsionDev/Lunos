@@ -419,6 +419,18 @@ export const dict = {
   "prompt.action.stop": "Зупинити",
   "prompt.escape.again": "Ще раз Esc, щоб очистити",
   "prompt.toast.cleared": "Запит очищено · {{key}} — відновити",
+  "prompt.voice.start": "Голосове введення: утримуйте, щоб говорити, або натисніть для початку й зупинки",
+  "prompt.voice.recording": "Слухаю… відпустіть або натисніть для розшифрування, Esc для скасування",
+  "prompt.voice.transcribing": "Розшифрування на цьому комп'ютері…",
+  "prompt.voice.missing": "Для голосового введення потрібен whisper.cpp (whisper-cli) на цьому комп'ютері",
+  "prompt.voice.micDenied": "Дозвольте Lunos використовувати мікрофон у налаштуваннях конфіденційності системи",
+  "prompt.voice.offline": "Автономний режим блокує завантаження мовленнєвої моделі. Установіть модель вручну",
+  "prompt.voice.download.title": "Завантажити мовленнєву модель?",
+  "prompt.voice.download.message":
+    "Мовлення розшифровується на цьому комп'ютері моделлю {{model}} whisper.cpp ({{size}} МБ), завантаженою один раз з huggingface.co і перевіреною за SHA-256. Ваш голос ніколи не залишає цей комп'ютер.",
+  "prompt.voice.download.confirm": "Завантажити",
+  "prompt.voice.download.progress": "Завантаження мовленнєвої моделі… {{percent}}%",
+  "prompt.voice.error": "Помилка голосового введення: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "Непідтримуване вкладення",
   "prompt.toast.attachmentDuplicate.title": "Цей файл уже завантажено",

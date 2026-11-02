@@ -397,6 +397,18 @@ export const dict = {
   "prompt.action.stop": "روکو",
   "prompt.escape.again": "ਸਾਫ਼ ਕਰਨ ਲਈ ਦੁਬਾਰਾ Esc ਦਬਾਓ",
   "prompt.toast.cleared": "ਪ੍ਰੌਂਪਟ ਸਾਫ਼ ਕੀਤਾ · ਵਾਪਸ ਲਿਆਉਣ ਲਈ {{key}}",
+  "prompt.voice.start": "آواز ان پٹ: بولن لئی دبا کے رکھو، یا شروع تے بند کرن لئی کلک کرو",
+  "prompt.voice.recording": "سن رہیا اے… لکھت لئی چھڈو یا کلک کرو، رد کرن لئی Esc",
+  "prompt.voice.transcribing": "ایس کمپیوٹر تے لکھت بنائی جا رہی اے…",
+  "prompt.voice.missing": "آواز ان پٹ لئی ایس کمپیوٹر تے whisper.cpp (whisper-cli) چاہیدا اے",
+  "prompt.voice.micDenied": "سسٹم دیاں پرائیویسی سیٹنگاں وچ Lunos نوں مائیکروفون ورتن دی اجازت دیو",
+  "prompt.voice.offline": "آف لائن موڈ سپیچ ماڈل دا ڈاؤن لوڈ روکدا اے۔ ماڈل ہتھ نال انسٹال کرو",
+  "prompt.voice.download.title": "سپیچ ماڈل ڈاؤن لوڈ کرنا اے؟",
+  "prompt.voice.download.message":
+    "آواز ایس کمپیوٹر تے whisper.cpp دے {{model}} ماڈل ({{size}} MB) نال لکھی جاندی اے، جیہڑا اک وار huggingface.co توں ڈاؤن لوڈ ہو کے SHA-256 نال جانچیا جاندا اے۔ تہاڈی آواز کدے ایس کمپیوٹر توں باہر نئیں جاندی۔",
+  "prompt.voice.download.confirm": "ڈاؤن لوڈ",
+  "prompt.voice.download.progress": "سپیچ ماڈل ڈاؤن لوڈ ہو رہیا اے… {{percent}}%",
+  "prompt.voice.error": "آواز ان پٹ ناکام رہیا: {{error}}",
   "prompt.toast.pasteUnsupported.title": "غیر تعاون یافتہ منسلکہ",
   "prompt.toast.pasteUnsupported.description":
     "ایتھے صرف تصویراں، پی ڈی ایف، یا ٹیکسٹ فائلاں منسلک کیتیاں جا سکدیاں نیں۔",

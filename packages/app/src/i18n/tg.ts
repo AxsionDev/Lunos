@@ -392,6 +392,18 @@ export const dict = {
   "prompt.action.stop": "Ист",
   "prompt.escape.again": "Барои тоза кардан боз Esc",
   "prompt.toast.cleared": "Дархост тоза шуд · барои барқарор {{key}}",
+  "prompt.voice.start": "Вуруди овозӣ: барои гап задан пахш карда нигоҳ доред ё барои оғоз ва қатъ клик кунед",
+  "prompt.voice.recording": "Гӯш мекунам… барои транскрипсия раҳо кунед ё клик кунед, Esc барои бекор кардан",
+  "prompt.voice.transcribing": "Транскрипсия дар ин компютер…",
+  "prompt.voice.missing": "Вуруди овозӣ дар ин компютер whisper.cpp (whisper-cli)-ро талаб мекунад",
+  "prompt.voice.micDenied": "Дар танзимоти махфияти система ба Lunos иҷозати истифодаи микрофонро диҳед",
+  "prompt.voice.offline": "Реҷаи офлайн боргирии модели нутқро манъ мекунад. Моделро дастӣ насб кунед",
+  "prompt.voice.download.title": "Модели нутқ боргирӣ шавад?",
+  "prompt.voice.download.message":
+    "Овоз дар ин компютер бо модели {{model}}-и whisper.cpp ({{size}} MB) транскрипсия мешавад, ки як бор аз huggingface.co боргирӣ ва бо SHA-256 санҷида мешавад. Овози шумо ҳеҷ гоҳ ин компютерро тарк намекунад.",
+  "prompt.voice.download.confirm": "Боргирӣ",
+  "prompt.voice.download.progress": "Модели нутқ боргирӣ мешавад… {{percent}}%",
+  "prompt.voice.error": "Вуруди овозӣ ноком шуд: {{error}}",
   "prompt.toast.pasteUnsupported.title": "Замимаи дастгирӣнашаванда",
   "prompt.toast.pasteUnsupported.description":
     "Дар ин ҷо танҳо тасвирҳо, PDFс ё файлҳои матнӣ замима кардан мумкин аст.",

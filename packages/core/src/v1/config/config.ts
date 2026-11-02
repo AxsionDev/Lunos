@@ -33,6 +33,7 @@ import { ConfigMemory } from "../../config/memory"
 import { ConfigSandbox } from "../../config/sandbox"
 import { ConfigBudget } from "../../config/budget"
 import { ConfigLog } from "../../config/log"
+import { ConfigVoice } from "../../config/voice"
 
 export type Layout = ConfigLayoutV1.Layout
 
@@ -52,7 +53,7 @@ export const Info = Schema.Struct({
   }),
   $locked: Schema.optional(Schema.Array(Schema.String)).annotate({
     description:
-      "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, log, resources, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)",
+      "Organisation policy: keys that user and project config, environment variables, CLI flags and in-session commands can't change. Only read from managed config (system directory or MDM profile). Lockable keys: residency, share, enabled_providers, disabled_providers, marketplace, marketplace_default, marketplace_allow, marketplace_unreviewed, autoupdate, memory, memory.enabled, audit, audit.enabled, audit.path, audit.forward, sandbox, sandbox.required, log, voice, voice.enabled, resources, permission (every permission, including each agent's own) and permission.<tool> (one tool's rule, e.g. permission.webfetch)",
   }),
   shell: Schema.optional(Schema.String).annotate({ description: "Default shell to use for terminal and bash tool" }),
   logLevel: Schema.optional(LogLevelRef).annotate({ description: "Log level" }),
@@ -170,6 +171,9 @@ export const Info = Schema.Struct({
   }),
   external: Schema.optional(ConfigExternal.Info).annotate({
     description: "Drive Claude Code and Codex CLI from Lunos with your own installs (XCOD-204)",
+  }),
+  voice: Schema.optional(ConfigVoice.Info).annotate({
+    description: "Push-to-talk dictation into the prompt, transcribed on this computer (whisper.cpp)",
   }),
   browser: Schema.optional(ConfigBrowser.Info).annotate({
     description:

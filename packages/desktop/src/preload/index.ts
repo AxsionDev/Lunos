@@ -140,6 +140,15 @@ const api: ElectronAPI = {
   setForceFocus: (enabled) => ipcRenderer.invoke("set-force-focus", enabled),
   recordFatalRendererError: (error) => ipcRenderer.invoke("record-fatal-renderer-error", error),
   setNativeTranslations: (bundle) => ipcRenderer.invoke("set-native-translations", bundle),
+  voiceStatus: (model) => ipcRenderer.invoke("voice-status", model),
+  voiceDownload: (model) => ipcRenderer.invoke("voice-download", model),
+  onVoiceDownloadProgress: (cb) => {
+    const handler = (_: unknown, percent: number) => cb(percent)
+    ipcRenderer.on("voice-download-progress", handler)
+    return () => ipcRenderer.removeListener("voice-download-progress", handler)
+  },
+  voiceTranscribe: (pcm, options) => ipcRenderer.invoke("voice-transcribe", pcm, options),
+  voiceMicAccess: () => ipcRenderer.invoke("voice-mic-access"),
 }
 
 contextBridge.exposeInMainWorld("api", api)

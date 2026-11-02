@@ -391,6 +391,18 @@ export const dict = {
   "prompt.action.stop": "Ndalo",
   "prompt.escape.again": "Esc përsëri për ta pastruar",
   "prompt.toast.cleared": "Kërkesa u pastrua · {{key}} për ta rikthyer",
+  "prompt.voice.start": "Hyrja me zë: mbaje shtypur për të folur, ose kliko për të nisur dhe ndalur",
+  "prompt.voice.recording": "Po dëgjoj… lëshoje ose kliko për transkriptim, Esc për anulim",
+  "prompt.voice.transcribing": "Po transkriptohet në këtë kompjuter…",
+  "prompt.voice.missing": "Hyrja me zë kërkon whisper.cpp (whisper-cli) në këtë kompjuter",
+  "prompt.voice.micDenied": "Lejoje Lunos të përdorë mikrofonin te cilësimet e privatësisë së sistemit",
+  "prompt.voice.offline": "Mënyra jashtë linje bllokon shkarkimin e modelit të të folurit. Instaloje modelin me dorë",
+  "prompt.voice.download.title": "Të shkarkohet modeli i të folurit?",
+  "prompt.voice.download.message":
+    "Zëri transkriptohet në këtë kompjuter me modelin {{model}} të whisper.cpp ({{size}} MB), i shkarkuar një herë nga huggingface.co dhe i verifikuar me SHA-256. Zëri juaj nuk largohet kurrë nga ky kompjuter.",
+  "prompt.voice.download.confirm": "Shkarko",
+  "prompt.voice.download.progress": "Po shkarkohet modeli i të folurit… {{percent}}%",
+  "prompt.voice.error": "Hyrja me zë dështoi: {{error}}",
   "prompt.toast.pasteUnsupported.title": "Bashkëngjitje e pambështetur",
   "prompt.toast.pasteUnsupported.description":
     "Këtu mund të bashkëngjiten vetëm imazhe, skedarë PDF ose skedarë teksti.",

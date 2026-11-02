@@ -130,6 +130,20 @@ type PlatformBase = {
 
   /** XCOD-235: sessions the Sessions window asks this (main) window to open; returns an unsubscribe */
   onOpenSession?(cb: (target: { directory: string; sessionID: string }) => void): () => void
+
+  /** XCOD-336: on-device speech to text with whisper.cpp (desktop only; the web app has no mic button) */
+  voice?: VoicePlatform
+}
+
+export type VoicePlatform = {
+  /** Whether whisper.cpp and the model are installed, the model's download size, and offline mode. */
+  status(model?: string): Promise<{ whisper: boolean; model: boolean; size: number; offline: boolean }>
+  /** Download the model (SHA-256 checked); only call after the user agreed. */
+  download(model: string | undefined, onProgress: (percent: number) => void): Promise<void>
+  /** Transcribe 16 kHz mono PCM on this computer. */
+  transcribe(pcm: Int16Array, options: { model?: string; language?: string }): Promise<string>
+  /** Ask the OS for the microphone where it needs asking first (macOS). */
+  microphone(): Promise<boolean>
 }
 
 export type Platform = PlatformBase &

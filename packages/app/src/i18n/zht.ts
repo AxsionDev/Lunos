@@ -413,6 +413,18 @@ export const dict = {
   "prompt.action.stop": "停止",
   "prompt.escape.again": "再按一次 Esc 清除",
   "prompt.toast.cleared": "已清除輸入 · 按 {{key}} 還原",
+  "prompt.voice.start": "語音輸入：按住說話，或點按開始和停止",
+  "prompt.voice.recording": "正在聆聽… 放開或點按即可轉寫，按 Esc 取消",
+  "prompt.voice.transcribing": "正在本機轉寫…",
+  "prompt.voice.missing": "語音輸入需要在本機安裝 whisper.cpp (whisper-cli)",
+  "prompt.voice.micDenied": "請在系統隱私權設定中允許 Lunos 使用麥克風",
+  "prompt.voice.offline": "離線模式會阻擋下載語音模型。請手動安裝模型",
+  "prompt.voice.download.title": "下載語音模型？",
+  "prompt.voice.download.message":
+    "語音在本機以 whisper.cpp 的 {{model}} 模型（{{size}} MB）轉寫，該模型從 huggingface.co 下載一次並以 SHA-256 驗證。您的語音絕不會離開這台電腦。",
+  "prompt.voice.download.confirm": "下載",
+  "prompt.voice.download.progress": "正在下載語音模型… {{percent}}%",
+  "prompt.voice.error": "語音輸入失敗：{{error}}",
 
   "prompt.toast.pasteUnsupported.title": "不支援的附件",
   "prompt.toast.attachmentDuplicate.title": "此檔案已上傳",

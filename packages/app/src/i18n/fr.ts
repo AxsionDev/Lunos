@@ -401,6 +401,19 @@ export const dict = {
   "prompt.action.stop": "Arrêter",
   "prompt.escape.again": "Échap à nouveau pour effacer",
   "prompt.toast.cleared": "Invite effacée · {{key}} pour restaurer",
+  "prompt.voice.start": "Saisie vocale : maintenez pour parler, ou cliquez pour démarrer et arrêter",
+  "prompt.voice.recording": "Écoute… relâchez ou cliquez pour transcrire, Échap pour annuler",
+  "prompt.voice.transcribing": "Transcription sur cet ordinateur…",
+  "prompt.voice.missing": "La saisie vocale nécessite whisper.cpp (whisper-cli) sur cet ordinateur",
+  "prompt.voice.micDenied": "Autorisez Lunos à utiliser le micro dans les réglages de confidentialité du système",
+  "prompt.voice.offline":
+    "Le mode hors ligne bloque le téléchargement du modèle vocal. Installez le modèle manuellement",
+  "prompt.voice.download.title": "Télécharger le modèle vocal ?",
+  "prompt.voice.download.message":
+    "La voix est transcrite sur cet ordinateur avec le modèle {{model}} de whisper.cpp ({{size}} Mo), téléchargé une fois depuis huggingface.co et vérifié par SHA-256. Votre voix ne quitte jamais cet ordinateur.",
+  "prompt.voice.download.confirm": "Télécharger",
+  "prompt.voice.download.progress": "Téléchargement du modèle vocal… {{percent}} %",
+  "prompt.voice.error": "Échec de la saisie vocale : {{error}}",
   "prompt.toast.pasteUnsupported.title": "Pièce jointe non prise en charge",
   "prompt.toast.attachmentDuplicate.title": "Ce fichier a déjà été téléversé",
   "prompt.toast.pasteUnsupported.description":

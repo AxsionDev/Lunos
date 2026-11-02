@@ -115,6 +115,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   enterprise: "Advanced / experimental",
   logLevel: "Advanced / experimental",
   log: "Advanced / experimental",
+  voice: "Advanced / experimental",
   experimental: "Advanced / experimental",
   $schema: "Advanced / experimental",
   $locked: "Advanced / experimental",

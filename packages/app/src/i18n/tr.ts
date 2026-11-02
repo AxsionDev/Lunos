@@ -422,6 +422,18 @@ export const dict = {
   "prompt.action.stop": "Durdur",
   "prompt.escape.again": "Temizlemek için tekrar Esc",
   "prompt.toast.cleared": "İstem temizlendi · geri almak için {{key}}",
+  "prompt.voice.start": "Sesli giriş: konuşmak için basılı tutun veya başlatıp durdurmak için tıklayın",
+  "prompt.voice.recording": "Dinleniyor… metne dönüştürmek için bırakın veya tıklayın, iptal için Esc",
+  "prompt.voice.transcribing": "Bu bilgisayarda metne dönüştürülüyor…",
+  "prompt.voice.missing": "Sesli giriş için bu bilgisayarda whisper.cpp (whisper-cli) gerekir",
+  "prompt.voice.micDenied": "Sistem gizlilik ayarlarında Lunos'un mikrofonu kullanmasına izin verin",
+  "prompt.voice.offline": "Çevrimdışı mod konuşma modelinin indirilmesini engelliyor. Modeli elle kurun",
+  "prompt.voice.download.title": "Konuşma modeli indirilsin mi?",
+  "prompt.voice.download.message":
+    "Ses bu bilgisayarda whisper.cpp'nin {{model}} modeliyle ({{size}} MB) metne dönüştürülür; model huggingface.co'dan bir kez indirilir ve SHA-256 ile doğrulanır. Sesiniz bu bilgisayardan asla çıkmaz.",
+  "prompt.voice.download.confirm": "İndir",
+  "prompt.voice.download.progress": "Konuşma modeli indiriliyor… %{{percent}}",
+  "prompt.voice.error": "Sesli giriş başarısız: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "Desteklenmeyen ek",
   "prompt.toast.attachmentDuplicate.title": "Bu dosya zaten yüklendi",

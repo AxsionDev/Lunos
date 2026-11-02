@@ -394,6 +394,19 @@ export const dict = {
   "prompt.action.stop": "ရပ်ပါ။",
   "prompt.escape.again": "ရှင်းရန် Esc ကို ထပ်နှိပ်ပါ",
   "prompt.toast.cleared": "ညွှန်ကြားချက်ကို ရှင်းလိုက်ပြီ · ပြန်ယူရန် {{key}}",
+  "prompt.voice.start": "အသံဖြင့်ထည့်သွင်းခြင်း- ပြောရန် ဖိထားပါ၊ သို့မဟုတ် စတင်ရန်နှင့် ရပ်ရန် နှိပ်ပါ",
+  "prompt.voice.recording": "နားထောင်နေသည်… စာသားပြောင်းရန် လွှတ်ပါ သို့မဟုတ် နှိပ်ပါ၊ ပယ်ဖျက်ရန် Esc",
+  "prompt.voice.transcribing": "ဤကွန်ပျူတာပေါ်တွင် စာသားပြောင်းနေသည်…",
+  "prompt.voice.missing": "အသံဖြင့်ထည့်သွင်းရန် ဤကွန်ပျူတာပေါ်တွင် whisper.cpp (whisper-cli) လိုအပ်သည်",
+  "prompt.voice.micDenied": "စနစ်၏ ကိုယ်ရေးလုံခြုံမှုဆက်တင်များတွင် Lunos ကို မိုက်ခရိုဖုန်းသုံးခွင့်ပြုပါ",
+  "prompt.voice.offline":
+    "အော့ဖ်လိုင်းမုဒ်သည် စကားပြောမော်ဒယ်ဒေါင်းလုဒ်ကို ပိတ်ထားသည်။ မော်ဒယ်ကို ကိုယ်တိုင်ထည့်သွင်းပါ",
+  "prompt.voice.download.title": "စကားပြောမော်ဒယ်ကို ဒေါင်းလုဒ်လုပ်မလား။",
+  "prompt.voice.download.message":
+    "အသံကို ဤကွန်ပျူတာပေါ်တွင် whisper.cpp ၏ {{model}} မော်ဒယ် ({{size}} MB) ဖြင့် စာသားပြောင်းသည်၊ ၎င်းကို huggingface.co မှ တစ်ကြိမ်ဒေါင်းလုဒ်လုပ်ပြီး SHA-256 ဖြင့် စစ်ဆေးသည်။ သင့်အသံသည် ဤကွန်ပျူတာမှ ဘယ်တော့မှ မထွက်ပါ။",
+  "prompt.voice.download.confirm": "ဒေါင်းလုဒ်",
+  "prompt.voice.download.progress": "စကားပြောမော်ဒယ် ဒေါင်းလုဒ်လုပ်နေသည်… {{percent}}%",
+  "prompt.voice.error": "အသံဖြင့်ထည့်သွင်းခြင်း မအောင်မြင်ပါ- {{error}}",
   "prompt.toast.pasteUnsupported.title": "ပူးတွဲပါဖိုင်ကို ပံ့ပိုးမထားပါ။",
   "prompt.toast.pasteUnsupported.description":
     "ရုပ်ပုံများ၊ PDF များ သို့မဟုတ် စာသားဖိုင်များကိုသာ ဤနေရာတွင် ပူးတွဲနိုင်ပါသည်။",
