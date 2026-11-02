@@ -1,0 +1,91 @@
+name: ide-plugins
+
+# XCOD-333: builds and tests the JetBrains plugin (sdks/jetbrains) and the Visual Studio extension
+# (sdks/visualstudio), and uploads the plugin .zip and the .vsix as artifacts. Build only: nothing is
+# signed or published here. The protocol test against the real server (packages/opencode/test/server/
+# httpapi-ide-protocol.test.ts) runs with the rest of the server tests in test.yml.
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "sdks/ide/**"
+      - "sdks/jetbrains/**"
+      - "sdks/visualstudio/**"
+      - ".github/workflows/ide-plugins.yml"
+  pull_request:
+    branches: [dev]
+    paths:
+      - "sdks/ide/**"
+      - "sdks/jetbrains/**"
+      - "sdks/visualstudio/**"
+      - ".github/workflows/ide-plugins.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  jetbrains:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: sdks/jetbrains
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      # Unit tests (incl. the shared hunk fixtures), the plugin build, and the Plugin Verifier against
+      # IntelliJ IDEA and Rider: the same checks JetBrains Marketplace runs on upload.
+      - name: Build, test and verify
+        run: ./gradlew buildPlugin test verifyPlugin --console=plain
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: lunos-jetbrains
+          path: |
+            sdks/jetbrains/build/distributions/*.zip
+            sdks/jetbrains/build/reports/pluginVerifier/**
+          if-no-files-found: warn
+
+  visualstudio:
+    runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: sdks/visualstudio
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+
+      - uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
+
+      # Lunos.Core: the protocol client, hunks (shared fixtures), prompt context and session state.
+      - name: Test Lunos.Core
+        run: dotnet test test/Lunos.Core.Tests/Lunos.Core.Tests.csproj --configuration Release
+
+      # The VSIX needs the VSSDK build tools, which run only in MSBuild for .NET Framework on Windows.
+      - name: Build the VSIX
+        run: msbuild src/Lunos.VisualStudio/Lunos.VisualStudio.csproj /restore /p:Configuration=Release /p:DeployExtension=false /v:minimal
+
+      - name: List the build output
+        if: always()
+        run: Get-ChildItem -Recurse src/Lunos.VisualStudio/bin/Release | Select-Object FullName, Length
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lunos-visualstudio
+          path: sdks/visualstudio/src/Lunos.VisualStudio/bin/Release/**/*.vsix
+          if-no-files-found: error

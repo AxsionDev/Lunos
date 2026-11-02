@@ -1852,6 +1852,28 @@ export type VoiceConfig = {
   auto_send?: number
 }
 
+export type BrowserConfig = {
+  enabled?: boolean
+  mode?: "lunos" | "extension"
+  allow?: Array<string>
+  deny?: Array<string>
+  deny_categories?: Array<"banking" | "payment" | "password_manager" | "system_settings">
+  stop_key?: string
+  headless?: boolean
+  executable?: string
+  port?: number
+  screenshots?: boolean
+}
+
+export type ComputerConfig = {
+  enabled?: boolean
+  allow?: Array<string>
+  deny?: Array<string>
+  deny_categories?: Array<"banking" | "payment" | "password_manager" | "system_settings" | "terminal">
+  stop_key?: string
+  screenshots?: boolean
+}
+
 export type CloudConfig = {
   issuer?: string
   client_id?: string
@@ -2346,6 +2368,8 @@ export type Config = {
   default_agent?: string
   external?: ExternalConfig
   voice?: VoiceConfig
+  browser?: BrowserConfig
+  computer?: ComputerConfig
   cloud?: CloudConfig
   auth?: AuthConfig
   sync?: SyncConfig

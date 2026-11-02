@@ -780,6 +780,105 @@
       },
       "additionalProperties": false
     },
+    "BrowserConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Give the qa and general agents the browser tool (off by default). Every site asks before the agent acts on it. Lock it to turn browser control off for an organisation"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["lunos", "extension"],
+          "description": "Which browser the agent controls. \"lunos\" (default): a separate Chrome profile Lunos manages. \"extension\": your own Chrome, Edge or Brave, through the Lunos extension on 127.0.0.1 only"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Sites the agent may act on without asking, as host patterns (\"localhost\", \"*.example.com\"). A site named here is allowed even in a denied category"
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Sites the agent is never allowed to open or act on, as host patterns. Wins over allow"
+        },
+        "deny_categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["banking", "payment", "password_manager", "system_settings"]
+          },
+          "description": "Site categories refused unless named in allow (default: banking, payment, password_manager, system_settings)"
+        },
+        "stop_key": {
+          "type": "string",
+          "description": "The key that stops browser control at once, pressed in the controlled browser (default \"ctrl+alt+escape\")"
+        },
+        "headless": {
+          "type": "boolean",
+          "description": "Run the Lunos browser without a window (default false; always headless inside a sandbox)"
+        },
+        "executable": {
+          "type": "string",
+          "description": "The Chrome, Chromium, Edge or Brave executable for the Lunos browser, when it isn't found"
+        },
+        "port": {
+          "exclusiveMinimum": 0,
+          "type": "integer",
+          "maximum": 9007199254740991,
+          "description": "The 127.0.0.1 port the Lunos extension connects to (default 47615)"
+        },
+        "screenshots": {
+          "type": "boolean",
+          "description": "Keep screenshots in the session history (default false: a screenshot is sent to the model once and never stored)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ComputerConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Give the qa and general agents the computer tool (off by default): screenshots, mouse, keyboard and clipboard on this computer. Every app asks before the agent acts on it. Lock it to turn computer control off for an organisation"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Apps the agent may act on without asking: a macOS bundle id (\"com.apple.TextEdit\") or a Windows executable (\"notepad.exe\"). An app named here is allowed even in a denied category"
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Apps the agent is never allowed to act on, as bundle ids or executable names. Wins over allow"
+        },
+        "deny_categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["banking", "payment", "password_manager", "system_settings", "terminal"]
+          },
+          "description": "App categories refused unless named in allow (default: banking, payment, password_manager, system_settings, terminal)"
+        },
+        "stop_key": {
+          "type": "string",
+          "description": "The key that stops all browser and computer control at once, anywhere on the computer (default \"ctrl+alt+escape\")"
+        },
+        "screenshots": {
+          "type": "boolean",
+          "description": "Keep screenshots in the session history (default false: a screenshot is sent to the model once and never stored)"
+        }
+      },
+      "additionalProperties": false
+    },
     "CloudConfig": {
       "type": "object",
       "properties": {
@@ -2341,6 +2440,14 @@
         "voice": {
           "$ref": "#/$defs/VoiceConfig",
           "description": "Push-to-talk dictation into the prompt, transcribed on this computer (whisper.cpp)"
+        },
+        "browser": {
+          "$ref": "#/$defs/BrowserConfig",
+          "description": "Browser control: the agent operates a browser, off by default, asking per site, with a stop key and an audit trail"
+        },
+        "computer": {
+          "$ref": "#/$defs/ComputerConfig",
+          "description": "Computer control: the agent operates desktop apps with screenshots, mouse, keyboard and clipboard, off by default, asking per app, with a stop key and an audit trail"
         },
         "cloud": {
           "$ref": "#/$defs/CloudConfig",

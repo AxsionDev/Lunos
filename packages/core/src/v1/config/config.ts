@@ -27,6 +27,8 @@ import { ConfigCloud } from "../../config/cloud"
 import { ConfigAuth } from "../../config/auth"
 import { ConfigSync } from "../../config/sync"
 import { ConfigExternal } from "../../config/external"
+import { ConfigBrowser } from "../../config/browser"
+import { ConfigComputer } from "../../config/computer"
 import { ConfigMemory } from "../../config/memory"
 import { ConfigSandbox } from "../../config/sandbox"
 import { ConfigBudget } from "../../config/budget"
@@ -172,6 +174,14 @@ export const Info = Schema.Struct({
   }),
   voice: Schema.optional(ConfigVoice.Info).annotate({
     description: "Push-to-talk dictation into the prompt, transcribed on this computer (whisper.cpp)",
+  }),
+  browser: Schema.optional(ConfigBrowser.Info).annotate({
+    description:
+      "Browser control: the agent operates a browser, off by default, asking per site, with a stop key and an audit trail",
+  }),
+  computer: Schema.optional(ConfigComputer.Info).annotate({
+    description:
+      "Computer control: the agent operates desktop apps with screenshots, mouse, keyboard and clipboard, off by default, asking per app, with a stop key and an audit trail",
   }),
   cloud: Schema.optional(ConfigCloud.Info).annotate({
     description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",

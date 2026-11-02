@@ -1958,6 +1958,8 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
   const shouldHide = createMemo(() => {
     if (ctx.showDetails()) return false
     if (props.part.state.status !== "completed") return false
+    // XCOD-327: instructions found on a page are always shown to the user.
+    if (Array.isArray(props.part.state.metadata?.["injection"])) return false
     return true
   })
 
@@ -2026,6 +2028,9 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         </Match>
         <Match when={display() === "skill"}>
           <Skill {...toolprops} />
+        </Match>
+        <Match when={props.part.tool === "browser" || props.part.tool === "computer"}>
+          <Browser {...toolprops} />
         </Match>
         <Match when={true}>
           <GenericTool {...toolprops} />
@@ -2449,6 +2454,45 @@ function WebFetch(props: ToolProps) {
     <InlineTool icon="%" pending="Fetching from the web…" complete={stringValue(props.input.url)} part={props.part}>
       WebFetch {stringValue(props.input.url)}
     </InlineTool>
+  )
+}
+
+// XCOD-327: one browser action, and any instructions the page held for the agent, which it was
+// told not to follow and which the user is shown here.
+function Browser(props: ToolProps) {
+  const { theme } = useTheme()
+  const injection = createMemo(() =>
+    Array.isArray(props.metadata["injection"])
+      ? (props.metadata["injection"] as unknown[]).filter((line): line is string => typeof line === "string")
+      : [],
+  )
+  const computer = () => props.part.tool === "computer"
+  const target = () =>
+    stringValue(props.input.url) ??
+    stringValue(props.input.ref) ??
+    stringValue(props.input.query) ??
+    stringValue(props.input.app) ??
+    (typeof props.input.x === "number" ? `${props.input.x},${props.input.y}` : "")
+  return (
+    <box>
+      <InlineTool
+        icon={computer() ? "▣" : "◎"}
+        pending={computer() ? "Using the computer…" : "Using the browser…"}
+        complete={stringValue(props.input.action)}
+        part={props.part}
+      >
+        {computer() ? "Computer" : "Browser"} {stringValue(props.input.action)} {target()}
+        {props.metadata["refused"] === true ? " · refused" : ""}
+      </InlineTool>
+      <Show when={injection().length > 0}>
+        <box paddingLeft={3}>
+          <text fg={theme.warning}>
+            ⚠ The {computer() ? "screen" : "page"} has instructions for the agent. They were not followed:
+          </text>
+          <For each={injection()}>{(line) => <text fg={theme.textMuted}>{`"${line}"`}</text>}</For>
+        </box>
+      </Show>
+    </box>
   )
 }
 

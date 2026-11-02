@@ -222,7 +222,9 @@ export const {
 
         case "permission.asked": {
           const request = event.properties
-          if (approvalOf(request.sessionID) === "auto") {
+          // XCOD-327: a request marked manual (a site for browser control, a form submit, a
+          // download) is always answered by a person, even in Auto-approve.
+          if (approvalOf(request.sessionID) === "auto" && request.metadata?.["manual"] !== true) {
             void sdk.client.permission.reply({
               requestID: request.id,
               reply: "once",

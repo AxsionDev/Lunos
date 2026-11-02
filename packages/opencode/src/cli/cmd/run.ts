@@ -1052,7 +1052,9 @@ export const RunCommand = effectCmd({
               const permission = event.properties
               if (!sessions.has(permission.sessionID)) continue
 
-              if (auto) {
+              // XCOD-327: --auto never answers a request marked manual (browser control's site
+              // approvals and confirmations): nobody is there to approve it, so it's refused.
+              if (auto && permission.metadata?.["manual"] !== true) {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "once",

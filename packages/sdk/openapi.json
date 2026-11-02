@@ -26870,6 +26870,88 @@
         },
         "additionalProperties": false
       },
+      "BrowserConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["lunos", "extension"]
+          },
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny_categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["banking", "payment", "password_manager", "system_settings"]
+            }
+          },
+          "stop_key": {
+            "type": "string"
+          },
+          "headless": {
+            "type": "boolean"
+          },
+          "executable": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "screenshots": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ComputerConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny_categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["banking", "payment", "password_manager", "system_settings", "terminal"]
+            }
+          },
+          "stop_key": {
+            "type": "string"
+          },
+          "screenshots": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "CloudConfig": {
         "type": "object",
         "properties": {
@@ -28262,6 +28344,12 @@
           },
           "voice": {
             "$ref": "#/components/schemas/VoiceConfig"
+          },
+          "browser": {
+            "$ref": "#/components/schemas/BrowserConfig"
+          },
+          "computer": {
+            "$ref": "#/components/schemas/ComputerConfig"
           },
           "cloud": {
             "$ref": "#/components/schemas/CloudConfig"

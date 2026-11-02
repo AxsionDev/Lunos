@@ -1,0 +1,22 @@
+{
+  "name": "added-file",
+  "file": "src/added-file.txt",
+  "before": "",
+  "after": "new line 1\nnew line 2\n",
+  "patch": "Index: src/added-file.txt\n===================================================================\n--- src/added-file.txt\t\n+++ src/added-file.txt\t\n@@ -0,0 +1,2 @@\n+new line 1\n+new line 2\n",
+  "hunks": 1,
+  "cases": [
+    {
+      "accept": [
+        false
+      ],
+      "expected": ""
+    },
+    {
+      "accept": [
+        true
+      ],
+      "expected": "new line 1\nnew line 2\n"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+  <Include href="KnownImageIds.vsct" />
+
+  <Commands package="guidLunosPackage">
+    <Groups>
+      <Group guid="guidLunosCommands" id="EditorContextGroup" priority="0x0100">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_CODEWIN" />
+      </Group>
+      <Group guid="guidLunosCommands" id="ErrorListContextGroup" priority="0x0100">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ERRORLIST" />
+      </Group>
+      <Group guid="guidLunosCommands" id="ToolsGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS" />
+      </Group>
+    </Groups>
+
+    <Buttons>
+      <Button guid="guidLunosCommands" id="cmdOpenToolWindow" priority="0x0100" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+        <Icon guid="ImageCatalogGuid" id="Comment" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Strings>
+          <ButtonText>Lunos</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidLunosCommands" id="cmdAskAboutSelection" priority="0x0100" type="Button">
+        <Parent guid="guidLunosCommands" id="EditorContextGroup" />
+        <Icon guid="ImageCatalogGuid" id="Comment" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Strings>
+          <ButtonText>Ask Lunos about Selection</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidLunosCommands" id="cmdSendErrors" priority="0x0100" type="Button">
+        <Parent guid="guidLunosCommands" id="ErrorListContextGroup" />
+        <Strings>
+          <ButtonText>Send to Lunos</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidLunosCommands" id="cmdReviewChanges" priority="0x0100" type="Button">
+        <Parent guid="guidLunosCommands" id="ToolsGroup" />
+        <Strings>
+          <ButtonText>Review Lunos Changes</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidLunosCommands" id="cmdOpenTui" priority="0x0101" type="Button">
+        <Parent guid="guidLunosCommands" id="ToolsGroup" />
+        <Strings>
+          <ButtonText>Open Lunos TUI in Terminal</ButtonText>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <KeyBindings>
+    <KeyBinding guid="guidLunosCommands" id="cmdAskAboutSelection" editor="guidVSStd97" key1="L" mod1="Control Alt" />
+  </KeyBindings>
+
+  <Symbols>
+    <GuidSymbol name="guidLunosPackage" value="{6b6c0f4e-3f0a-4a4b-9d2a-0c3f3c3e0333}" />
+    <GuidSymbol name="guidLunosCommands" value="{a3e3f9a1-7c0d-4b8e-8f1e-2d4c5b6a0333}">
+      <IDSymbol name="EditorContextGroup" value="0x1020" />
+      <IDSymbol name="ErrorListContextGroup" value="0x1021" />
+      <IDSymbol name="ToolsGroup" value="0x1022" />
+      <IDSymbol name="cmdOpenToolWindow" value="0x0100" />
+      <IDSymbol name="cmdAskAboutSelection" value="0x0101" />
+      <IDSymbol name="cmdSendErrors" value="0x0102" />
+      <IDSymbol name="cmdReviewChanges" value="0x0103" />
+      <IDSymbol name="cmdOpenTui" value="0x0104" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>

@@ -124,6 +124,21 @@ export const EVENTS = [
   // XCOD-334: a security-review finding suppressed by a `lunos-ignore-security <reason>` comment:
   // rule, CWE, severity, file, line, the reason as written and the review target. Never the code.
   "security.suppressed",
+  // XCOD-327: browser control. One `browser.action` per action the agent took or was refused
+  // (action, host, how it was approved), a site refused before any approval was asked
+  // (`browser.denied`), control stopped by the user (`browser.stop`), and instructions found on a
+  // page and shown to the user rather than followed (`browser.injection`). Never page text, typed
+  // text or screenshots. XCOD-339 adds `computer.*` the same way.
+  "browser.action",
+  "browser.denied",
+  "browser.stop",
+  "browser.injection",
+  // XCOD-339: computer control, the same four for desktop apps (`app` instead of `host`). Never
+  // typed text, clipboard contents or screenshots.
+  "computer.action",
+  "computer.denied",
+  "computer.stop",
+  "computer.injection",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { ControlEphemeral } from "@/control/ephemeral"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Image } from "@/image/image"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -180,7 +181,9 @@ const layer = Layer.effect(
             metadata: output.metadata,
             title: output.title,
             time: { start: match.part.state.time.start, end: Date.now() },
-            attachments: output.attachments,
+            // XCOD-327: every completed tool call is stored through here (an aborted turn too), so
+            // media a tool marks ephemeral (browser screenshots) never reaches the session as data.
+            attachments: ControlEphemeral.storable(output.metadata, output.attachments),
           },
         })
         yield* settleToolCall(toolCallID)
