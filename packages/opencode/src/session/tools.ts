@@ -128,20 +128,20 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     ask: (req) =>
       home(
         permission
-        .ask({
-          ...req,
-          sessionID: input.session.id,
-          tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-          ruleset: Permission.merge(
-            input.agent.permission,
-            input.session.permission ?? [],
-            SkillScope.rules(
-              input.session.id,
-              input.messages.findLast((message) => message.info.role === "user")?.info.id,
+          .ask({
+            ...req,
+            sessionID: input.session.id,
+            tool: { messageID: input.processor.message.id, callID: options.toolCallId },
+            ruleset: Permission.merge(
+              input.agent.permission,
+              input.session.permission ?? [],
+              SkillScope.rules(
+                input.session.id,
+                input.messages.findLast((message) => message.info.role === "user")?.info.id,
+              ),
             ),
-          ),
-        })
-        .pipe(Effect.orDie),
+          })
+          .pipe(Effect.orDie),
       ),
   })
 
