@@ -33,6 +33,8 @@ import { MemoryRecall } from "@/memory/recall"
 import { MemoryStore } from "@/memory/store"
 import MEMORY_REMEMBER from "@/memory/remember.txt"
 import MEMORY_SEARCH from "@/memory/search.txt"
+import { InstanceRef } from "@/effect/instance-ref"
+import { SubagentIsolation } from "./isolation"
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -47,6 +49,33 @@ const SUPPORTED_MCP_RESOURCE_ATTACHMENT_MIMES = new Set([
   "image/png",
   "image/webp",
 ])
+
+/**
+ * XCOD-332: runs a tool of a session bound to a worktree (SubagentIsolation.bind) inside it: the
+ * instance's directory and worktree are the worktree's, and the user's absolute paths in the
+ * arguments are moved there. Any other tool or session runs as it is.
+ */
+export function isolated<A, E, R>(
+  tool: string,
+  sessionID: string,
+  args: Record<string, unknown>,
+  execute: (args: Record<string, unknown>) => Effect.Effect<A, E, R>,
+) {
+  const binding = SubagentIsolation.lookup(sessionID)
+  if (!binding || !SubagentIsolation.TOOLS.has(tool)) return execute(args)
+  return Effect.gen(function* () {
+    const instance = yield* InstanceRef
+    const effect = execute(SubagentIsolation.remapArgs(tool, args, binding))
+    if (!instance) return yield* effect
+    return yield* effect.pipe(
+      Effect.provideService(InstanceRef, {
+        ...instance,
+        directory: binding.to.directory,
+        worktree: binding.to.root,
+      }),
+    )
+  })
+}
 
 export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   agent: Agent.Info
@@ -66,6 +95,11 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
   const memory = yield* Memory.Service
+  // XCOD-332: a subagent in its own worktree runs its file and shell tools there (`isolated`), while
+  // permission prompts, questions and tool metadata stay on the user's instance, where the TUI is.
+  const instance = yield* InstanceRef
+  const home = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+    instance ? effect.pipe(Effect.provideService(InstanceRef, instance)) : effect
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -76,21 +110,24 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     agent: input.agent.name,
     messages: input.messages,
     metadata: (val) =>
-      input.processor.updateToolCall(options.toolCallId, (match) => {
-        if (!["running", "pending"].includes(match.state.status)) return match
-        return {
-          ...match,
-          state: {
-            title: val.title,
-            metadata: val.metadata,
-            status: "running",
-            input: args,
-            time: match.state.status === "running" ? match.state.time : { start: Date.now() },
-          },
-        }
-      }),
+      home(
+        input.processor.updateToolCall(options.toolCallId, (match) => {
+          if (!["running", "pending"].includes(match.state.status)) return match
+          return {
+            ...match,
+            state: {
+              title: val.title,
+              metadata: val.metadata,
+              status: "running",
+              input: args,
+              time: match.state.status === "running" ? match.state.time : { start: Date.now() },
+            },
+          }
+        }),
+      ),
     ask: (req) =>
-      permission
+      home(
+        permission
         .ask({
           ...req,
           sessionID: input.session.id,
@@ -105,6 +142,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
           ),
         })
         .pipe(Effect.orDie),
+      ),
   })
 
   // XCOD-136: memory_remember asks "replace or keep both?" through the question tool, and only
@@ -132,7 +170,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
               { args },
             )
             AuditLog.toolRun({ tool: item.id, agent: ctx.agent, session: ctx.sessionID, args })
-            const result = yield* item.execute(args, ctx)
+            const result = yield* isolated(item.id, input.session.id, args, (next) => item.execute(next, ctx))
             const output = {
               ...result,
               attachments: result.attachments?.map((attachment) => ({

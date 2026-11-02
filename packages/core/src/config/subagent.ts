@@ -19,6 +19,10 @@ export const Info = Schema.Struct({
   max_parallel: PositiveInt.pipe(Schema.optional).annotate({
     description: "At most this many subagents run at once per session; more wait their turn (default 3)",
   }),
+  isolation: Schema.Literals(["worktree", "shared"]).pipe(Schema.optional).annotate({
+    description:
+      'Where writing subagents edit: "worktree" gives each its own git worktree, merged back when it finishes (the default in a git repository); "shared" has them all edit your working tree',
+  }),
   fun_names: Schema.Boolean.pipe(Schema.optional).annotate({
     description:
       'Give subagents funny names in the TUI, such as "Turbo Pickle" (on by default; false shows "Subagent 1")',

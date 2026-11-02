@@ -1379,7 +1379,7 @@ const layer = Layer.effect(
         config: cfg,
         agent,
         session: { ...input.session, metadata: (yield* sessions.get(input.sessionID).pipe(Effect.orDie)).metadata },
-        subagents: (yield* agents.list()).filter((item) => item.mode !== "primary"),
+        subagents: (yield* agents.list()).filter((item) => Agent.dispatchable(item)),
       }).on
       // Continuations count against the step limit like any step; at the limit the turn stops.
       const stop = AutoContinue.classify({
@@ -1604,7 +1604,7 @@ const layer = Layer.effect(
           const isLastStep = step >= maxSteps
           // XCOD-287: Build's nudge to split development work across subagents.
           const stepConfig = yield* config.get()
-          const subagents = (yield* agents.list()).filter((item) => item.mode !== "primary")
+          const subagents = (yield* agents.list()).filter((item) => Agent.dispatchable(item))
           const stepBackground = backgroundEnabled(flags.experimentalBackgroundSubagents, stepConfig)
           // XCOD-303: Dynamic workflows, read every step so `/workflows on|off` applies to the next one.
           const decision = DynamicWorkflows.decide({
@@ -2054,7 +2054,7 @@ const layer = Layer.effect(
                   after.by === "session" ? after.on : undefined,
                 ),
               },
-              subagents: (yield* agents.list()).filter((item) => item.mode !== "primary"),
+              subagents: (yield* agents.list()).filter((item) => Agent.dispatchable(item)),
             })
           : after
         const status = `${refusal}Dynamic workflows: ${after.on ? "on" : "off"} (${after.reason}).${

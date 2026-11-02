@@ -25,6 +25,12 @@ import { ConfigPolicy } from "@/config/policy"
 import { DynamicWorkflows } from "@/session/workflows"
 import { Budget } from "@/budget"
 import { Question } from "@/question"
+import path from "path"
+import { realpathSync } from "fs"
+import { Global } from "@opencode-ai/core/global"
+import { InstanceState } from "@/effect/instance-state"
+import { Permission } from "@/permission"
+import { SubagentIsolation } from "@/session/isolation"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -111,6 +117,12 @@ export function withBackground(input: { description: string; schema: JSONSchema7
   }
 }
 
+/** A file version for a conflict prompt or question: long ones are cut. */
+function clip(text: string, max = 4000) {
+  if (!text) return "(no file)"
+  return text.length > max ? `${text.slice(0, max)}\n… (${text.length - max} more characters)` : text
+}
+
 function renderOutput(input: {
   sessionID: SessionID
   state: "running" | "completed" | "error"
@@ -161,6 +173,24 @@ export const TaskTool = Tool.define(
       yield* sessions.setMetadata({ sessionID, metadata: queued ? { ...rest, subagent: { queued: true } } : rest })
     })
 
+    // XCOD-332: one merge into a working tree at a time, so each lands on the result of the last.
+    const merging = new Map<string, Semaphore.Semaphore>()
+    const mergeLock = (root: string) => {
+      const hit = merging.get(root)
+      if (hit) return hit
+      const next = Semaphore.makeUnsafe(1)
+      merging.set(root, next)
+      return next
+    }
+    /** XCOD-332: the subagent's worktree, diff size and merge state, for the sidebar. */
+    const setIsolation = Effect.fn("TaskTool.setIsolation")(function* (
+      sessionID: SessionID,
+      value: Record<string, unknown>,
+    ) {
+      const latest = yield* sessions.get(sessionID)
+      yield* sessions.setMetadata({ sessionID, metadata: { ...(latest.metadata ?? {}), isolation: value } })
+    })
+
     const lastAssistant = Effect.fn("TaskTool.lastAssistant")(function* (sessionID: SessionID) {
       const messages = yield* sessions.messages({ sessionID }).pipe(Effect.orElseSucceed(() => []))
       const info = messages.findLast((item) => item.info.role === "assistant")?.info
@@ -206,7 +236,7 @@ export const TaskTool = Tool.define(
           config: cfg,
           agent: parentAgent,
           session: parent,
-          subagents: (yield* agent.list()).filter((item) => item.mode !== "primary"),
+          subagents: (yield* agent.list()).filter((item) => Agent.dispatchable(item)),
         }).on
       if (dynamic) {
         const stop = yield* Budget.dispatchStop(
@@ -393,8 +423,249 @@ export const TaskTool = Tool.define(
             .pipe(Effect.onInterrupt(() => markQueued(nextSession.id, false).pipe(Effect.ignore)))
         })
 
+      // XCOD-332: a writing subagent in a git repository works in its own worktree, merged into the
+      // user's tree when it finishes and removed whatever happens (a failed one leaves no edits).
       const prompt = Effect.fn("TaskTool.runTask")(function* () {
-        const parts = yield* ops.resolvePromptParts(params.prompt)
+        const binding = yield* isolate()
+        if (!binding) return yield* work()
+        return yield* Effect.acquireUseRelease(
+          Effect.succeed(binding),
+          () =>
+            Effect.gen(function* () {
+              const text = yield* work(binding)
+              return [text, yield* land(binding)].filter(Boolean).join("\n\n")
+            }),
+          (_, exit) =>
+            Effect.gen(function* () {
+              SubagentIsolation.unbind(nextSession.id)
+              yield* Effect.promise(() => SubagentIsolation.discard(binding.handle).catch(() => undefined))
+              if (exit._tag === "Failure")
+                yield* setIsolation(nextSession.id, {
+                  state: "discarded",
+                  branch: binding.handle.branch,
+                  directory: binding.handle.directory,
+                }).pipe(Effect.ignore)
+            }),
+        )
+      })
+
+      const isolate = Effect.fn("TaskTool.isolate")(function* () {
+        const instance = yield* InstanceState.context
+        const sandbox = (cfg as { sandbox?: { enabled?: boolean; required?: boolean } }).sandbox
+        const decision = yield* Effect.promise(() =>
+          SubagentIsolation.decide({
+            configured: cfg.subagent?.isolation,
+            vcs: instance.project.vcs,
+            writes: !Permission.disabled(["edit"], next.permission).has("edit"),
+            sandboxed: !!(sandbox?.enabled || sandbox?.required),
+            directory: instance.directory,
+          }),
+        )
+        if (decision.mode === "shared") return undefined
+        const created = yield* Effect.tryPromise(async () => {
+          const root = await SubagentIsolation.toplevel(instance.directory)
+          const real = realpathSync(instance.directory)
+          const created = await SubagentIsolation.create({
+            root,
+            dataDir: Global.Path.data,
+            session: ctx.sessionID,
+            step: params.description,
+          })
+          return {
+            handle: created.handle,
+            from: { root: path.resolve(instance.directory, path.relative(real, root)), directory: instance.directory },
+            to: { root: created.handle.directory, directory: path.join(created.handle.directory, path.relative(root, real)) },
+          } satisfies SubagentIsolation.Binding
+        }).pipe(
+          // A worktree that can't be made (disk full, a broken repository) never stops the work:
+          // the subagent shares the tree, as before, and its session says why.
+          Effect.catchCause((cause) =>
+            Effect.logWarning("subagent worktree failed; sharing the working tree", { cause }).pipe(
+              Effect.andThen(setIsolation(nextSession.id, { state: "shared", reason: "the worktree could not be created" })),
+              Effect.ignore,
+              Effect.as(undefined),
+            ),
+          ),
+        )
+        if (!created) return undefined
+        SubagentIsolation.bind(nextSession.id, created)
+        yield* setIsolation(nextSession.id, {
+          state: "running",
+          branch: created.handle.branch,
+          directory: created.handle.directory,
+        }).pipe(Effect.ignore)
+        return created
+      })
+
+      const regenerate = (root: string) =>
+        SubagentIsolation.regenerate(root).catch(
+          (error) => `lockfile regeneration failed (${error instanceof Error ? error.message : String(error)})`,
+        )
+
+      /** Commits the worktree and merges it into the user's tree, through `merge` and the user on a conflict. */
+      const land = Effect.fn("TaskTool.land")(function* (binding: SubagentIsolation.Binding) {
+        const handle = binding.handle
+        yield* Effect.promise(() => SubagentIsolation.finalize(handle, `lunos: ${params.description}`))
+        return yield* mergeLock(handle.root).withPermits(1)(
+          Effect.gen(function* () {
+            const first = yield* Effect.promise(() => SubagentIsolation.merge(handle, { regenerate }))
+            const result = first.state === "conflict" ? yield* resolveConflict(binding, first) : first
+            yield* setIsolation(nextSession.id, {
+              state: result.state === "empty" ? "unchanged" : "merged",
+              branch: handle.branch,
+              directory: handle.directory,
+              files: result.files.length,
+              additions: result.additions,
+              deletions: result.deletions,
+            }).pipe(Effect.ignore)
+            if (result.state === "empty") return "<isolation>The subagent changed no files.</isolation>"
+            if (result.state === "conflict") return ""
+            return [
+              `<isolation branch="${handle.branch}">`,
+              `Merged ${result.files.length} file(s) (+${result.additions} -${result.deletions}) into the working tree: ${result.files.join(", ")}.`,
+              ...(result.resolved.length ? [`Combined automatically: ${result.resolved.join(", ")}.`] : []),
+              ...(result.regenerated ? [`Lockfile: ${result.regenerated}.`] : []),
+              "Run the qa checks on the combined result before reporting this step done.",
+              "</isolation>",
+            ].join("\n")
+          }),
+        )
+      })
+
+      const resolveConflict = Effect.fn("TaskTool.resolveConflict")(function* (
+        binding: SubagentIsolation.Binding,
+        conflict: Extract<SubagentIsolation.MergeResult, { state: "conflict" }>,
+      ) {
+        const handle = binding.handle
+        yield* setIsolation(nextSession.id, {
+          state: "conflict",
+          branch: handle.branch,
+          directory: handle.directory,
+          conflicts: conflict.conflicts.map((item) => item.path),
+        }).pipe(Effect.ignore)
+        if (yield* mergeAgent(binding, conflict)) {
+          const again = yield* Effect.promise(() => SubagentIsolation.merge(handle, { regenerate }))
+          if (again.state !== "conflict") return again
+        }
+        // XCOD-324: a conflict neither side could resolve is one of the reasons a person is needed.
+        const files = conflict.conflicts.map((item) => item.path)
+        const asker = Budget.unattended(current.permission) ? undefined : Option.getOrUndefined(question)
+        const THEIRS = "Use the subagent's version"
+        const OURS = "Keep my version"
+        const answers = !asker
+          ? []
+          : yield* asker
+              .ask({
+                sessionID: ctx.sessionID,
+                questions: [
+                  {
+                    header: "Merge conflict",
+                    question: [
+                      `"${params.description}" (${handle.branch}) conflicts with your working tree in ${files.join(", ")}, and the merge subagent couldn't resolve it.`,
+                      ...conflict.conflicts.flatMap((item) => [
+                        "",
+                        `${item.path}, your version:`,
+                        clip(item.ours),
+                        `${item.path}, the subagent's version:`,
+                        clip(item.theirs),
+                      ]),
+                    ].join("\n"),
+                    options: [
+                      { label: THEIRS, description: `Take the subagent's ${files.join(", ")}; merge the rest` },
+                      { label: OURS, description: `Keep your ${files.join(", ")}; merge the rest` },
+                      { label: "Stop", description: "Merge nothing; the subagent's changes are saved as a patch" },
+                    ],
+                  },
+                ],
+              })
+              .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<ReadonlyArray<string>>))
+        const answer = answers[0]?.[0]
+        if (answer === THEIRS || answer === OURS)
+          return yield* Effect.promise(() =>
+            SubagentIsolation.settle(handle, answer === THEIRS ? "theirs" : "ours", { regenerate }),
+          )
+        const saved = yield* Effect.promise(async () => {
+          const target = path.join(SubagentIsolation.home(Global.Path.data, handle.root), "patches", `${handle.branch.replaceAll("/", "-")}.patch`)
+          await Bun.write(target, await SubagentIsolation.diff(handle))
+          return target
+        })
+        yield* setIsolation(nextSession.id, {
+          state: "conflict",
+          branch: handle.branch,
+          conflicts: files,
+          patch: saved,
+        }).pipe(Effect.ignore)
+        return yield* Effect.fail(
+          new Error(
+            `Merge conflict in ${files.join(", ")}: nothing from "${params.description}" was merged into your working tree. Its changes are saved in ${saved}.`,
+          ),
+        )
+      })
+
+      /** The `merge` subagent, in the conflicted worktree. True when it left no conflict behind. */
+      const mergeAgent = Effect.fn("TaskTool.mergeAgent")(function* (
+        binding: SubagentIsolation.Binding,
+        conflict: Extract<SubagentIsolation.MergeResult, { state: "conflict" }>,
+      ) {
+        const info = yield* agent.get("merge")
+        if (!info) return false
+        const handle = binding.handle
+        yield* Effect.promise(() => SubagentIsolation.prepareConflict(handle, conflict.ours))
+        const child = yield* sessions.create({
+          parentID: ctx.sessionID,
+          title: `Merge ${params.description} (@merge subagent)`,
+          agent: info.name,
+          permission: deriveSubagentSessionPermission({ parentSessionPermission: parent.permission ?? [], subagent: info }),
+        })
+        SubagentIsolation.bind(child.id, binding)
+        const ok = yield* ops
+          .prompt({
+            messageID: MessageID.ascending(),
+            sessionID: child.id,
+            model: { modelID: model.modelID, providerID: model.providerID },
+            agent: info.name,
+            parts: [
+              {
+                type: "text",
+                text: [
+                  `Resolve the merge conflicts in ${binding.to.root} (an isolated worktree; edit files only there).`,
+                  `Conflicted files: ${conflict.conflicts.map((item) => item.path).join(", ")}.`,
+                  ...conflict.conflicts.flatMap((item) => [
+                    "",
+                    `## ${item.path}`,
+                    "Base (where both started):",
+                    clip(item.base),
+                    "Ours (the user's working tree now):",
+                    clip(item.ours),
+                    `Theirs (the subagent's change for "${params.description}"):`,
+                    clip(item.theirs),
+                  ]),
+                ].join("\n"),
+              },
+            ],
+          })
+          .pipe(
+            Effect.map((result) => !(result.info.role === "assistant" && result.info.error)),
+            Effect.catchCause(() => Effect.succeed(false)),
+            Effect.ensuring(Effect.sync(() => SubagentIsolation.unbind(child.id))),
+          )
+        const done = ok && (yield* Effect.promise(() => SubagentIsolation.conclude(handle, conflict.ours)))
+        if (!done) yield* Effect.promise(() => SubagentIsolation.abortConflict(handle))
+        return done
+      })
+
+      const work = Effect.fn("TaskTool.work")(function* (binding?: SubagentIsolation.Binding) {
+        const resolvedParts = yield* ops.resolvePromptParts(params.prompt)
+        const parts = binding
+          ? [
+              ...resolvedParts,
+              {
+                type: "text" as const,
+                synthetic: true,
+                text: `You are working in an isolated git worktree at ${binding.to.directory}, a copy of ${binding.from.directory} with its uncommitted changes. Your file and shell tools run there, and paths under ${binding.from.root} are mapped to it. When you finish, your changes are merged into the user's working tree; if you fail, they are discarded. Don't commit, switch branches, stash or touch other worktrees.`,
+              },
+            ]
+          : resolvedParts
         const result = yield* ops.prompt({
           messageID: MessageID.ascending(),
           sessionID: nextSession.id,
