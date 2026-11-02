@@ -876,7 +876,9 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       })
     })
     // XCOD-338: /remote on|off.
-    const sessionRemote = Effect.fn("ExperimentalHttpApi.sessionRemote")(function* (ctx: { params: { sessionID: string } }) {
+    const sessionRemote = Effect.fn("ExperimentalHttpApi.sessionRemote")(function* (ctx: {
+      params: { sessionID: string }
+    }) {
       return CloudRemote.status(ctx.params.sessionID)
     })
     const sessionRemoteSet = Effect.fn("ExperimentalHttpApi.sessionRemoteSet")(function* (ctx: {
@@ -884,8 +886,7 @@ export const experimentalHandlers = HttpApiBuilder.group(InstanceHttpApi, "exper
       payload: typeof SessionRemotePayload.Type
     }) {
       const sessionID = SessionID.make(ctx.params.sessionID)
-      if (!ctx.payload.on)
-        return yield* Effect.promise(() => CloudRemote.disable(sessionID))
+      if (!ctx.payload.on) return yield* Effect.promise(() => CloudRemote.disable(sessionID))
       const info = yield* sessions.get(sessionID).pipe(Effect.catch(() => Effect.fail(notFound("No such session."))))
       yield* notDrivenElsewhere(sessionID)
       const agent = yield* agentOf(info)

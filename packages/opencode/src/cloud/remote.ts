@@ -85,7 +85,10 @@ export function gate(input: {
 }): Gate | undefined {
   if (input.offline) return "offline"
   const locked = (key: string) => ConfigPolicy.isLocked(input.config.$locked, key)
-  if ((input.config.remote_control === false && locked("remote_control")) || (input.config.sync === false && locked("sync")))
+  if (
+    (input.config.remote_control === false && locked("remote_control")) ||
+    (input.config.sync === false && locked("sync"))
+  )
     return "policy"
   if (input.config.remote_control === false || input.config.sync === false) return "directory"
   if (!input.signedIn) return "signed-out"
@@ -134,7 +137,8 @@ export function bridge(input: BridgeInput) {
   let timer: ReturnType<typeof setTimeout> | undefined
   let flushing: Promise<void> = Promise.resolve()
 
-  const own = (sessionID: unknown) => typeof sessionID === "string" && (sessionID === input.sessionID || children.has(sessionID))
+  const own = (sessionID: unknown) =>
+    typeof sessionID === "string" && (sessionID === input.sessionID || children.has(sessionID))
 
   function queue(events: CloudRemoteLink.Event[]) {
     if (!open) return
@@ -182,7 +186,9 @@ export function bridge(input: BridgeInput) {
     siblings.set(part.id, part)
     parts.set(part.messageID, siblings)
     const list = [...siblings.values()].sort((a, b) => a.id.localeCompare(b.id))
-    const redacted = CloudSyncRedact.message({ info: {}, parts: list }, isSecret).parts.find((p: Part) => p.id === part.id)
+    const redacted = CloudSyncRedact.message({ info: {}, parts: list }, isSecret).parts.find(
+      (p: Part) => p.id === part.id,
+    )
     return CloudSyncRedact.scan(clip(redacted ?? part))
   }
 
@@ -196,13 +202,23 @@ export function bridge(input: BridgeInput) {
         const info = p.info ?? {}
         if (info.parentID && own(info.parentID)) children.add(info.id)
         if (!own(info.id)) return []
-        return [{ type: "session", key: `session:${info.id}`, data: CloudSyncRedact.scan({ id: info.id, title: info.title, parentID: info.parentID }) }]
+        return [
+          {
+            type: "session",
+            key: `session:${info.id}`,
+            data: CloudSyncRedact.scan({ id: info.id, title: info.title, parentID: info.parentID }),
+          },
+        ]
       }
       case "message.updated": {
         const info = p.info ?? {}
         if (!own(info.sessionID)) return []
         const out: CloudRemoteLink.Event[] = [
-          { type: "message", key: `message:${info.id}`, data: { id: info.id, sessionID: info.sessionID, role: info.role, time: info.time } },
+          {
+            type: "message",
+            key: `message:${info.id}`,
+            data: { id: info.id, sessionID: info.sessionID, role: info.role, time: info.time },
+          },
         ]
         if (info.role === "assistant" && info.sessionID === input.sessionID)
           out.push({
@@ -235,7 +251,11 @@ export function bridge(input: BridgeInput) {
           {
             type: "status",
             key: `status:${p.sessionID}`,
-            data: { sessionID: p.sessionID, type: p.status?.type ?? "idle", message: p.status?.message ? CloudSyncRedact.scan(String(p.status.message)) : undefined },
+            data: {
+              sessionID: p.sessionID,
+              type: p.status?.type ?? "idle",
+              message: p.status?.message ? CloudSyncRedact.scan(String(p.status.message)) : undefined,
+            },
           },
         ]
       case "permission.asked":
@@ -249,14 +269,22 @@ export function bridge(input: BridgeInput) {
               id: p.id,
               sessionID: p.sessionID,
               permission: p.permission ?? p.action,
-              patterns: (Array.isArray(p.patterns) ? p.patterns : []).map((x: unknown) => (isSecret(String(x)) ? `[not synced: ${x}]` : String(x))),
+              patterns: (Array.isArray(p.patterns) ? p.patterns : []).map((x: unknown) =>
+                isSecret(String(x)) ? `[not synced: ${x}]` : String(x),
+              ),
             }),
           },
         ]
       case "question.asked":
       case "question.v2.asked":
         if (!own(p.sessionID)) return []
-        return [{ type: "question.asked", key: `ask:${p.id}`, data: CloudSyncRedact.scan({ id: p.id, sessionID: p.sessionID, questions: p.questions }) }]
+        return [
+          {
+            type: "question.asked",
+            key: `ask:${p.id}`,
+            data: CloudSyncRedact.scan({ id: p.id, sessionID: p.sessionID, questions: p.questions }),
+          },
+        ]
       case "permission.replied":
       case "permission.v2.replied":
       case "question.replied":
@@ -264,10 +292,22 @@ export function bridge(input: BridgeInput) {
       case "question.rejected":
       case "question.v2.rejected":
         if (!own(p.sessionID)) return []
-        return [{ type: "ask.settled", key: `ask:${p.requestID}`, data: { id: p.requestID, sessionID: p.sessionID, reply: p.reply } }]
+        return [
+          {
+            type: "ask.settled",
+            key: `ask:${p.requestID}`,
+            data: { id: p.requestID, sessionID: p.sessionID, reply: p.reply },
+          },
+        ]
       case "todo.updated":
         if (p.sessionID !== input.sessionID) return []
-        return [{ type: "todo", key: `todo:${p.sessionID}`, data: CloudSyncRedact.scan({ sessionID: p.sessionID, todos: p.todos }) }]
+        return [
+          {
+            type: "todo",
+            key: `todo:${p.sessionID}`,
+            data: CloudSyncRedact.scan({ sessionID: p.sessionID, todos: p.todos }),
+          },
+        ]
       case "session.deleted":
         if (p.sessionID === input.sessionID || p.info?.id === input.sessionID) end("ended")
         return []
@@ -292,7 +332,8 @@ export function bridge(input: BridgeInput) {
         return { ok: true, delivery: r.delivery }
       }
       case "permission": {
-        if (!(await pendingFor("permission", command.requestID))) return { ok: false, error: "No such approval is waiting in this session." }
+        if (!(await pendingFor("permission", command.requestID)))
+          return { ok: false, error: "No such approval is waiting in this session." }
         input.mark(command.requestID)
         const res = await input.api(`/permission/${command.requestID}/reply`, {
           method: "POST",
@@ -301,10 +342,14 @@ export function bridge(input: BridgeInput) {
         return res.ok ? { ok: true } : { ok: false, error: `The approval failed (${res.status}).` }
       }
       case "question": {
-        if (!(await pendingFor("question", command.requestID))) return { ok: false, error: "No such question is waiting in this session." }
+        if (!(await pendingFor("question", command.requestID)))
+          return { ok: false, error: "No such question is waiting in this session." }
         const res = command.reject
           ? await input.api(`/question/${command.requestID}/reject`, { method: "POST", body: "null" })
-          : await input.api(`/question/${command.requestID}/reply`, { method: "POST", body: JSON.stringify({ answers: command.answers ?? [] }) })
+          : await input.api(`/question/${command.requestID}/reply`, {
+              method: "POST",
+              body: JSON.stringify({ answers: command.answers ?? [] }),
+            })
         return res.ok ? { ok: true } : { ok: false, error: `The answer failed (${res.status}).` }
       }
       case "stop":
@@ -327,7 +372,10 @@ export function bridge(input: BridgeInput) {
         failures = 0
       } catch (error) {
         if (error instanceof CloudRemoteLink.LinkEndedError) return end(error.reason ?? "revoked")
-        if (error instanceof CloudRemoteLink.RelayError && (error.status === 401 || error.status === 403 || error.status === 404))
+        if (
+          error instanceof CloudRemoteLink.RelayError &&
+          (error.status === 401 || error.status === 403 || error.status === 404)
+        )
           return end("refused")
         failures++
         log("remote control: the relay didn't answer; retrying", { error: String(error) })
@@ -337,7 +385,10 @@ export function bridge(input: BridgeInput) {
       for (const command of commands) {
         // `/remote off` may have come while this poll was in flight: nothing it brought runs.
         if (!open) return
-        const result = await run(command).catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }))
+        const result = await run(command).catch((error) => ({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }))
         AuditLog.emit("remote.command", {
           session: input.sessionID,
           link: input.link.id,
@@ -390,17 +441,25 @@ export function bridge(input: BridgeInput) {
           `/session/${input.sessionID}/message?limit=${SNAPSHOT_MESSAGES}`,
           "/permission",
           "/question",
-        ].map((path) => input.api(path).then((r) => (r.ok ? r.json() : undefined)).catch(() => undefined)),
+        ].map((path) =>
+          input
+            .api(path)
+            .then((r) => (r.ok ? r.json() : undefined))
+            .catch(() => undefined),
+        ),
       )
       const out: GlobalEvent[] = []
-      if (session) out.push({ payload: { type: "session.updated", properties: { sessionID: input.sessionID, info: session } } })
+      if (session)
+        out.push({ payload: { type: "session.updated", properties: { sessionID: input.sessionID, info: session } } })
       for (const m of Array.isArray(messages) ? messages : []) {
         out.push({ payload: { type: "message.updated", properties: { sessionID: input.sessionID, info: m.info } } })
-        for (const part of m.parts ?? []) out.push({ payload: { type: "message.part.updated", properties: { sessionID: input.sessionID, part } } })
+        for (const part of m.parts ?? [])
+          out.push({ payload: { type: "message.part.updated", properties: { sessionID: input.sessionID, part } } })
       }
       for (const ask of Array.isArray(permissions) ? permissions : [])
         out.push({ payload: { type: "permission.asked", properties: ask } })
-      for (const ask of Array.isArray(questions) ? questions : []) out.push({ payload: { type: "question.asked", properties: ask } })
+      for (const ask of Array.isArray(questions) ? questions : [])
+        out.push({ payload: { type: "question.asked", properties: ask } })
       queue(out.flatMap(translate))
       await new Promise((resolve) => setTimeout(resolve, FLUSH_MS + 10))
       await flushing
@@ -425,14 +484,21 @@ function tokens(t: any) {
 
 /** Cuts a part's long strings (tool output, text) so one part can't fill the relay's buffer. */
 function clip<T>(value: T): T {
-  if (typeof value === "string") return (value.length > MAX_FIELD ? value.slice(0, MAX_FIELD) + "…[cut for remote]" : value) as T
+  if (typeof value === "string")
+    return (value.length > MAX_FIELD ? value.slice(0, MAX_FIELD) + "…[cut for remote]" : value) as T
   if (Array.isArray(value)) return value.map(clip) as T
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clip(v)])) as T
+  if (value && typeof value === "object")
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clip(v)])) as T
   return value
 }
 
 // The process's remote sessions: one bridge per session, at most.
-type Active = { bridge: ReturnType<typeof bridge>; link: CloudRemoteLink.Link; opts: CloudRemoteLink.Options; directory: string }
+type Active = {
+  bridge: ReturnType<typeof bridge>
+  link: CloudRemoteLink.Link
+  opts: CloudRemoteLink.Options
+  directory: string
+}
 const active = new Map<string, Active>()
 
 /** The link to app.lunos.tech for a session, as the user opens it. */

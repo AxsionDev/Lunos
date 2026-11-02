@@ -24,23 +24,36 @@ function fakeRelay() {
     port: 0,
     async fetch(req) {
       const url = new URL(req.url)
-      if (req.headers.get("authorization") !== "Bearer t0k") return Response.json({ error: { code: "unauthenticated" } }, { status: 401 })
+      if (req.headers.get("authorization") !== "Bearer t0k")
+        return Response.json({ error: { code: "unauthenticated" } }, { status: 401 })
       if (url.pathname === "/v1/remote/links" && req.method === "POST") {
         opened = await req.json()
         return Response.json(
-          { id: "rl_1", host: "a".repeat(64), session: opened.session, device: opened.device, createdAt: Date.now(), expiresAt: Date.now() + 12 * 3_600_000 },
+          {
+            id: "rl_1",
+            host: "a".repeat(64),
+            session: opened.session,
+            device: opened.device,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + 12 * 3_600_000,
+          },
           { status: 201 },
         )
       }
       hosts.push(req.headers.get("x-lunos-remote-host") ?? "")
-      if (ended) return Response.json({ error: { code: "remote_ended", message: "This remote session was revoked.", details: { reason: ended } } }, { status: 410 })
+      if (ended)
+        return Response.json(
+          { error: { code: "remote_ended", message: "This remote session was revoked.", details: { reason: ended } } },
+          { status: 410 },
+        )
       if (url.pathname === "/v1/remote/links/rl_1/events" && req.method === "POST") {
         events.push(...((await req.json()) as any).events)
         return Response.json({ seq: events.length })
       }
       if (url.pathname === "/v1/remote/links/rl_1/commands") {
         for (let i = 0; i < 20 && !commands.length && !ended; i++) await Bun.sleep(25)
-        if (ended) return Response.json({ error: { code: "remote_ended", details: { reason: ended } } }, { status: 410 })
+        if (ended)
+          return Response.json({ error: { code: "remote_ended", details: { reason: ended } } }, { status: 410 })
         const out = commands
         commands = []
         return Response.json({ commands: out })
@@ -76,7 +89,10 @@ function fakeApi() {
         { id: "per_child", sessionID: "ses_child" },
         { id: "per_other", sessionID: "ses_other" },
       ])
-    if (p === "/question") return Response.json([{ id: "que_1", sessionID: "ses_1", questions: [{ question: "Which?", options: [{ label: "A" }] }] }])
+    if (p === "/question")
+      return Response.json([
+        { id: "que_1", sessionID: "ses_1", questions: [{ question: "Which?", options: [{ label: "A" }] }] },
+      ])
     if (p === "/session/ses_1") return Response.json({ id: "ses_1", title: "Fix the bug" })
     if (p.startsWith("/session/ses_1/message")) return Response.json([])
     return Response.json(true)
@@ -184,7 +200,9 @@ describe("CloudRemote.gate (XCOD-338)", () => {
   test("a refusal says why and is audited; nothing is sent to the relay", async () => {
     await expect(turnOn({ config: { sync: false, $locked: ["sync"] } })).rejects.toThrow("organisation's policy")
     expect(relay.opened()).toBeUndefined()
-    expect(await auditLines()).toContainEqual(expect.objectContaining({ event: "remote.denied", session: "ses_1", gate: "policy" }))
+    expect(await auditLines()).toContainEqual(
+      expect.objectContaining({ event: "remote.denied", session: "ses_1", gate: "policy" }),
+    )
   })
 })
 
@@ -199,7 +217,9 @@ describe("CloudRemote bridge (XCOD-338)", () => {
     expect(relay.events.find((e) => e.type === "question.asked")?.data.questions[0].question).toBe("Which?")
     // Every relay call after open carries the host secret.
     expect(relay.hosts.every((h) => h === "a".repeat(64))).toBe(true)
-    expect(await auditLines()).toContainEqual(expect.objectContaining({ event: "remote.on", session: "ses_1", link: "rl_1", device: "dev_mac" }))
+    expect(await auditLines()).toContainEqual(
+      expect.objectContaining({ event: "remote.on", session: "ses_1", link: "rl_1", device: "dev_mac" }),
+    )
   })
 
   test("AC1: an approval from the web is checked, marked via remote, answered through the process's own permission route, and audited", async () => {
@@ -215,7 +235,15 @@ describe("CloudRemote bridge (XCOD-338)", () => {
     await until(() => relay.events.some((e) => e.type === "command.result"))
     expect(relay.events.find((e) => e.type === "command.result")?.data).toMatchObject({ kind: "permission", ok: true })
     expect(await auditLines()).toContainEqual(
-      expect.objectContaining({ event: "remote.command", session: "ses_1", kind: "permission", request: "per_1", reply: "once", via: "remote", ok: true }),
+      expect.objectContaining({
+        event: "remote.command",
+        session: "ses_1",
+        kind: "permission",
+        request: "per_1",
+        reply: "once",
+        via: "remote",
+        ok: true,
+      }),
     )
   })
 
@@ -228,7 +256,10 @@ describe("CloudRemote bridge (XCOD-338)", () => {
     expect(r.api.calls.some((c) => c.path.startsWith("/permission/per_child"))).toBe(false)
     expect(r.marked).toEqual([])
 
-    emit({ type: "session.created", properties: { sessionID: "ses_child", info: { id: "ses_child", parentID: "ses_1", title: "explore" } } })
+    emit({
+      type: "session.created",
+      properties: { sessionID: "ses_child", info: { id: "ses_child", parentID: "ses_1", title: "explore" } },
+    })
     relay.send({ type: "permission", requestID: "per_child", reply: "once" })
     await until(() => r.api.calls.some((c) => c.path === "/permission/per_child/reply"))
     expect(r.marked).toEqual(["per_child"])
@@ -246,14 +277,22 @@ describe("CloudRemote bridge (XCOD-338)", () => {
       { text: "and add a test", interrupt: false },
       { text: "stop that, do this", interrupt: true },
     ])
-    expect(r.api.calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/question/que_1/reply", "/session/ses_1/abort"])
+    expect(r.api.calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual([
+      "/question/que_1/reply",
+      "/session/ses_1/abort",
+    ])
     // The audit never holds the prompt text.
     expect(JSON.stringify(await auditLines())).not.toContain("add a test")
   })
 
   test("a command older than its TTL is dropped, never run late", async () => {
     const r = await turnOn()
-    relay.send({ type: "permission", requestID: "per_1", reply: "always", at: Date.now() - CloudRemote.COMMAND_TTL_MS - 1 } as never)
+    relay.send({
+      type: "permission",
+      requestID: "per_1",
+      reply: "always",
+      at: Date.now() - CloudRemote.COMMAND_TTL_MS - 1,
+    } as never)
     await until(() => relay.events.some((e) => e.type === "command.result"))
     expect(relay.events.find((e) => e.type === "command.result")?.data).toMatchObject({ ok: false })
     expect(r.marked).toEqual([])
@@ -261,25 +300,65 @@ describe("CloudRemote bridge (XCOD-338)", () => {
 
   test("what the web sees follows the sync rules: never-upload files, the scanner, and secrets split across streamed deltas", async () => {
     await turnOn()
-    emit({ type: "message.updated", properties: { sessionID: "ses_1", info: { id: "msg_1", sessionID: "ses_1", role: "assistant", providerID: "anthropic", modelID: "claude", cost: 0.12, tokens: { input: 10, output: 5 } } } })
+    emit({
+      type: "message.updated",
+      properties: {
+        sessionID: "ses_1",
+        info: {
+          id: "msg_1",
+          sessionID: "ses_1",
+          role: "assistant",
+          providerID: "anthropic",
+          modelID: "claude",
+          cost: 0.12,
+          tokens: { input: 10, output: 5 },
+        },
+      },
+    })
     emit({
       type: "message.part.updated",
       properties: {
         sessionID: "ses_1",
-        part: { id: "prt_1", messageID: "msg_1", sessionID: "ses_1", type: "tool", tool: "read", state: { status: "completed", input: { filePath: ".env" }, output: "DB_PASSWORD=hunter2" } },
+        part: {
+          id: "prt_1",
+          messageID: "msg_1",
+          sessionID: "ses_1",
+          type: "tool",
+          tool: "read",
+          state: { status: "completed", input: { filePath: ".env" }, output: "DB_PASSWORD=hunter2" },
+        },
       },
     })
-    emit({ type: "message.part.updated", properties: { sessionID: "ses_1", part: { id: "prt_2", messageID: "msg_1", sessionID: "ses_1", type: "text", text: "export API_KEY=sk-abcdef" } } })
-    emit({ type: "message.part.delta", properties: { sessionID: "ses_1", messageID: "msg_1", partID: "prt_2", field: "text", delta: "ghijklmnop1234" } })
+    emit({
+      type: "message.part.updated",
+      properties: {
+        sessionID: "ses_1",
+        part: { id: "prt_2", messageID: "msg_1", sessionID: "ses_1", type: "text", text: "export API_KEY=sk-abcdef" },
+      },
+    })
+    emit({
+      type: "message.part.delta",
+      properties: { sessionID: "ses_1", messageID: "msg_1", partID: "prt_2", field: "text", delta: "ghijklmnop1234" },
+    })
     // Another session's events never go.
-    emit({ type: "message.part.updated", properties: { sessionID: "ses_other", part: { id: "prt_9", messageID: "msg_9", sessionID: "ses_other", type: "text", text: "not mine" } } })
+    emit({
+      type: "message.part.updated",
+      properties: {
+        sessionID: "ses_other",
+        part: { id: "prt_9", messageID: "msg_9", sessionID: "ses_other", type: "text", text: "not mine" },
+      },
+    })
     await until(() => relay.events.some((e) => e.key === "part:prt_2" && String(e.data.text).length > 20))
     const sent = JSON.stringify(relay.events)
     expect(sent).not.toContain("hunter2")
     expect(sent).toContain("[not synced: .env]")
     expect(sent).not.toContain("sk-abcdefghijklmnop1234")
     expect(sent).not.toContain("not mine")
-    expect(relay.events.find((e) => e.type === "statusline")?.data).toEqual({ model: "anthropic/claude", tokens: 15, cost: 0.12 })
+    expect(relay.events.find((e) => e.type === "statusline")?.data).toEqual({
+      model: "anthropic/claude",
+      tokens: 15,
+      cost: 0.12,
+    })
   })
 
   test("AC4: /remote off stops control at once: the link is closed, and nothing a poll in flight brings runs", async () => {
@@ -290,14 +369,18 @@ describe("CloudRemote bridge (XCOD-338)", () => {
     relay.send({ type: "permission", requestID: "per_1", reply: "once" })
     await Bun.sleep(300)
     expect(r.marked).toEqual([])
-    expect(await auditLines()).toContainEqual(expect.objectContaining({ event: "remote.off", session: "ses_1", reason: "off" }))
+    expect(await auditLines()).toContainEqual(
+      expect.objectContaining({ event: "remote.off", session: "ses_1", reason: "off" }),
+    )
   })
 
   test("AC4: revoked on the web, or the session deleted, ends it here too", async () => {
     await turnOn()
     relay.revoke()
     await until(() => !CloudRemote.status("ses_1").on)
-    expect(await auditLines()).toContainEqual(expect.objectContaining({ event: "remote.off", session: "ses_1", reason: "revoked" }))
+    expect(await auditLines()).toContainEqual(
+      expect.objectContaining({ event: "remote.off", session: "ses_1", reason: "revoked" }),
+    )
 
     relay.stop()
     relay = fakeRelay()

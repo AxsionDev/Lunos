@@ -638,7 +638,9 @@ export function Session() {
         const url = res.data.url
         await clipboard
           .write?.(url)
-          .then(() => toast.show({ message: `Remote control is on: ${url} (copied)`, variant: "success", duration: 8000 }))
+          .then(() =>
+            toast.show({ message: `Remote control is on: ${url} (copied)`, variant: "success", duration: 8000 }),
+          )
           .catch(() => toast.show({ message: `Remote control is on: ${url}`, variant: "success", duration: 8000 }))
       },
     },

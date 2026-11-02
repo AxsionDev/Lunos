@@ -70,7 +70,12 @@ export class RelayError extends Error {
   }
 }
 
-async function call(opts: Options, method: string, path: string, init: { body?: unknown; host?: string; timeoutMs?: number } = {}) {
+async function call(
+  opts: Options,
+  method: string,
+  path: string,
+  init: { body?: unknown; host?: string; timeoutMs?: number } = {},
+) {
   const res = await (opts.fetch ?? fetch)(opts.endpoint.replace(/\/+$/, "") + path, {
     method,
     redirect: "error",
@@ -84,9 +89,14 @@ async function call(opts: Options, method: string, path: string, init: { body?: 
     signal: AbortSignal.timeout(init.timeoutMs ?? 30_000),
   })
   const json = (await res.json().catch(() => undefined)) as any
-  if (res.status === 410) throw new LinkEndedError(json?.error?.message ?? "The remote session ended.", json?.error?.details?.reason)
+  if (res.status === 410)
+    throw new LinkEndedError(json?.error?.message ?? "The remote session ended.", json?.error?.details?.reason)
   if (!res.ok)
-    throw new RelayError(res.status, json?.error?.code ?? `http_${res.status}`, json?.error?.message ?? `HTTP ${res.status}`)
+    throw new RelayError(
+      res.status,
+      json?.error?.code ?? `http_${res.status}`,
+      json?.error?.message ?? `HTTP ${res.status}`,
+    )
   return json
 }
 
@@ -116,5 +126,7 @@ export async function collect(opts: Options, link: Link, wait = WAIT_SECONDS): P
 }
 
 export async function close(opts: Options, link: Link) {
-  await call(opts, "DELETE", `/v1/remote/links/${link.id}`, { host: link.host, timeoutMs: 5_000 }).catch(() => undefined)
+  await call(opts, "DELETE", `/v1/remote/links/${link.id}`, { host: link.host, timeoutMs: 5_000 }).catch(
+    () => undefined,
+  )
 }
