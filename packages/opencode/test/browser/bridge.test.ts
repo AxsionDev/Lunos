@@ -55,7 +55,7 @@ suite("BrowserBridge with a relaying extension (real Chrome)", () => {
 
   afterAll(async () => {
     extension?.close()
-    bridge?.browser.dispose()
+    bridge?.stop()
     backend?.dispose()
     site?.stop(true)
     await fs.rm(profile, { recursive: true, force: true }).catch(() => {})

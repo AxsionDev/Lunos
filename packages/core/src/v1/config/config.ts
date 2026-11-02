@@ -172,7 +172,7 @@ export const Info = Schema.Struct({
   }),
   browser: Schema.optional(ConfigBrowser.Info).annotate({
     description:
-      "Browser control (XCOD-327): the agent operates a browser, off by default, asking per site, with a stop key and an audit trail",
+      "Browser control: the agent operates a browser, off by default, asking per site, with a stop key and an audit trail",
   }),
   cloud: Schema.optional(ConfigCloud.Info).annotate({
     description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",

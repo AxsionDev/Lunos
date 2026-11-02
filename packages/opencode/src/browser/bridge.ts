@@ -178,14 +178,15 @@ export async function serve(input: { port?: number; onStop: (origin: string) => 
       closeListeners.add(listener)
       return () => closeListeners.delete(listener)
     },
+    // Ends the extension's connection; the server keeps listening for it to reconnect.
     dispose() {
       socket?.close()
-      server.stop(true)
     },
   }
 
   return {
     browser,
+    stop: () => server.stop(true),
     port: server.port,
     connected: () => !!socket,
     /** Waits up to `ms` for the extension to connect. */

@@ -509,6 +509,13 @@ export function getToolInfo(
         title: webSearchProviderLabel(metadata?.provider, i18n),
         subtitle: input.query,
       }
+    // XCOD-327: browser control.
+    case "browser":
+      return {
+        icon: "window-cursor",
+        title: "Browser",
+        subtitle: [input.action, input.url ?? input.ref ?? input.query].filter(Boolean).join(" "),
+      }
     case "task": {
       const type =
         typeof input.subagent_type === "string" && input.subagent_type
@@ -1898,6 +1905,47 @@ ToolRegistry.register({
           </div>
         </Show>
       </BasicTool>
+    )
+  },
+})
+
+// XCOD-327: one browser action, and any instructions the page held for the agent: it was told not
+// to follow them, and the user is shown them here.
+ToolRegistry.register({
+  name: "browser",
+  render(props) {
+    const injection = createMemo(() => {
+      const value = props.metadata.injection
+      if (!Array.isArray(value)) return []
+      return value.filter((line): line is string => typeof line === "string")
+    })
+    return (
+      <>
+        <BasicTool
+          {...props}
+          icon="window-cursor"
+          trigger={{
+            title: "Browser",
+            subtitle: [props.input.action, props.input.url ?? props.input.ref ?? props.input.query]
+              .filter((item) => typeof item === "string" && item)
+              .join(" "),
+            args: props.metadata.refused === true ? ["refused"] : [],
+          }}
+        />
+        <Show when={injection().length > 0}>
+          <div data-component="tool-loaded-file">
+            <Icon name="warning" size="small" />
+            <span>The page has instructions for the agent. They were not followed:</span>
+          </div>
+          <For each={injection()}>
+            {(line) => (
+              <div data-component="tool-loaded-file">
+                <span>"{line}"</span>
+              </div>
+            )}
+          </For>
+        </Show>
+      </>
     )
   },
 })

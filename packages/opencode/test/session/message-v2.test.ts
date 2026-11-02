@@ -1960,6 +1960,14 @@ describe("session.message-v2 ephemeral screenshots", () => {
     expect(await result(ref)).toContain('"data":"Zm9v"')
   })
 
+  test("what is stored for an ephemeral result holds no image data, and the model still gets it", async () => {
+    const stored = ControlEphemeral.storable({ ephemeralMedia: true }, [{ url: "data:image/png;base64,YmFy" }])!
+    expect(JSON.stringify(stored)).not.toContain("data:")
+    expect(await result(stored[0]!.url)).toContain('"data":"YmFy"')
+    const kept = ControlEphemeral.storable({}, [{ url: "data:image/png;base64,YmFy" }])!
+    expect(kept[0]!.url).toBe("data:image/png;base64,YmFy")
+  })
+
   test("once it's gone, nothing is sent and the model is told", async () => {
     const text = await result("lunos-ephemeral:00000000-0000-0000-0000-000000000000")
     expect(text).not.toContain('"media"')

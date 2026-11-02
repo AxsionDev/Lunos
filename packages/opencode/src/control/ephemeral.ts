@@ -29,6 +29,18 @@ export function resolve(url: string) {
   return items.get(url.slice(SCHEME.length))?.url
 }
 
+/**
+ * What a tool result's attachments are stored as: unchanged, unless its metadata marks its media
+ * ephemeral, in which case every `data:` URL is held here and only the reference is stored.
+ */
+export function storable<T extends { url: string }>(
+  metadata: Record<string, unknown> | undefined,
+  attachments: T[] | undefined,
+) {
+  if (metadata?.["ephemeralMedia"] !== true || !attachments) return attachments
+  return attachments.map((item) => (item.url.startsWith("data:") ? { ...item, url: put(item.url) } : item))
+}
+
 export function is(url: string) {
   return url.startsWith(SCHEME)
 }

@@ -137,7 +137,7 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   browser: ConfigBrowser.Info.pipe(Schema.optional).annotate({
     description:
-      "Browser control (XCOD-327): the agent operates a browser, off by default, asking per site, with a stop key and an audit trail",
+      "Browser control: the agent operates a browser, off by default, asking per site, with a stop key and an audit trail",
   }),
   cloud: ConfigCloud.Info.pipe(Schema.optional).annotate({
     description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",

@@ -147,6 +147,14 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   }
 })
 
+// Chrome stops an idle service worker after about 30 seconds, and its timers with it. The alarm
+// wakes it up to reconnect; while connected, the pings below keep it awake.
+chrome.alarms.create("lunos-reconnect", { periodInMinutes: 0.5 })
+chrome.alarms.onAlarm.addListener(() => {
+  if (!socket) void connect()
+})
+chrome.runtime.onStartup.addListener(() => void connect())
+
 // Reconnect while Lunos isn't running, and keep the service worker awake while connected.
 setInterval(() => {
   if (!socket) void connect()

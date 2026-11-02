@@ -181,7 +181,9 @@ const layer = Layer.effect(
             metadata: output.metadata,
             title: output.title,
             time: { start: match.part.state.time.start, end: Date.now() },
-            attachments: output.attachments,
+            // XCOD-327: every completed tool call is stored through here (an aborted turn too), so
+            // media a tool marks ephemeral (browser screenshots) never reaches the session as data.
+            attachments: ControlEphemeral.storable(output.metadata, output.attachments),
           },
         })
         yield* settleToolCall(toolCallID)
@@ -404,16 +406,7 @@ const layer = Layer.effect(
                 : Effect.succeed(Exit.succeed<SessionV1.FilePart>(attachment)),
             )
             const omitted = normalized.filter(Exit.isFailure).length
-            // XCOD-327: media a tool marks ephemeral (browser screenshots) is held in memory for the
-            // next model request and never written to the session.
-            const ephemeral = rawOutput.metadata?.["ephemeralMedia"] === true
-            const attachments = normalized
-              .filter(Exit.isSuccess)
-              .map((item) =>
-                ephemeral && item.value.url.startsWith("data:")
-                  ? { ...item.value, url: ControlEphemeral.put(item.value.url) }
-                  : item.value,
-              )
+            const attachments = normalized.filter(Exit.isSuccess).map((item) => item.value)
             const output = {
               ...rawOutput,
               output:

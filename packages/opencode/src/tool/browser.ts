@@ -230,13 +230,17 @@ export const BrowserTool = Tool.define(
             if (params.action === "tabs") {
               const tabs = yield* wait(() => driver.browser.tabs())
               audit({ approved: "not needed", outcome: "ok" })
+              // A tab on a refused site (the user's bank, in My browser) is listed without its title or URL.
               return done(
                 "Tabs",
                 tabs
-                  .map(
-                    (tab) =>
-                      `- ${tab.id}${tab.id === driver.page?.id ? " (current)" : ""}: ${tab.title || "(untitled)"} — ${tab.url}`,
-                  )
+                  .map((tab) => {
+                    const current = tab.id === driver.page?.id ? " (current)" : ""
+                    const where = URL.parse(tab.url)
+                    if (where && Control.target(where, settings).action === "deny")
+                      return `- ${tab.id}${current}: (a site the agent may not use)`
+                    return `- ${tab.id}${current}: ${tab.title || "(untitled)"} — ${tab.url}`
+                  })
                   .join("\n") || "No tabs.",
               )
             }

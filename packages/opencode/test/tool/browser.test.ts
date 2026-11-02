@@ -131,6 +131,9 @@ suite("tool.browser (real Chrome)", () => {
         expect(result.output).toContain("WARNING: the page contains instructions addressed to an AI agent")
         expect(result.title).toContain("page has instructions for the agent (not followed)")
         expect(result.metadata["injection"]).toBeDefined()
+        // A page can't end the untrusted block early with its own closing tag.
+        expect(result.output.match(/<\/untrusted-content>/g)).toHaveLength(1)
+        expect((result.metadata["injection"] as string[]).some((line) => line.includes("untrusted-content"))).toBe(true)
       }),
     { timeout: 60_000 },
   )

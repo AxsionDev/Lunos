@@ -57,18 +57,25 @@ async function open(config: ConfigBrowser.Info | undefined, headless: boolean) {
       message.kind === "stop" ? Control.stop("browser", message.origin) : Control.pause("browser", message.origin),
   }
   if (mode(config) === "extension") {
-    const bridge = await BrowserBridge.serve({
-      port: config?.port,
-      onStop: (origin) => Control.stop("browser", origin),
-    })
-    await bridge.ready(5_000).catch((error) => {
-      bridge.browser.dispose()
-      throw error
-    })
+    const bridge = await listen(config?.port ?? ConfigBrowser.DEFAULT_PORT)
+    await bridge.ready(8_000)
     return new BrowserDriver.Driver(bridge.browser, options)
   }
   const browser = await BrowserLaunch.start({ executable: config?.executable, headless })
   return new BrowserDriver.Driver(browser, options)
+}
+
+// The extension's server keeps listening once extension mode is used, so the extension can
+// reconnect whenever its service worker wakes, not only during an action.
+const bridges = new Map<number, ReturnType<typeof BrowserBridge.serve>>()
+
+function listen(port: number) {
+  const existing = bridges.get(port)
+  if (existing) return existing
+  const started = BrowserBridge.serve({ port, onStop: (origin) => Control.stop("browser", origin) })
+  bridges.set(port, started)
+  started.catch(() => bridges.delete(port))
+  return started
 }
 
 /** Closes the browser connection (the Lunos browser itself closes with it). */

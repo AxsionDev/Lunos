@@ -2368,7 +2368,7 @@
         },
         "browser": {
           "$ref": "#/$defs/BrowserConfig",
-          "description": "Browser control (XCOD-327): the agent operates a browser, off by default, asking per site, with a stop key and an audit trail"
+          "description": "Browser control: the agent operates a browser, off by default, asking per site, with a stop key and an audit trail"
         },
         "cloud": {
           "$ref": "#/$defs/CloudConfig",
