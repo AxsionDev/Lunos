@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Lunos",
+  "version": "0.1.0",
+  "description": "Lets Lunos operate this browser when you allow it. Connects to Lunos on 127.0.0.1 only.",
+  "minimum_chrome_version": "116",
+  "permissions": ["debugger", "tabs", "downloads", "storage", "alarms"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "Lunos" }
+}

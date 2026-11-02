@@ -1,0 +1,38 @@
+{
+  "name": "no-trailing-newline",
+  "file": "src/no-trailing-newline.txt",
+  "before": "first\nmiddle\nlast",
+  "after": "FIRST\nmiddle\nlast changed",
+  "patch": "Index: src/no-trailing-newline.txt\n===================================================================\n--- src/no-trailing-newline.txt\t\n+++ src/no-trailing-newline.txt\t\n@@ -1,3 +1,3 @@\n-first\n+FIRST\n middle\n-last\n\\ No newline at end of file\n+last changed\n\\ No newline at end of file\n",
+  "hunks": 2,
+  "cases": [
+    {
+      "accept": [
+        false,
+        false
+      ],
+      "expected": "first\nmiddle\nlast"
+    },
+    {
+      "accept": [
+        true,
+        false
+      ],
+      "expected": "FIRST\nmiddle\nlast"
+    },
+    {
+      "accept": [
+        false,
+        true
+      ],
+      "expected": "first\nmiddle\nlast changed"
+    },
+    {
+      "accept": [
+        true,
+        true
+      ],
+      "expected": "FIRST\nmiddle\nlast changed"
+    }
+  ]
+}

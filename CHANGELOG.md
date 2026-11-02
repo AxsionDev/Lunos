@@ -31,6 +31,36 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   is recorded in your audit log as coming from remote, `/remote off` or one tap on the web ends it at
   once, and it ends by itself after 12 hours. Off by default, and off wherever your organisation keeps
   session sync off. See docs/remote-control.md. <!-- XCOD-338 -->
+- **Lunos in JetBrains IDEs and Visual Studio (preview).** There are now plugins for IntelliJ IDEA,
+  Rider and Visual Studio 2022, built from `sdks/jetbrains` and `sdks/visualstudio`. They aren't on
+  the marketplaces yet. Each one gives you a chat panel and a session picker, and lists the same
+  sessions as the TUI's `/sessions`. Right-click "Ask Lunos about Selection" sends the open file and
+  the selected lines with your question. Lunos's edits open in the IDE's diff viewer, where you
+  accept or reject each hunk. You can send the IDE's errors and warnings as context. The panel shows
+  subagents and their state, and you can answer approvals there or in a TUI opened on the same
+  session. <!-- XCOD-333 -->
+- **Lunos can check your app in a real browser.** Turn on browser control in /settings › Permissions ›
+  Browser & computer, and the qa agent opens the app Build just started, clicks through the change
+  and reports what it saw. It reads pages as text, so it works with text-only EU models. It uses a
+  separate Lunos browser profile, or your own Chrome, Edge or Brave through the Lunos extension
+  (`lunos browser pair`), which connects on 127.0.0.1 only. It asks before it acts on each site, and
+  before anything that submits, sends, buys, downloads or deletes, even in Auto-approve. Banking,
+  payment and password-manager sites are refused. It never types passwords, card numbers or keys,
+  and never solves CAPTCHAs. Instructions planted on a page are shown to you, not followed. Stop it
+  at once with the on-page Stop or Ctrl+Alt+Esc. Every action is in the audit log, and screenshots
+  aren't kept. Off by default; an organisation can turn it off. See docs/browser-control.md.
+- **Lunos can operate desktop apps on macOS and Windows.** Turn on computer control in /settings ›
+  Permissions › Browser & computer, and the qa and general agents can read an app's window, take
+  screenshots, click, type, press keys, open apps and use the clipboard, for tasks with no API.
+  It asks before it acts on each app, and before anything that submits, sends, buys or deletes,
+  and every clipboard read or write, even in Auto-approve. Password managers, Keychain, banking,
+  payment, system-settings and terminal apps are refused, and so is the app Lunos runs in. It
+  never types passwords, card numbers or keys, or into a password field. Instructions on screen
+  are shown to you, not followed. Press Ctrl+Alt+Esc anywhere, or Stop on the on-screen strip, to
+  stop it at once; moving the mouse pauses it. Every action is in the audit log, and screenshots
+  aren't kept. On macOS, `lunos computer setup` grants the Accessibility and Screen Recording
+  permissions. Off by default; an organisation can turn it off. Linux isn't supported yet.
+  <!-- XCOD-339 -->
 
 ## [1.19.0] - 2026-11-02
 

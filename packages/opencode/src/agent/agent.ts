@@ -157,6 +157,11 @@ const layer = Layer.effect(
           // XCOD-204: handing work to Claude Code / Codex, and every edit or command they make, is
           // asked. The tools act outside Lunos's own edit and shell rules, so "*" mustn't cover them.
           external: "ask",
+          // XCOD-327: the browser tool, while browser control is on, is for `qa` and `general` only
+          // (below). Its pattern is the site; each site asks unless config allows it.
+          browser: "deny",
+          // XCOD-339: the same for the computer tool; its pattern is the app (bundle id or exe).
+          computer: "deny",
           external_directory: {
             "*": "ask",
             ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
@@ -307,6 +312,8 @@ const layer = Layer.effect(
               defaults,
               Permission.fromConfig({
                 todowrite: "deny",
+                browser: "ask",
+                computer: "ask",
               }),
               user,
             ),
@@ -409,6 +416,10 @@ const layer = Layer.effect(
                 // shut by instruction only. It is the accepted trade: qa
                 // cannot run the suite without a shell. See spec §5.2.
                 bash: "allow",
+                // XCOD-327: qa checks a running app in the browser (while browser control is on).
+                browser: "ask",
+                // XCOD-339: and desktop apps (while computer control is on).
+                computer: "ask",
                 external_directory: readonlyExternalDirectory,
               }),
               user,

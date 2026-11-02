@@ -3,6 +3,7 @@ import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { createXai } from "@ai-sdk/xai"
 import { APICallError, generateText } from "ai"
 import { MessageV2 } from "../../src/session/message-v2"
+import { ControlEphemeral } from "@/control/ephemeral"
 import { ProviderTransform } from "@/provider/transform"
 import type { Provider } from "@/provider/provider"
 
@@ -1915,5 +1916,61 @@ describe("session.message-v2.latest", () => {
 
     expect(state.tasks).toHaveLength(1)
     expect(state.tasks[0]).toMatchObject({ type: "subtask", prompt: "inspect" })
+  })
+})
+
+// XCOD-327: a browser screenshot is stored as an in-memory reference, never as image data.
+describe("session.message-v2 ephemeral screenshots", () => {
+  const withScreenshot = (url: string): SessionV1.WithParts[] => [
+    {
+      info: userInfo("m-user-e"),
+      parts: [{ ...basePart("m-user-e", "ue1"), type: "text", text: "look" }] as SessionV1.Part[],
+    },
+    {
+      info: assistantInfo("m-assistant-e", "m-user-e"),
+      parts: [
+        {
+          ...basePart("m-assistant-e", "ae1"),
+          type: "tool",
+          callID: "call-e",
+          tool: "browser",
+          state: {
+            status: "completed",
+            input: { action: "screenshot" },
+            output: "Screenshot",
+            title: "Screenshot",
+            metadata: { ephemeralMedia: true },
+            time: { start: 0, end: 1 },
+            attachments: [
+              { ...basePart("m-assistant-e", "fe1"), type: "file", mime: "image/png", filename: "s.png", url },
+            ],
+          },
+        },
+      ] as SessionV1.Part[],
+    },
+  ]
+  const result = async (url: string) => {
+    const messages = await MessageV2.toModelMessages(withScreenshot(url), model)
+    return JSON.stringify(messages.find((message) => message.role === "tool"))
+  }
+
+  test("a held screenshot is sent to the model from memory", async () => {
+    const ref = ControlEphemeral.put("data:image/png;base64,Zm9v")
+    expect(ref.startsWith("lunos-ephemeral:")).toBe(true)
+    expect(await result(ref)).toContain('"data":"Zm9v"')
+  })
+
+  test("what is stored for an ephemeral result holds no image data, and the model still gets it", async () => {
+    const stored = ControlEphemeral.storable({ ephemeralMedia: true }, [{ url: "data:image/png;base64,YmFy" }])!
+    expect(JSON.stringify(stored)).not.toContain("data:")
+    expect(await result(stored[0]!.url)).toContain('"data":"YmFy"')
+    const kept = ControlEphemeral.storable({}, [{ url: "data:image/png;base64,YmFy" }])!
+    expect(kept[0]!.url).toBe("data:image/png;base64,YmFy")
+  })
+
+  test("once it's gone, nothing is sent and the model is told", async () => {
+    const text = await result("lunos-ephemeral:00000000-0000-0000-0000-000000000000")
+    expect(text).not.toContain('"media"')
+    expect(text).toContain("A screenshot was not kept")
   })
 })

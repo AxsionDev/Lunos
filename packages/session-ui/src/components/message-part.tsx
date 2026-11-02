@@ -509,6 +509,22 @@ export function getToolInfo(
         title: webSearchProviderLabel(metadata?.provider, i18n),
         subtitle: input.query,
       }
+    // XCOD-327: browser control.
+    case "browser":
+      return {
+        icon: "window-cursor",
+        title: "Browser",
+        subtitle: [input.action, input.url ?? input.ref ?? input.query].filter(Boolean).join(" "),
+      }
+    // XCOD-339: computer control.
+    case "computer":
+      return {
+        icon: "window-cursor",
+        title: "Computer",
+        subtitle: [input.action, input.app ?? (typeof input.x === "number" ? `${input.x},${input.y}` : undefined)]
+          .filter(Boolean)
+          .join(" "),
+      }
     case "task": {
       const type =
         typeof input.subagent_type === "string" && input.subagent_type
@@ -1901,6 +1917,54 @@ ToolRegistry.register({
     )
   },
 })
+
+// XCOD-327 / XCOD-339: one browser or computer action, and any instructions the page or screen held
+// for the agent: it was told not to follow them, and the user is shown them here.
+for (const name of ["browser", "computer"] as const)
+  ToolRegistry.register({
+    name,
+    render(props) {
+      const injection = createMemo(() => {
+        const value = props.metadata.injection
+        if (!Array.isArray(value)) return []
+        return value.filter((line): line is string => typeof line === "string")
+      })
+      const target = () =>
+        props.input.url ??
+        props.input.ref ??
+        props.input.query ??
+        props.input.app ??
+        (typeof props.input.x === "number" ? `${props.input.x},${props.input.y}` : undefined)
+      return (
+        <>
+          <BasicTool
+            {...props}
+            icon="window-cursor"
+            trigger={{
+              title: name === "browser" ? "Browser" : "Computer",
+              subtitle: [props.input.action, target()].filter((item) => typeof item === "string" && item).join(" "),
+              args: props.metadata.refused === true ? ["refused"] : [],
+            }}
+          />
+          <Show when={injection().length > 0}>
+            <div data-component="tool-loaded-file">
+              <Icon name="warning" size="small" />
+              <span>
+                The {name === "browser" ? "page" : "screen"} has instructions for the agent. They were not followed:
+              </span>
+            </div>
+            <For each={injection()}>
+              {(line) => (
+                <div data-component="tool-loaded-file">
+                  <span>"{line}"</span>
+                </div>
+              )}
+            </For>
+          </Show>
+        </>
+      )
+    },
+  })
 
 ToolRegistry.register({
   name: "webfetch",
