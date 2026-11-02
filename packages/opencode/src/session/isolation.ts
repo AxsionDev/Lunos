@@ -115,6 +115,15 @@ export async function snapshot(root: string) {
   }
 }
 
+// git's worktree bookkeeping (.git/worktrees) isn't safe for concurrent adds and removes in one
+// repository, and parallel subagents start and finish together: one at a time per repository.
+const queues = new Map<string, Promise<unknown>>()
+function serial<T>(root: string, fn: () => Promise<T>) {
+  const next = (queues.get(root) ?? Promise.resolve()).catch(() => undefined).then(fn)
+  queues.set(root, next)
+  return next
+}
+
 function slug(input: string) {
   return (
     input
@@ -149,11 +158,18 @@ export async function create(input: { root: string; dataDir: string; session: st
     if (!(await taken(candidate))) return candidate
     return pick(n + 1)
   }
-  const target = await pick(0)
-  await must(
-    ["worktree", "add", "--lock", "--reason", `${LOCK_REASON}${process.pid}`, "-b", target.branch, target.directory, base],
-    { cwd: input.root },
-  )
+  // Two steps with the same description can race for a name: the loser takes the next one.
+  const add = async (n: number, attempts: number): Promise<{ directory: string; branch: string }> => {
+    const target = await pick(n)
+    const out = await git(
+      ["worktree", "add", "--lock", "--reason", `${LOCK_REASON}${process.pid}`, "-b", target.branch, target.directory, base],
+      { cwd: input.root },
+    )
+    if (out.code === 0) return target
+    if (attempts <= 0 || !/already exists/.test(out.stderr)) throw new Error(`git worktree add failed: ${out.stderr.trim()}`)
+    return add(n + 1, attempts - 1)
+  }
+  const target = await serial(input.root, () => add(0, 5))
   const linked = await link(input.root, target.directory)
   await include(input.root, target.directory)
   return { handle: { root: input.root, ...target, base, linked } satisfies Handle, ms: Date.now() - started }
@@ -467,6 +483,10 @@ export async function settle(
 /** Removes a subagent's worktree and branch. Never anything but `lunos/*`. */
 export async function discard(handle: Pick<Handle, "root" | "directory" | "branch">) {
   if (!handle.branch.startsWith(BRANCH_PREFIX)) throw new Error(`refusing to remove ${handle.branch}`)
+  return serial(handle.root, () => remove(handle))
+}
+
+async function remove(handle: Pick<Handle, "root" | "directory" | "branch">) {
   await git(["worktree", "unlock", handle.directory], { cwd: handle.root })
   await git(["worktree", "remove", "--force", "--force", handle.directory], { cwd: handle.root })
   await fs.rm(handle.directory, { recursive: true, force: true })
@@ -594,6 +614,8 @@ export async function forget(sessionID: string) {
   bound.delete(sessionID)
   if (!binding) return
   if ([...bound.values()].some((item) => item.handle === binding.handle)) return
+  const { disposeInstance } = await import("@/effect/instance-registry")
+  await disposeInstance(binding.to.directory).catch(() => undefined)
   await discard(binding.handle).catch(() => undefined)
 }
 

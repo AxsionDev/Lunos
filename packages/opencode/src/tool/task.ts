@@ -11,7 +11,7 @@ import { Agent } from "../agent/agent"
 import { deriveSubagentSessionPermission } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
-import { Effect, Exit, Option, Schema, Scope, Semaphore } from "effect"
+import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { backgroundEnabled } from "@/background/enabled"
@@ -31,6 +31,7 @@ import { Global } from "@opencode-ai/core/global"
 import { InstanceState } from "@/effect/instance-state"
 import { Permission } from "@/permission"
 import { SubagentIsolation } from "@/session/isolation"
+import { disposeInstance } from "@/effect/instance-registry"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -116,6 +117,9 @@ export function withBackground(input: { description: string; schema: JSONSchema7
     schema: { ...input.schema, properties },
   }
 }
+
+/** XCOD-332: a conflict nobody resolved; the patch is already saved. */
+class MergeStopped extends Error {}
 
 /** A file version for a conflict prompt or question: long ones are cut. */
 function clip(text: string, max = 4000) {
@@ -432,12 +436,15 @@ export const TaskTool = Tool.define(
           Effect.succeed(binding),
           () =>
             Effect.gen(function* () {
-              const text = yield* work(binding)
+              // The worktree is gone after the merge: the report names the user's paths instead.
+              const text = SubagentIsolation.remap(yield* work(binding), binding.to.root, binding.from.root)
               return [text, yield* land(binding)].filter(Boolean).join("\n\n")
             }),
           (_, exit) =>
             Effect.gen(function* () {
               SubagentIsolation.unbind(nextSession.id)
+              // LSP, formatter and other per-directory state the tools started in the worktree.
+              yield* Effect.promise(() => disposeInstance(binding.to.directory).catch(() => undefined))
               yield* Effect.promise(() => SubagentIsolation.discard(binding.handle).catch(() => undefined))
               if (exit._tag === "Failure")
                 yield* setIsolation(nextSession.id, {
@@ -503,7 +510,39 @@ export const TaskTool = Tool.define(
         )
 
       /** Commits the worktree and merges it into the user's tree, through `merge` and the user on a conflict. */
+      /** The subagent's changes as a patch beside its worktrees, for when they can't be merged. */
+      const savePatch = (handle: SubagentIsolation.Handle) =>
+        Effect.promise(async () => {
+          const target = path.join(
+            SubagentIsolation.home(Global.Path.data, handle.root),
+            "patches",
+            `${handle.branch.replaceAll("/", "-")}.patch`,
+          )
+          await Bun.write(target, await SubagentIsolation.diff(handle))
+          return target
+        })
+
       const land = Effect.fn("TaskTool.land")(function* (binding: SubagentIsolation.Binding) {
+        return yield* landing(binding).pipe(
+          // A merge that breaks (the user edited a file mid-apply, a git error) must not lose the work.
+          Effect.catchCause((cause) =>
+            Effect.gen(function* () {
+              const failure = Cause.squash(cause)
+              if (failure instanceof MergeStopped) return yield* Effect.fail(failure)
+              const saved = yield* savePatch(binding.handle).pipe(Effect.option)
+              return yield* Effect.fail(
+                new Error(
+                  `Merging "${params.description}" into your working tree failed (${failure instanceof Error ? failure.message : String(failure)}).${
+                    Option.isSome(saved) ? ` Its changes are saved in ${saved.value}.` : ""
+                  }`,
+                ),
+              )
+            }),
+          ),
+        )
+      })
+
+      const landing = Effect.fn("TaskTool.landing")(function* (binding: SubagentIsolation.Binding) {
         const handle = binding.handle
         yield* Effect.promise(() => SubagentIsolation.finalize(handle, `lunos: ${params.description}`))
         return yield* mergeLock(handle.root).withPermits(1)(
@@ -584,11 +623,7 @@ export const TaskTool = Tool.define(
           return yield* Effect.promise(() =>
             SubagentIsolation.settle(handle, answer === THEIRS ? "theirs" : "ours", { regenerate }),
           )
-        const saved = yield* Effect.promise(async () => {
-          const target = path.join(SubagentIsolation.home(Global.Path.data, handle.root), "patches", `${handle.branch.replaceAll("/", "-")}.patch`)
-          await Bun.write(target, await SubagentIsolation.diff(handle))
-          return target
-        })
+        const saved = yield* savePatch(handle)
         yield* setIsolation(nextSession.id, {
           state: "conflict",
           branch: handle.branch,
@@ -596,7 +631,7 @@ export const TaskTool = Tool.define(
           patch: saved,
         }).pipe(Effect.ignore)
         return yield* Effect.fail(
-          new Error(
+          new MergeStopped(
             `Merge conflict in ${files.join(", ")}: nothing from "${params.description}" was merged into your working tree. Its changes are saved in ${saved}.`,
           ),
         )

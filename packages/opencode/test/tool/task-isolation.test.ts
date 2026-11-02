@@ -6,6 +6,7 @@ import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { Cause, Effect, Exit } from "effect"
 import path from "path"
 import { SubagentIsolation } from "@/session/isolation"
+import { Question } from "@/question"
 import { Agent } from "../../src/agent/agent"
 import { BackgroundJob } from "@/background/job"
 import { EventV2Bridge } from "@/event-v2-bridge"
@@ -187,9 +188,15 @@ const lunosBranches = (dir: string) =>
     Effect.map((out) => out.stdout.split("\n").filter(Boolean)),
   )
 
-const call = (promptOps: TaskPromptOps, chat: { id: SessionID }, assistant: { id: MessageID }) =>
+const call = (
+  promptOps: TaskPromptOps,
+  chat: { id: SessionID },
+  assistant: { id: MessageID },
+  question?: Question.Interface,
+) =>
   Effect.gen(function* () {
-    const def = yield* (yield* TaskTool).init()
+    const tool = yield* (question ? TaskTool.pipe(Effect.provideService(Question.Service, question)) : TaskTool)
+    const def = yield* tool.init()
     return yield* def
       .execute(
         { description: "add feature", prompt: "do it", subagent_type: "general" },
@@ -241,7 +248,7 @@ describe("tool.task worktree isolation (XCOD-332)", () => {
               expect(input.parts.some((part) => part.type === "text" && part.text.includes("isolated git worktree"))).toBe(true)
               await Bun.write(path.join(binding.to.root, "src/b.ts"), "export const b = 2\n")
               during = await Bun.file(path.join(dir, "src/b.ts")).text().catch(() => undefined)
-              return { text: "added b" }
+              return { text: `added ${path.join(binding.to.root, "src/b.ts")}` }
             },
           }),
           chat,
@@ -250,6 +257,8 @@ describe("tool.task worktree isolation (XCOD-332)", () => {
         if (Exit.isFailure(exit)) throw Cause.squash(exit.cause)
         expect(during).toBeUndefined()
         expect(yield* read(path.join(dir, "src/b.ts"))).toBe("export const b = 2\n")
+        // The report names the user's path: the worktree is gone after the merge.
+        expect(exit.value.output).toContain(`added ${path.join(dir, "src/b.ts")}`)
         expect(exit.value.output).toContain("<isolation")
         expect(exit.value.output).toContain("Run the qa checks")
         expect(yield* lunosBranches(dir)).toEqual([])
@@ -347,6 +356,49 @@ describe("tool.task worktree isolation (XCOD-332)", () => {
         expect(yield* read(patch!)).toContain("export const a = 2")
         expect(yield* read(path.join(dir, "src/a.ts"))).toBe("export const a = 3\n")
         expect(yield* read(path.join(dir, "src/other.ts"))).toBeUndefined()
+        expect(yield* lunosBranches(dir)).toEqual([])
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "when the merge subagent fails, the user is asked with both versions shown, and their choice is merged",
+    () =>
+      Effect.gen(function* () {
+        const dir = yield* setup()
+        const { chat, assistant } = yield* seed()
+        const asked: string[] = []
+        const question: Question.Interface = {
+          ask: (input) =>
+            Effect.sync(() => {
+              asked.push(...input.questions.map((item) => item.question))
+              return [["Keep my version"]]
+            }),
+          reply: () => Effect.void,
+          reject: () => Effect.void,
+          list: () => Effect.succeed([]),
+        }
+        const exit = yield* call(
+          ops({
+            general: async (_, binding) => {
+              await Bun.write(path.join(binding!.to.root, "src/a.ts"), "export const a = 2\n")
+              await Bun.write(path.join(binding!.to.root, "src/other.ts"), "export const other = 1\n")
+              await Bun.write(path.join(dir, "src/a.ts"), "export const a = 3\n")
+              return {}
+            },
+            merge: async () => ({ error: true }),
+          }),
+          chat,
+          assistant,
+          question,
+        )
+        if (Exit.isFailure(exit)) throw Cause.squash(exit.cause)
+        expect(asked).toHaveLength(1)
+        expect(asked[0]).toContain("src/a.ts")
+        expect(asked[0]).toContain("export const a = 3")
+        expect(asked[0]).toContain("export const a = 2")
+        expect(yield* read(path.join(dir, "src/a.ts"))).toBe("export const a = 3\n")
+        expect(yield* read(path.join(dir, "src/other.ts"))).toBe("export const other = 1\n")
         expect(yield* lunosBranches(dir)).toEqual([])
       }),
     { git: true },

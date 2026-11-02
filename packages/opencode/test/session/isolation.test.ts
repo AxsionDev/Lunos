@@ -112,6 +112,10 @@ describe("SubagentIsolation", () => {
       "libs/c/package.json": '{ "name": "c", "version": "1.0.0" }\n',
     })
     const data = await tmp("lunos-iso-data-")
+    const install = Bun.spawnSync(["bun", "install", "--ignore-scripts"], { cwd: root, stdout: "ignore", stderr: "pipe" })
+    expect(install.exitCode).toBe(0)
+    await sh(root, "add", "-A")
+    await sh(root, "commit", "-q", "-m", "lock")
     // The user keeps working meanwhile: an uncommitted change of their own.
     await edit(root, "README.md", () => "mine\n")
     const steps = await Promise.all(
@@ -128,7 +132,7 @@ describe("SubagentIsolation", () => {
     const regenerated: string[] = []
     const regenerate = async (dir: string) => {
       regenerated.push(dir)
-      return "fake install"
+      return SubagentIsolation.regenerate(dir)
     }
     const results = []
     for (const step of steps) results.push(await SubagentIsolation.merge(step.handle, { regenerate }))
@@ -137,13 +141,16 @@ describe("SubagentIsolation", () => {
     expect(results[1]!.state === "merged" && results[1]!.resolved).toEqual(["package.json"])
     expect(regenerated).toEqual([root, root, root])
 
+    // The real lockfile, regenerated after each merge, lists all three.
+    const lock = await Bun.file(path.join(root, "bun.lock")).text()
+    for (const name of ["a", "b", "c"]) expect(lock).toContain(`"${name}": "file:./libs/${name}"`)
     const pkg = JSON.parse(await Bun.file(path.join(root, "package.json")).text())
     expect(Object.keys(pkg.dependencies)).toEqual(["base", "a", "b", "c"])
     for (const name of ["a", "b", "c"]) expect(await Bun.file(path.join(root, `src/${name}.ts`)).exists()).toBe(true)
     expect(await Bun.file(path.join(root, "README.md")).text()).toBe("mine\n")
     // Working tree only: nothing staged, HEAD unchanged.
     expect(await sh(root, "diff", "--cached", "--name-only")).toBe("")
-    expect((await sh(root, "rev-list", "--count", "HEAD"))).toBe("1")
+    expect(await sh(root, "rev-list", "--count", "HEAD")).toBe("2")
 
     await Promise.all(steps.map((step) => SubagentIsolation.discard(step.handle)))
     expect(await lunosRefs(root)).toEqual({ branches: [], worktrees: [] })
