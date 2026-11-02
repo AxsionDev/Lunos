@@ -77,6 +77,8 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   // answer, but enforced by the container rather than by prompts. Not residency: it doesn't decide
   // where data goes (network egress isn't restricted yet).
   sandbox: "Permissions",
+  // XCOD-327: Settings › Permissions › Browser & computer.
+  browser: "Permissions",
   residency: "Residency & privacy",
   audit: "Residency & privacy",
   share: "Residency & privacy",
@@ -123,7 +125,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
 export const SUBTABS: Partial<Record<Category, readonly string[]>> = {
   "Models & agents": ["Models", "Agents", "Subagents", "Workflows", "Providers", "External sessions"],
   Projects: ["Projects", "Budgets"],
-  Permissions: ["Rules", "Tools", "Sandbox"],
+  Permissions: ["Rules", "Tools", "Sandbox", "Browser & computer"],
   "Residency & privacy": ["Residency", "Audit", "Sharing"],
   Memory: ["Overview", "Settings", "Advanced"],
   "Marketplace & plugins": ["Marketplaces", "Plugins", "Policy"],
@@ -157,6 +159,7 @@ const SUBTAB: Record<string, string> = {
   external: "External sessions",
   tools: "Tools",
   sandbox: "Sandbox",
+  browser: "Browser & computer",
   audit: "Audit",
   share: "Sharing",
   autoshare: "Sharing",
@@ -244,6 +247,14 @@ const DEFAULTS: Record<string, unknown> = {
   marketplace_default: true,
   "memory.enabled": false,
   "sandbox.enabled": false,
+  // XCOD-327: browser control is off until the user turns it on.
+  "browser.enabled": false,
+  "browser.mode": "lunos",
+  "browser.deny_categories": ["banking", "payment", "password_manager", "system_settings"],
+  "browser.stop_key": "ctrl+alt+escape",
+  "browser.headless": false,
+  "browser.port": 47615,
+  "browser.screenshots": false,
   "sandbox.required": false,
   "sandbox.workspace": "copy",
   "sandbox.on_finish": "destroy",
