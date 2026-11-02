@@ -481,14 +481,19 @@ export const TaskTool = Tool.define(
           return {
             handle: created.handle,
             from: { root: path.resolve(instance.directory, path.relative(real, root)), directory: instance.directory },
-            to: { root: created.handle.directory, directory: path.join(created.handle.directory, path.relative(root, real)) },
+            to: {
+              root: created.handle.directory,
+              directory: path.join(created.handle.directory, path.relative(root, real)),
+            },
           } satisfies SubagentIsolation.Binding
         }).pipe(
           // A worktree that can't be made (disk full, a broken repository) never stops the work:
           // the subagent shares the tree, as before, and its session says why.
           Effect.catchCause((cause) =>
             Effect.logWarning("subagent worktree failed; sharing the working tree", { cause }).pipe(
-              Effect.andThen(setIsolation(nextSession.id, { state: "shared", reason: "the worktree could not be created" })),
+              Effect.andThen(
+                setIsolation(nextSession.id, { state: "shared", reason: "the worktree could not be created" }),
+              ),
               Effect.ignore,
               Effect.as(undefined),
             ),
@@ -650,7 +655,10 @@ export const TaskTool = Tool.define(
           parentID: ctx.sessionID,
           title: `Merge ${params.description} (@merge subagent)`,
           agent: info.name,
-          permission: deriveSubagentSessionPermission({ parentSessionPermission: parent.permission ?? [], subagent: info }),
+          permission: deriveSubagentSessionPermission({
+            parentSessionPermission: parent.permission ?? [],
+            subagent: info,
+          }),
         })
         SubagentIsolation.bind(child.id, binding)
         const ok = yield* ops

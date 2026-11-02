@@ -30,6 +30,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   runs at most once a second, is stopped after 300 ms, and a slow or failing script never holds up the
   TUI. Budget and context turn to the warning colour as they run low, and a project can have its own
   line. See "Status line" in the TUI docs.
+
 ### Changed
 
 - **Parallel subagents no longer overwrite each other.** In a git repository, each subagent that
@@ -39,6 +40,7 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   you, with both versions shown. A subagent that fails leaves nothing behind, and no worktree or
   branch outlives the session. Set `"subagent": { "isolation": "shared" }` to have subagents share
   your working tree as before. <!-- XCOD-332 -->
+
 ## [1.19.0] - 2026-11-02
 
 ### Fixed

@@ -112,7 +112,11 @@ describe("SubagentIsolation", () => {
       "libs/c/package.json": '{ "name": "c", "version": "1.0.0" }\n',
     })
     const data = await tmp("lunos-iso-data-")
-    const install = Bun.spawnSync(["bun", "install", "--ignore-scripts"], { cwd: root, stdout: "ignore", stderr: "pipe" })
+    const install = Bun.spawnSync(["bun", "install", "--ignore-scripts"], {
+      cwd: root,
+      stdout: "ignore",
+      stderr: "pipe",
+    })
     expect(install.exitCode).toBe(0)
     await sh(root, "add", "-A")
     await sh(root, "commit", "-q", "-m", "lock")
@@ -159,7 +163,11 @@ describe("SubagentIsolation", () => {
   test("a real lockfile regeneration runs offline with bun", async () => {
     const root = await repo({ "libs/a/package.json": '{ "name": "a", "version": "1.0.0" }\n' })
     const data = await tmp("lunos-iso-data-")
-    const install = Bun.spawnSync(["bun", "install", "--ignore-scripts"], { cwd: root, stdout: "ignore", stderr: "pipe" })
+    const install = Bun.spawnSync(["bun", "install", "--ignore-scripts"], {
+      cwd: root,
+      stdout: "ignore",
+      stderr: "pipe",
+    })
     expect(install.exitCode).toBe(0)
     await sh(root, "add", "-A")
     await sh(root, "commit", "-q", "-m", "lock")
@@ -210,7 +218,11 @@ describe("SubagentIsolation", () => {
     const prepared = await SubagentIsolation.prepareConflict(step.handle, result.ours)
     expect(prepared.unmerged).toEqual(["src/math.ts"])
     expect(await SubagentIsolation.conclude(step.handle, result.ours)).toBe(false)
-    await edit(step.handle.directory, "src/math.ts", () => "export function add(a: number, b: number) {\n  return b - a\n}\n")
+    await edit(
+      step.handle.directory,
+      "src/math.ts",
+      () => "export function add(a: number, b: number) {\n  return b - a\n}\n",
+    )
     expect(await SubagentIsolation.conclude(step.handle, result.ours)).toBe(true)
     expect((await SubagentIsolation.merge(step.handle)).state).toBe("merged")
     expect(await Bun.file(path.join(root, "src/math.ts")).text()).toContain("b - a")
@@ -260,12 +272,10 @@ describe("SubagentIsolation", () => {
       ["one", "two"].map((step) => SubagentIsolation.create({ root, dataDir: data, session: "ses_8", step })),
     )
     for (const item of crashed)
-      await sh(root, "worktree", "lock", "--reason", `lunos pid ${dead.pid}`, item.handle.directory).catch(
-        async () => {
-          await sh(root, "worktree", "unlock", item.handle.directory)
-          await sh(root, "worktree", "lock", "--reason", `lunos pid ${dead.pid}`, item.handle.directory)
-        },
-      )
+      await sh(root, "worktree", "lock", "--reason", `lunos pid ${dead.pid}`, item.handle.directory).catch(async () => {
+        await sh(root, "worktree", "unlock", item.handle.directory)
+        await sh(root, "worktree", "lock", "--reason", `lunos pid ${dead.pid}`, item.handle.directory)
+      })
     // An orphan branch whose worktree directory is already gone.
     await sh(root, "branch", "lunos/ses-8/orphan")
     // Another live Lunos (this process stands in) keeps its running worktree...
@@ -303,9 +313,13 @@ describe("SubagentIsolation", () => {
 
   test("mergeJson merges keys and refuses the same key changed two ways", () => {
     const base = '{\n    "a": 1\n}\n'
-    expect(SubagentIsolation.mergeJson({ base, ours: '{\n    "a": 1,\n    "b": 2\n}\n', theirs: '{\n    "a": 1,\n    "c": 3\n}\n' })).toBe(
-      '{\n    "a": 1,\n    "b": 2,\n    "c": 3\n}\n',
-    )
+    expect(
+      SubagentIsolation.mergeJson({
+        base,
+        ours: '{\n    "a": 1,\n    "b": 2\n}\n',
+        theirs: '{\n    "a": 1,\n    "c": 3\n}\n',
+      }),
+    ).toBe('{\n    "a": 1,\n    "b": 2,\n    "c": 3\n}\n')
     expect(SubagentIsolation.mergeJson({ base, ours: '{ "a": 2 }', theirs: '{ "a": 3 }' })).toBeUndefined()
   })
 

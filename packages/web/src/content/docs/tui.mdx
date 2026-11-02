@@ -760,7 +760,7 @@ The line under the prompt shows context, cost, budget and Dynamic workflows by d
 ```
 
 - `preset` - `default` (context, cost, budget, Dynamic workflows), `minimal` (model, context %), `cost` (session cost, budget left, context %), `git` (branch, changed files, commits ahead and behind) or `agents` (subagents working, waiting and done).
-- `template` - Your own line. Wins over `preset`. ` · ` or ` | ` split it into parts, and a part whose fields are all empty is left out, so `ctx {context_pct}%` doesn't show before the first reply.
+- `template` - Your own line. Wins over `preset`. `·` or `|` split it into parts, and a part whose fields are all empty is left out, so `ctx {context_pct}%` doesn't show before the first reply.
 - `command` - A command that gets the session as JSON on stdin and prints one line. Wins over `template` and `preset`. It runs when something changes, at most once a second, and is stopped after 300 ms; a command that fails or is too slow never holds up the TUI, and the last good line stays. Only the first line is shown, without colours or control characters. It's read from your own `tui.json` only: a repository's `tui.json` can choose a preset or template, not a command.
 
 Fields (the JSON a command gets uses the same names): `workflow`, `approval`, `model`, `provider`, `variant`, `project`, `directory`, `branch`, `dirty`, `ahead`, `behind`, `context` (tokens and %), `context_tokens`, `context_pct`, `cost_session`, `cost_today` (the sessions you worked in today), `budget` (the budget meter's line), `budget_left`, `budget_pct`, `workflows`, `subagents_running`, `subagents_waiting`, `subagents_done`, `sandbox`, `lsp`, `mcp`, `version` and `update` (a newer version, when there is one).
