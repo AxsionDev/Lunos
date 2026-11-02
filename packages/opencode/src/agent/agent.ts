@@ -151,6 +151,8 @@ const layer = Layer.effect(
           // XCOD-327: the browser tool, while browser control is on, is for `qa` and `general` only
           // (below). Its pattern is the site; each site asks unless config allows it.
           browser: "deny",
+          // XCOD-339: the same for the computer tool; its pattern is the app (bundle id or exe).
+          computer: "deny",
           external_directory: {
             "*": "ask",
             ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
@@ -302,6 +304,7 @@ const layer = Layer.effect(
               Permission.fromConfig({
                 todowrite: "deny",
                 browser: "ask",
+                computer: "ask",
               }),
               user,
             ),
@@ -406,6 +409,8 @@ const layer = Layer.effect(
                 bash: "allow",
                 // XCOD-327: qa checks a running app in the browser (while browser control is on).
                 browser: "ask",
+                // XCOD-339: and desktop apps (while computer control is on).
+                computer: "ask",
                 external_directory: readonlyExternalDirectory,
               }),
               user,

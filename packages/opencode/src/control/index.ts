@@ -2,17 +2,21 @@ export * as Control from "."
 
 import { AuditLog } from "@/audit/log"
 import { ConfigBrowser } from "@opencode-ai/core/config/browser"
+import { ConfigComputer } from "@opencode-ai/core/config/computer"
+import { Residency } from "@opencode-ai/core/residency"
 
 // XCOD-327: what keeps a person in control while an agent operates something outside the
-// terminal. Browser control (part A) uses it now; computer control (XCOD-339, part B) is meant to
-// reuse it as is, with `kind: "computer"` and an app name as the target:
+// terminal. Browser control (part A) and computer control (XCOD-339, part B) both use it, with
+// `kind: "browser"` and a site as the target, or `kind: "computer"` and an app:
 //
-// - `target()`: is this site (or app) refused outright, allowed by config, or to be asked about?
+// - `target()` / `app()`: is this site (or app) refused outright, allowed by config, or to be asked about?
 // - `never()` / `sensitiveValue()`: steps the agent never takes, whatever it is told (passwords,
 //   card and ID numbers, API keys, CAPTCHAs). They are handed to the user.
 // - `confirm()`: actions that always ask first (submit, send, buy, download, accept, delete…).
 // - `suspicious()`: instructions found in page or app content. Shown to the user, never followed.
-// - `begin()` / `stop()`: the stop key and the on-screen Stop end every action of a kind at once.
+// - `begin()` / `stop()`: the stop key and the on-screen Stop end every action of a kind at once;
+//   `stopAll()` ends browser and computer control together (the OS-wide stop key).
+// - `screenshot()`: whether a screenshot may go to the session's model at all.
 // - `audit()`: one audit line per action, `<kind>.<event>`.
 
 export type Kind = "browser" | "computer"
@@ -144,6 +148,150 @@ export function target(url: URL, config: ConfigBrowser.Info | undefined): Target
 /** The approval pattern for a URL: its host (or `file`), which "always" remembers. */
 export function site(url: URL) {
   return url.hostname || url.protocol.replace(/:$/, "")
+}
+
+/**
+ * A desktop app, as the OS reports it. `id` is what approvals and config lists use: the bundle id
+ * on macOS (`com.apple.TextEdit`), the executable's file name on Windows (`notepad.exe`) or the
+ * window class on Linux. An app can name its window anything, but not its bundle id or executable.
+ */
+export type App = { id: string; name: string; pid?: number }
+
+/** Known apps per category, by bundle id (macOS) or executable (Windows), lower case. */
+export const CATEGORY_APPS: Record<ConfigComputer.Category, readonly string[]> = {
+  banking: [],
+  payment: ["com.apple.wallet", "com.apple.passkit", "com.paypal.paypal", "wallet.exe"],
+  password_manager: [
+    "com.1password.1password",
+    "com.agilebits.onepassword7",
+    "com.agilebits.onepassword-osx",
+    "com.bitwarden.desktop",
+    "com.lastpass.lastpassmacdesktop",
+    "com.dashlane.dashlanephonefinal",
+    "com.dashlane.dashlane",
+    "org.keepassxc.keepassxc",
+    "com.keepersecurity.passwordmanager",
+    "in.sinew.enpass-desktop",
+    "com.nordsec.nordpass",
+    "me.proton.pass.electron",
+    "com.apple.passwords",
+    "com.apple.keychainaccess",
+    "1password.exe",
+    "bitwarden.exe",
+    "lastpass.exe",
+    "dashlane.exe",
+    "keepass.exe",
+    "keepassxc.exe",
+    "keeperpasswordmanager.exe",
+    "enpass.exe",
+    "nordpass.exe",
+    "proton pass.exe",
+    "credentialuibroker.exe",
+  ],
+  system_settings: [
+    "com.apple.systempreferences",
+    "com.apple.settings",
+    "com.apple.securityagent",
+    "com.apple.loginwindow",
+    "com.apple.coreservices.uiagent",
+    "com.apple.diskutility",
+    "com.apple.directoryutility",
+    "com.apple.mdmclient",
+    "systemsettings.exe",
+    "control.exe",
+    "mmc.exe",
+    "regedit.exe",
+    "secpol.exe",
+    "gpedit.exe",
+    "sechealthui.exe",
+    "consent.exe",
+    "useraccountcontrolsettings.exe",
+    "windowsdefender.exe",
+    "msconfig.exe",
+    "taskmgr.exe",
+    "gnome-control-center",
+    "systemsettings",
+  ],
+  // Typing into a shell would run commands outside Lunos's own bash rules.
+  terminal: [
+    "com.apple.terminal",
+    "com.googlecode.iterm2",
+    "dev.warp.warp-stable",
+    "com.github.wez.wezterm",
+    "net.kovidgoyal.kitty",
+    "io.alacritty",
+    "com.mitchellh.ghostty",
+    "co.zeit.hyper",
+    "windowsterminal.exe",
+    "cmd.exe",
+    "powershell.exe",
+    "pwsh.exe",
+    "conhost.exe",
+    "wt.exe",
+    "gnome-terminal-server",
+    "konsole",
+    "xterm",
+  ],
+}
+
+/** Apps whose id or name says what they are, for the ones the list doesn't name. */
+const APP_WORDS: Partial<Record<ConfigComputer.Category, RegExp>> = {
+  banking: /(bank|banca|banque|sparkasse|revolut|monzo|bunq|(^|[.\s_-])n26([.\s_-]|$))/i,
+  password_manager: /(password|keychain|1password|bitwarden|lastpass|dashlane|keepass|nordpass|enpass)/i,
+  system_settings: /(^|[.\s])(system ?(settings|preferences)|control panel|registry editor|group policy)([.\s]|$)/i,
+}
+
+/** The category an app falls in, if it's one the agent must not act on by default. */
+export function appCategory(app: App): ConfigComputer.Category | undefined {
+  const id = app.id.toLowerCase()
+  for (const [name, ids] of Object.entries(CATEGORY_APPS) as [ConfigComputer.Category, readonly string[]][]) {
+    if (ids.includes(id)) return name
+    if (APP_WORDS[name]?.test(id) || APP_WORDS[name]?.test(app.name)) return name
+  }
+  return undefined
+}
+
+/** `app` matches a config entry: its id exactly (any case), or `prefix.*` for a bundle id family. */
+export function matchApp(app: App, pattern: string) {
+  const id = app.id.toLowerCase()
+  const p = pattern.trim().toLowerCase()
+  if (!p) return false
+  if (p === "*") return true
+  if (p.endsWith(".*")) return id.startsWith(p.slice(0, -1))
+  return id === p
+}
+
+/**
+ * Whether the agent may act on `app` without asking, must ask, or is refused. Lunos itself (the
+ * terminal or desktop app it runs in) is always refused: the agent could otherwise answer its own
+ * approval prompts. Then the same order as sites: deny list, allow list, denied categories, ask.
+ */
+export function app(
+  target: App,
+  config: ConfigComputer.Info | undefined,
+  self: readonly string[] = [],
+): TargetDecision {
+  const label = target.name && target.name !== target.id ? `${target.name} (${target.id})` : target.id
+  if (!target.id)
+    return { action: "deny", reason: "Lunos can't tell which app this is, so it won't act on it", audit: "unknown app" }
+  if (self.some((id) => id.toLowerCase() === target.id.toLowerCase()))
+    return {
+      action: "deny",
+      reason: `${label} is where Lunos itself runs. The agent never controls it, because it could answer its own approval prompts`,
+      audit: "self",
+    }
+  if ((config?.deny ?? []).some((pattern) => matchApp(target, pattern)))
+    return { action: "deny", reason: `${label} is on the computer deny list`, audit: "deny list" }
+  if ((config?.allow ?? []).some((pattern) => matchApp(target, pattern)))
+    return { action: "allow", reason: "allow list" }
+  const found = appCategory(target)
+  if (found && ConfigComputer.categories(config).includes(found))
+    return {
+      action: "deny",
+      reason: `${label} is a ${found.replace("_", " ")} app, which the agent never acts on unless you add it to computer.allow. Do this step yourself`,
+      audit: `category:${found}`,
+    }
+  return { action: "ask" }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -292,6 +440,47 @@ function defuse(text: string) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Screenshots
+
+/** The model a tool call is made for, from `ctx.extra.model`. */
+export function model(extra: Record<string, unknown> | undefined) {
+  const found = extra?.["model"] as
+    | { providerID?: string; api?: { url?: string }; capabilities?: { input?: { image?: boolean } } }
+    | undefined
+  if (!found?.providerID) return undefined
+  return { providerID: found.providerID, baseURL: found.api?.url, image: found.capabilities?.input?.image === true }
+}
+
+/**
+ * Why a screenshot can't be sent to this model, or undefined when it can: the model can't see
+ * images, or the residency policy doesn't allow it. `strict` also refuses when the model is
+ * unknown, so a screenshot of the desktop never goes anywhere unchecked.
+ */
+export function screenshot(
+  found: ReturnType<typeof model>,
+  residency: Parameters<typeof Residency.resolve>[0],
+  strict = false,
+): { reason: "text-only model" | "residency" | "unknown model"; message: string } | undefined {
+  if (!found)
+    return strict
+      ? { reason: "unknown model", message: "Refused: Lunos can't tell which model this screenshot would go to." }
+      : undefined
+  if (!found.image)
+    return {
+      reason: "text-only model",
+      message:
+        "Refused: this model can't see images. Use read (the accessibility tree) or text instead: they work with any model.",
+    }
+  const blocked = Residency.blocked(found.providerID, found.baseURL, Residency.resolve(residency))
+  if (blocked)
+    return {
+      reason: "residency",
+      message: `Refused: a screenshot can't go to this model under the data-residency policy. ${blocked.reason}`,
+    }
+  return undefined
+}
+
+// ---------------------------------------------------------------------------------------------
 // Stop key and on-screen Stop
 
 type Run = {
@@ -347,6 +536,14 @@ export function stop(kind: Kind, origin: string) {
   audit(kind, "stop", { origin })
   for (const listener of STOP_LISTENERS) listener(kind, origin)
   return now
+}
+
+/** The OS-wide stop key: ends browser and computer control at once. */
+export function stopAll(origin: string) {
+  const at = Date.now()
+  stop("computer", origin)
+  stop("browser", origin)
+  return at
 }
 
 /** The user took over (moved the mouse): actions in flight finish, the next one asks first. */
@@ -405,9 +602,7 @@ export function parseKey(input: string | undefined) {
 type Event = "action" | "denied" | "stop" | "injection"
 
 export function audit(kind: Kind, event: Event, fields: Record<string, string | number | boolean | undefined>) {
-  // `computer.*` events arrive with XCOD-339; until then only `browser.*` exist.
-  if (kind !== "browser") return
-  AuditLog.emit(`browser.${event}`, fields)
+  AuditLog.emit(`${kind}.${event}`, fields)
 }
 
 /** Test hook: forget every stop and pause. */

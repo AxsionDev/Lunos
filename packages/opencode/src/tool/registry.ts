@@ -20,6 +20,8 @@ import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
 import { BrowserTool } from "./browser"
 import { ConfigBrowser } from "@opencode-ai/core/config/browser"
+import { ComputerTool } from "./computer"
+import { ConfigComputer } from "@opencode-ai/core/config/computer"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
 import { SkillTool } from "./skill"
@@ -120,6 +122,7 @@ const layer = Layer.effect(
     const plan = yield* PlanExitTool
     const webfetch = yield* WebFetchTool
     const browser = yield* BrowserTool
+    const computer = yield* ComputerTool
     const websearch = yield* WebSearchTool
     const externalAgent = yield* ExternalAgentTool
     const shell = yield* ShellTool
@@ -236,6 +239,7 @@ const layer = Layer.effect(
           task: Tool.init(task),
           fetch: Tool.init(webfetch),
           browser: Tool.init(browser),
+          computer: Tool.init(computer),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
           skill: Tool.init(skilltool),
@@ -266,6 +270,8 @@ const layer = Layer.effect(
             ...(Offline.enabled() ? [] : [tool.fetch]),
             // XCOD-327: offered only while browser control is on in the live config (tools() below).
             ...(Offline.enabled() ? [] : [tool.browser]),
+            // XCOD-339: offered only while computer control is on in the live config (tools() below).
+            tool.computer,
             tool.todo,
             ...(Offline.enabled() ? [] : [tool.search]),
             tool.skill,
@@ -325,10 +331,14 @@ const layer = Layer.effect(
       const searchable = yield* resources.searchable(input.sessionID ?? "").pipe(Effect.orElseSucceed(() => false))
       // XCOD-327: off by default, and absent while the organisation's policy (a locked
       // `browser.enabled`) or the user's setting has it off.
-      const browsing = ConfigBrowser.enabled((yield* config.get()).browser)
+      const live = yield* config.get()
+      const browsing = ConfigBrowser.enabled(live.browser)
+      // XCOD-339: the same for computer control (`computer.enabled`).
+      const computing = ConfigComputer.enabled(live.computer)
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === ProjectResourcesSearchTool.id) return searchable
         if (tool.id === BrowserTool.id) return browsing
+        if (tool.id === ComputerTool.id) return computing
 
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })

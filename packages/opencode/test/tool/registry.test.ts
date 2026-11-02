@@ -84,6 +84,19 @@ const browserOn = testEffect(
     [RuntimeFlags.node, RuntimeFlags.layer()],
   ] as const),
 )
+// XCOD-339: computer control turned on in config.
+const computerOn = testEffect(
+  LayerNode.compile(root, [
+    [
+      Config.node,
+      TestConfig.layer({
+        get: () => Effect.succeed({ computer: { enabled: true } }),
+        directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
+      }),
+    ],
+    [RuntimeFlags.node, RuntimeFlags.layer()],
+  ] as const),
+)
 const withCodeMode = testEffect(
   LayerNode.compile(root, [
     [Config.node, configLayer],
@@ -206,6 +219,39 @@ describe("tool.registry", () => {
         expect(Permission.disabled(["browser"], (yield* agents.get(name))!.permission).has("browser")).toBe(false)
       for (const name of ["build", "explore", "plan"])
         expect(Permission.disabled(["browser"], (yield* agents.get(name))!.permission).has("browser")).toBe(true)
+    }),
+  )
+
+  // XCOD-339: the computer tool is absent unless computer control is on (an organisation locks it
+  // off with `computer.enabled`), and only qa and general get it.
+  it.instance("computer tool is absent while computer control is off", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: (yield* agents.get("general"))!,
+      })
+      expect(tools.map((tool) => tool.id)).not.toContain("computer")
+    }),
+  )
+
+  computerOn.instance("computer tool is offered when on, to qa and general only", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: (yield* agents.get("general"))!,
+      })
+      expect(tools.map((tool) => tool.id)).toContain("computer")
+      expect(tools.map((tool) => tool.id)).not.toContain("browser")
+      for (const name of ["qa", "general"])
+        expect(Permission.disabled(["computer"], (yield* agents.get(name))!.permission).has("computer")).toBe(false)
+      for (const name of ["build", "explore", "plan"])
+        expect(Permission.disabled(["computer"], (yield* agents.get(name))!.permission).has("computer")).toBe(true)
     }),
   )
 

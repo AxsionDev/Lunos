@@ -130,6 +130,12 @@ export const EVENTS = [
   "browser.denied",
   "browser.stop",
   "browser.injection",
+  // XCOD-339: computer control, the same four for desktop apps (`app` instead of `host`). Never
+  // typed text, clipboard contents or screenshots.
+  "computer.action",
+  "computer.denied",
+  "computer.stop",
+  "computer.injection",
 ] as const
 export type EventName = (typeof EVENTS)[number]
 

@@ -813,6 +813,46 @@
       },
       "additionalProperties": false
     },
+    "ComputerConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Give the qa and general agents the computer tool (off by default): screenshots, mouse, keyboard and clipboard on this computer. Every app asks before the agent acts on it. Lock it to turn computer control off for an organisation"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Apps the agent may act on without asking: a macOS bundle id (\"com.apple.TextEdit\") or a Windows executable (\"notepad.exe\"). An app named here is allowed even in a denied category"
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Apps the agent is never allowed to act on, as bundle ids or executable names. Wins over allow"
+        },
+        "deny_categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["banking", "payment", "password_manager", "system_settings", "terminal"]
+          },
+          "description": "App categories refused unless named in allow (default: banking, payment, password_manager, system_settings, terminal)"
+        },
+        "stop_key": {
+          "type": "string",
+          "description": "The key that stops all browser and computer control at once, anywhere on the computer (default \"ctrl+alt+escape\")"
+        },
+        "screenshots": {
+          "type": "boolean",
+          "description": "Keep screenshots in the session history (default false: a screenshot is sent to the model once and never stored)"
+        }
+      },
+      "additionalProperties": false
+    },
     "CloudConfig": {
       "type": "object",
       "properties": {
@@ -2369,6 +2409,10 @@
         "browser": {
           "$ref": "#/$defs/BrowserConfig",
           "description": "Browser control: the agent operates a browser, off by default, asking per site, with a stop key and an audit trail"
+        },
+        "computer": {
+          "$ref": "#/$defs/ComputerConfig",
+          "description": "Computer control: the agent operates desktop apps with screenshots, mouse, keyboard and clipboard, off by default, asking per app, with a stop key and an audit trail"
         },
         "cloud": {
           "$ref": "#/$defs/CloudConfig",

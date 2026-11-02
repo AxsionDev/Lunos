@@ -120,7 +120,9 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
   // XCOD-285: a Claude Code / Codex approval offers the tool's own choices, in its wording.
   // XCOD-327: browser control's approvals bring their own choices too (once / always for this site / deny).
   const choices = createMemo(() =>
-    props.request.permission === "external" || props.request.permission.startsWith("browser")
+    props.request.permission === "external" ||
+    props.request.permission.startsWith("browser") ||
+    props.request.permission.startsWith("computer")
       ? externalChoices(props.request.metadata)
       : undefined,
   )
@@ -459,6 +461,27 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                     <text fg={theme.textMuted}>
                       Stop browser control at any time with Stop in the browser, or its stop key (Ctrl+Alt+Esc by
                       default).
+                    </text>
+                  </box>
+                ),
+              }
+            }
+
+            // XCOD-339: an app for computer control, a confirmation, a clipboard read or write.
+            if (permission === "computer" || permission === "computer_confirm") {
+              const meta = props.request.metadata ?? {}
+              const title =
+                typeof meta["title"] === "string" ? meta["title"] : `Computer: ${props.request.patterns?.[0] ?? ""}`
+              const detail = typeof meta["detail"] === "string" ? meta["detail"] : ""
+              return {
+                icon: "▣",
+                title,
+                body: (
+                  <box paddingLeft={1} gap={1}>
+                    <text fg={theme.textMuted}>{detail}</text>
+                    <text fg={theme.textMuted}>
+                      Stop computer control at any time with Stop on screen or the stop key (Ctrl+Alt+Esc by default).
+                      Moving the mouse pauses it.
                     </text>
                   </box>
                 ),

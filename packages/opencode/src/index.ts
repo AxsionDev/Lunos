@@ -21,6 +21,7 @@ import { OrgCommand } from "./cli/cmd/org"
 import { ProjectCommand } from "./cli/cmd/project"
 import { BudgetCommand } from "./cli/cmd/budget"
 import { BrowserCommand } from "./cli/cmd/browser"
+import { ComputerCommand } from "./cli/cmd/computer"
 import { CloudCostReport } from "./cloud/cost-report"
 import { ExternalCommand } from "./cli/cmd/external"
 import { LspCommand } from "./cli/cmd/lsp"
@@ -203,6 +204,7 @@ const cli = yargs(args)
   .command(ProjectCommand)
   .command(BudgetCommand)
   .command(BrowserCommand)
+  .command(ComputerCommand)
   .command(ExternalCommand)
   .command(LspCommand)
   .command(StatsCommand)

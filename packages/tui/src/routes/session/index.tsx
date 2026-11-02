@@ -2029,7 +2029,7 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
         <Match when={display() === "skill"}>
           <Skill {...toolprops} />
         </Match>
-        <Match when={props.part.tool === "browser"}>
+        <Match when={props.part.tool === "browser" || props.part.tool === "computer"}>
           <Browser {...toolprops} />
         </Match>
         <Match when={true}>
@@ -2466,17 +2466,29 @@ function Browser(props: ToolProps) {
       ? (props.metadata["injection"] as unknown[]).filter((line): line is string => typeof line === "string")
       : [],
   )
+  const computer = () => props.part.tool === "computer"
   const target = () =>
-    stringValue(props.input.url) ?? stringValue(props.input.ref) ?? stringValue(props.input.query) ?? ""
+    stringValue(props.input.url) ??
+    stringValue(props.input.ref) ??
+    stringValue(props.input.query) ??
+    stringValue(props.input.app) ??
+    (typeof props.input.x === "number" ? `${props.input.x},${props.input.y}` : "")
   return (
     <box>
-      <InlineTool icon="◎" pending="Using the browser…" complete={stringValue(props.input.action)} part={props.part}>
-        Browser {stringValue(props.input.action)} {target()}
+      <InlineTool
+        icon={computer() ? "▣" : "◎"}
+        pending={computer() ? "Using the computer…" : "Using the browser…"}
+        complete={stringValue(props.input.action)}
+        part={props.part}
+      >
+        {computer() ? "Computer" : "Browser"} {stringValue(props.input.action)} {target()}
         {props.metadata["refused"] === true ? " · refused" : ""}
       </InlineTool>
       <Show when={injection().length > 0}>
         <box paddingLeft={3}>
-          <text fg={theme.warning}>⚠ The page has instructions for the agent. They were not followed:</text>
+          <text fg={theme.warning}>
+            ⚠ The {computer() ? "screen" : "page"} has instructions for the agent. They were not followed:
+          </text>
           <For each={injection()}>{(line) => <text fg={theme.textMuted}>{`"${line}"`}</text>}</For>
         </box>
       </Show>
