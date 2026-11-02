@@ -26850,6 +26850,26 @@
         },
         "additionalProperties": false
       },
+      "VoiceConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "model": {
+            "type": "string",
+            "enum": ["tiny", "base", "small", "medium"]
+          },
+          "language": {
+            "type": "string"
+          },
+          "auto_send": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
       "CloudConfig": {
         "type": "object",
         "properties": {
@@ -28235,6 +28255,9 @@
           },
           "external": {
             "$ref": "#/components/schemas/ExternalConfig"
+          },
+          "voice": {
+            "$ref": "#/components/schemas/VoiceConfig"
           },
           "cloud": {
             "$ref": "#/components/schemas/CloudConfig"

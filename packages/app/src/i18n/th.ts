@@ -415,6 +415,18 @@ export const dict = {
   "prompt.action.stop": "หยุด",
   "prompt.escape.again": "กด Esc อีกครั้งเพื่อล้าง",
   "prompt.toast.cleared": "ล้างพรอมต์แล้ว · {{key}} เพื่อกู้คืน",
+  "prompt.voice.start": "ป้อนข้อมูลด้วยเสียง: กดค้างไว้เพื่อพูด หรือคลิกเพื่อเริ่มและหยุด",
+  "prompt.voice.recording": "กำลังฟัง… ปล่อยหรือคลิกเพื่อถอดความ กด Esc เพื่อยกเลิก",
+  "prompt.voice.transcribing": "กำลังถอดความบนคอมพิวเตอร์เครื่องนี้…",
+  "prompt.voice.missing": "การป้อนข้อมูลด้วยเสียงต้องใช้ whisper.cpp (whisper-cli) บนคอมพิวเตอร์เครื่องนี้",
+  "prompt.voice.micDenied": "อนุญาตให้ Lunos ใช้ไมโครโฟนในการตั้งค่าความเป็นส่วนตัวของระบบ",
+  "prompt.voice.offline": "โหมดออฟไลน์บล็อกการดาวน์โหลดโมเดลเสียงพูด ติดตั้งโมเดลด้วยตนเอง",
+  "prompt.voice.download.title": "ดาวน์โหลดโมเดลเสียงพูดหรือไม่",
+  "prompt.voice.download.message":
+    "เสียงจะถูกถอดความบนคอมพิวเตอร์เครื่องนี้ด้วยโมเดล {{model}} ของ whisper.cpp ({{size}} MB) ซึ่งดาวน์โหลดครั้งเดียวจาก huggingface.co และตรวจสอบด้วย SHA-256 เสียงของคุณไม่เคยออกจากคอมพิวเตอร์เครื่องนี้",
+  "prompt.voice.download.confirm": "ดาวน์โหลด",
+  "prompt.voice.download.progress": "กำลังดาวน์โหลดโมเดลเสียงพูด… {{percent}}%",
+  "prompt.voice.error": "การป้อนข้อมูลด้วยเสียงล้มเหลว: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "ไฟล์แนบที่ไม่รองรับ",
   "prompt.toast.attachmentDuplicate.title": "ไฟล์นี้ถูกอัปโหลดแล้ว",

@@ -396,6 +396,18 @@ export const dict = {
   "prompt.action.stop": "ހުއްޓުން",
   "prompt.escape.again": "ފޮހެލުމަށް އަލުން Esc",
   "prompt.toast.cleared": "ޕްރޮމްޕްޓް ފޮހެލެވިއްޖެ · އަނބުރާ ގެނައުމަށް {{key}}",
+  "prompt.voice.start": "އަޑުން ލިޔުން: ވާހަކަދައްކަން ފިތާލާފައި ބަހައްޓާ، ނުވަތަ ފެށުމާއި ހުއްޓުމަށް ކްލިކްކުރޭ",
+  "prompt.voice.recording": "އަޑުއަހަނީ… ލިޔުމަށް ދޫކޮށްލާ ނުވަތަ ކްލިކްކުރޭ، ކެންސަލްކުރަން Esc",
+  "prompt.voice.transcribing": "މި ކޮމްޕިއުޓަރުގައި ލިޔެވެނީ…",
+  "prompt.voice.missing": "އަޑުން ލިޔުމަށް މި ކޮމްޕިއުޓަރުގައި whisper.cpp (whisper-cli) ބޭނުންވޭ",
+  "prompt.voice.micDenied": "ސިސްޓަމުގެ ޕްރައިވެސީ ސެޓިންގްސްގައި Lunos އަށް މައިކްރޮފޯން ބޭނުންކުރުމުގެ ހުއްދަ ދޭ",
+  "prompt.voice.offline": "އޮފްލައިން މޯޑު ވާހަކައިގެ މޮޑެލް ޑައުންލޯޑުކުރުން މަނާކުރޭ. މޮޑެލް އަތުން އިންސްޓޯލްކުރޭ",
+  "prompt.voice.download.title": "ވާހަކައިގެ މޮޑެލް ޑައުންލޯޑުކުރަންތަ؟",
+  "prompt.voice.download.message":
+    "އަޑު ލިޔެވެނީ މި ކޮމްޕިއުޓަރުގައި whisper.cpp ގެ {{model}} މޮޑެލް ({{size}} MB) އިން، huggingface.co އިން އެއްފަހަރު ޑައުންލޯޑުކޮށް SHA-256 އިން ޗެކްކުރެވިގެން. ތިޔަބޭފުޅާގެ އަޑު މި ކޮމްޕިއުޓަރުން ބޭރަށް ދެއެއް ނުދޭ.",
+  "prompt.voice.download.confirm": "ޑައުންލޯޑު",
+  "prompt.voice.download.progress": "ވާހަކައިގެ މޮޑެލް ޑައުންލޯޑުވަނީ… {{percent}}%",
+  "prompt.voice.error": "އަޑުން ލިޔުން ނާކާމިޔާބުވި: {{error}}",
   "prompt.toast.pasteUnsupported.title": "ސަޕޯޓް ނުކުރާ އެޓޭޗްމަންޓެވެ",
   "prompt.toast.pasteUnsupported.description":
     "މިތަނުގައި އެޓޭޗް ކުރެވޭނީ ހަމައެކަނި ތަސްވީރު، PDFs، ނުވަތަ ޓެކްސްޓް ފައިލްތަކެވެ.",

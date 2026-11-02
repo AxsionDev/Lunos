@@ -418,6 +418,18 @@ export const dict = {
   "prompt.action.stop": "Detener",
   "prompt.escape.again": "Esc otra vez para borrar",
   "prompt.toast.cleared": "Indicación borrada · {{key}} para restaurar",
+  "prompt.voice.start": "Entrada de voz: mantén pulsado para hablar o haz clic para iniciar y detener",
+  "prompt.voice.recording": "Escuchando… suelta o haz clic para transcribir, Esc para cancelar",
+  "prompt.voice.transcribing": "Transcribiendo en este equipo…",
+  "prompt.voice.missing": "La entrada de voz necesita whisper.cpp (whisper-cli) en este equipo",
+  "prompt.voice.micDenied": "Permite que Lunos use el micrófono en la configuración de privacidad del sistema",
+  "prompt.voice.offline": "El modo sin conexión bloquea la descarga del modelo de voz. Instala el modelo manualmente",
+  "prompt.voice.download.title": "¿Descargar el modelo de voz?",
+  "prompt.voice.download.message":
+    "La voz se transcribe en este equipo con el modelo {{model}} de whisper.cpp ({{size}} MB), descargado una vez de huggingface.co y verificado con SHA-256. Tu voz nunca sale de este equipo.",
+  "prompt.voice.download.confirm": "Descargar",
+  "prompt.voice.download.progress": "Descargando el modelo de voz… {{percent}}%",
+  "prompt.voice.error": "Error en la entrada de voz: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "Adjunto no compatible",
   "prompt.toast.attachmentDuplicate.title": "Este archivo ya se ha subido",

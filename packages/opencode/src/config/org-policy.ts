@@ -103,6 +103,8 @@ export const HOSTED_KEYS: ReadonlySet<string> = new Set([
   "share",
   "sandbox",
   "external",
+  // XCOD-336: turning voice input off is a restriction; it only ever runs on this computer.
+  "voice",
 ])
 
 /** A hosted organisation's policy, reduced to HOSTED_KEYS (and locks on them only). */

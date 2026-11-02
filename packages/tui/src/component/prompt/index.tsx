@@ -49,6 +49,7 @@ import { usePromptHistory, type PromptInfo } from "../../prompt/history"
 import { computePromptTraits } from "../../prompt/traits"
 import { expandPastedTextPlaceholders, expandTrackedPastedText } from "../../prompt/part"
 import { usePromptStash } from "../../prompt/stash"
+import { usePromptVoice } from "./voice"
 import { DialogStash } from "../dialog-stash"
 import { type AutocompleteOption, type AutocompleteRef, Autocomplete } from "./autocomplete"
 import { leftOpensMonitor, takeoverChoices, takeoverQuestion } from "../../util/agent-monitor"
@@ -933,6 +934,14 @@ export function Prompt(props: PromptProps) {
       enabled: inputTarget() !== undefined && !props.disabled && store.prompt.input !== "",
       bindings: tuiConfig.keybinds.get("prompt.clear"),
     }
+  })
+
+  // XCOD-336: push-to-talk dictation (prompt.voice); the transcript is inserted for editing.
+  const voice = usePromptVoice({
+    target: inputTarget,
+    text: () => store.prompt.input,
+    enabled: () => !props.disabled && store.mode === "normal",
+    submit: () => void submit(),
   })
 
   // XCOD-255/313: Esc twice clears the prompt, idle or busy: the typed text is the innermost thing Esc
@@ -2095,6 +2104,7 @@ export function Prompt(props: PromptProps) {
               cursorStyle={tuiConfig.cursor}
               syntaxStyle={syntax()}
             />
+            <voice.View />
             <box flexDirection="row" flexShrink={0} paddingTop={1} gap={1} justifyContent="space-between">
               <box flexDirection="row" gap={1}>
                 <Show when={external()}>

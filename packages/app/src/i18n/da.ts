@@ -313,6 +313,18 @@ export const dict = {
   "prompt.action.stop": "Stop",
   "prompt.escape.again": "Esc igen for at rydde",
   "prompt.toast.cleared": "Prompt ryddet · {{key}} for at gendanne",
+  "prompt.voice.start": "Stemmeinput: hold nede for at tale, eller klik for at starte og stoppe",
+  "prompt.voice.recording": "Lytter… slip eller klik for at transskribere, Esc for at annullere",
+  "prompt.voice.transcribing": "Transskriberer på denne computer…",
+  "prompt.voice.missing": "Stemmeinput kræver whisper.cpp (whisper-cli) på denne computer",
+  "prompt.voice.micDenied": "Tillad Lunos at bruge mikrofonen i systemets privatlivsindstillinger",
+  "prompt.voice.offline": "Offlinetilstand blokerer download af talemodellen. Installer modellen manuelt",
+  "prompt.voice.download.title": "Download talemodellen?",
+  "prompt.voice.download.message":
+    "Tale transskriberes på denne computer med whisper.cpp's {{model}}-model ({{size}} MB), downloadet én gang fra huggingface.co og kontrolleret med SHA-256. Din stemme forlader aldrig denne computer.",
+  "prompt.voice.download.confirm": "Download",
+  "prompt.voice.download.progress": "Downloader talemodellen… {{percent}} %",
+  "prompt.voice.error": "Stemmeinput mislykkedes: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "Ikke understøttet vedhæftning",
   "prompt.toast.attachmentDuplicate.title": "Denne fil er allerede uploadet",

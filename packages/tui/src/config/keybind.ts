@@ -285,6 +285,9 @@ export const Definitions = {
     "none",
     "Delete every session shown in the Sessions view, after typing their count",
   ),
+  // XCOD-336: no other TUI binding uses ctrl+space. macOS uses it to switch input sources when more
+  // than one keyboard layout is on; rebind it there, e.g. "prompt.voice": "ctrl+alt+v".
+  "prompt.voice": keybind("ctrl+space", "Voice input: hold to talk, or press to start and again to stop"),
   "prompt.autocomplete.prev": keybind("up,ctrl+p", "Move to previous autocomplete item"),
   "prompt.autocomplete.next": keybind("down,ctrl+n", "Move to next autocomplete item"),
   "prompt.autocomplete.hide": keybind("escape", "Hide autocomplete"),

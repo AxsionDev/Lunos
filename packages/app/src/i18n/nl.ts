@@ -391,6 +391,18 @@ export const dict = {
   "prompt.action.stop": "Stop",
   "prompt.escape.again": "Nogmaals Esc om te wissen",
   "prompt.toast.cleared": "Prompt gewist · {{key}} om te herstellen",
+  "prompt.voice.start": "Spraakinvoer: houd ingedrukt om te praten, of klik om te starten en te stoppen",
+  "prompt.voice.recording": "Luistert… loslaten of klikken om te transcriberen, Esc om te annuleren",
+  "prompt.voice.transcribing": "Transcriberen op deze computer…",
+  "prompt.voice.missing": "Spraakinvoer heeft whisper.cpp (whisper-cli) op deze computer nodig",
+  "prompt.voice.micDenied": "Sta Lunos toe de microfoon te gebruiken in de privacyinstellingen van het systeem",
+  "prompt.voice.offline": "Offlinemodus blokkeert het downloaden van het spraakmodel. Installeer het model handmatig",
+  "prompt.voice.download.title": "Spraakmodel downloaden?",
+  "prompt.voice.download.message":
+    "Spraak wordt op deze computer getranscribeerd met het whisper.cpp-model {{model}} ({{size}} MB), eenmalig gedownload van huggingface.co en gecontroleerd met SHA-256. Je stem verlaat deze computer nooit.",
+  "prompt.voice.download.confirm": "Downloaden",
+  "prompt.voice.download.progress": "Spraakmodel downloaden… {{percent}}%",
+  "prompt.voice.error": "Spraakinvoer mislukt: {{error}}",
   "prompt.toast.pasteUnsupported.title": "Niet-ondersteunde bijlage",
   "prompt.toast.pasteUnsupported.description":
     "Hier kunnen alleen afbeeldingen, pdf's of tekstbestanden worden bijgevoegd.",

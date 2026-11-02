@@ -36,6 +36,7 @@ import { ConfigMemory } from "./config/memory"
 import { ConfigSandbox } from "./config/sandbox"
 import { ConfigBudget } from "./config/budget"
 import { ConfigLog } from "./config/log"
+import { ConfigVoice } from "./config/voice"
 import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
 import { ConfigV1 } from "./v1/config/config"
@@ -170,6 +171,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   log: ConfigLog.Info.pipe(Schema.optional).annotate({
     description: "How long run logs are kept: failed runs' logs for retention_days, all within max_mb",
+  }),
+  voice: ConfigVoice.Info.pipe(Schema.optional).annotate({
+    description: "Push-to-talk dictation into the prompt, transcribed on this computer (whisper.cpp)",
   }),
   residency: ConfigResidency.Info.pipe(Schema.optional).annotate({
     description:

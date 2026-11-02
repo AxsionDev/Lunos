@@ -33,6 +33,9 @@ export const KNOWN = [
   "sandbox.required",
   // How long run logs are kept (log.retention_days, log.max_mb).
   "log",
+  // XCOD-336: an organisation can turn voice input off (hides the TUI key and the desktop mic button).
+  "voice",
+  "voice.enabled",
   // XCOD-300: an organisation's project resources, read-only for members, and whether web ones are allowed.
   "resources",
   // XCOD-213: an organisation's curated Recommended model list.

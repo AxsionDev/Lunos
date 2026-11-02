@@ -21,6 +21,14 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## [Unreleased]
 
+### Added
+
+- **Dictate your prompt, transcribed on your computer.** Hold `ctrl+space` in the TUI, or the mic button
+  in the desktop app, and speak: whisper.cpp turns it into text in the prompt for you to edit. The audio
+  never leaves your computer and is never written to disk; the speech model downloads once, with your
+  consent, checked against its SHA-256. Organisations can turn it off with `voice.enabled`. See
+  docs/voice-input.md. <!-- XCOD-336 -->
+
 ## [1.18.57] - 2026-10-29
 
 ### Added

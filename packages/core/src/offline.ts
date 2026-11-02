@@ -308,6 +308,15 @@ export const CALLS: Call[] = [
     alsoOffBy:
       '`lunos sync off` (this device), `"sync": false` (this directory, or everywhere when your organisation locks it)',
   },
+  {
+    // XCOD-336: the model only; recording and transcription never use the network.
+    id: "voice-model",
+    what: "Voice input: whisper.cpp speech model download (SHA-256 checked)",
+    hosts: "huggingface.co (ggerganov/whisper.cpp)",
+    when: "the first time you use voice input, after you agree to the download",
+    offline: "blocked",
+    alsoOffBy: '`"voice": { "enabled": false }`. Pre-install the model in `<data>/voice/models` instead',
+  },
 ]
 
 /** One line per blocked call, for `lunos --version --verbose`. */

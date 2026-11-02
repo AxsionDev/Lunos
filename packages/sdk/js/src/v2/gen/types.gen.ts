@@ -1845,6 +1845,13 @@ export type ExternalConfig = {
   }
 }
 
+export type VoiceConfig = {
+  enabled?: boolean
+  model?: "tiny" | "base" | "small" | "medium"
+  language?: string
+  auto_send?: number
+}
+
 export type CloudConfig = {
   issuer?: string
   client_id?: string
@@ -2337,6 +2344,7 @@ export type Config = {
   }
   default_agent?: string
   external?: ExternalConfig
+  voice?: VoiceConfig
   cloud?: CloudConfig
   auth?: AuthConfig
   sync?: SyncConfig
