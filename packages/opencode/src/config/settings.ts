@@ -64,6 +64,7 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   cloud: "Advanced / experimental",
   auth: "Advanced / experimental",
   sync: "Advanced / experimental",
+  remote_control: "Advanced / experimental",
   external: "Models & agents",
   subagent_depth: "Models & agents",
   agent: "Models & agents",

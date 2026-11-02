@@ -124,6 +124,12 @@ async function stopIn(sessionID: string, directory: string, reason: string) {
   return inner(`/session/${sessionID}/abort`, directory, { method: "POST" })
 }
 
+/** XCOD-338: the same stop for a session whose directory the caller knows (remote control). */
+export const stopSession = async (sessionID: string, directory: string, reason: string) => {
+  const response = await stopIn(sessionID, directory, reason)
+  if (!response.ok) throw new PeerError(response.status, (await response.text()) || `${response.status}`)
+}
+
 /** XCOD-265: stops a session this process runs. Throws PeerError(404) when it runs none by that id. */
 export async function stopHere(sessionID: string, reason = STOP_REASON) {
   const directory = SessionLive.directoryOf(sessionID)

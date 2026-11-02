@@ -471,7 +471,18 @@ export const ExperimentalPaths = {
   sessionTakeover: "/experimental/session/:sessionID/takeover",
   sessionQueued: "/experimental/session/:sessionID/queued",
   peerPrompt: "/experimental/peer/:sessionID/prompt",
+  sessionRemote: "/experimental/session/:sessionID/remote",
 } as const
+
+// XCOD-338: remote control of a session from app.lunos.tech.
+export const SessionRemotePayload = Schema.Struct({ on: Schema.Boolean })
+export const SessionRemoteStatus = Schema.Struct({
+  on: Schema.Boolean,
+  link: Schema.optional(Schema.String),
+  /** Where to open the session: app.lunos.tech/remote/<link>. */
+  url: Schema.optional(Schema.String),
+  expiresAt: Schema.optional(NonNegativeInt),
+}).annotate({ identifier: "SessionRemoteStatus" })
 
 // XCOD-325: a session's new name; empty goes back to the automatic one.
 export const SessionRenamePayload = Schema.Struct({ title: Schema.String })
@@ -486,7 +497,7 @@ export const PeerAsks = Schema.Struct({
 export const SessionEnqueuePayload = Schema.Struct({
   text: Schema.String,
   interrupt: Schema.optional(Schema.Boolean),
-  via: Schema.optional(Schema.Literals(["local", "peer"])),
+  via: Schema.optional(Schema.Literals(["local", "peer", "remote"])),
   /** A session the monitor just started: the model picked there. Not forwarded by peer.prompt. */
   model: Schema.optional(Schema.Struct({ providerID: Schema.String, modelID: Schema.String })),
   variant: Schema.optional(Schema.String),
@@ -1150,6 +1161,32 @@ export const ExperimentalApi = HttpApi.make("experimental")
             summary: "Take over a session whose Lunos stopped",
             description:
               "Run a session here whose Lunos process stopped, after the user confirmed it. The prompts that process had queued for it are sent first, in order (queued: send), or dropped (queued: discard); then text, if given. Refused while another Lunos runs the session, or while the process that queued them still exists. Audited as session.takeover, without the text.",
+          }),
+        ),
+        HttpApiEndpoint.get("sessionRemote", ExperimentalPaths.sessionRemote, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(SessionRemoteStatus, "Whether the session is remote"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.remote",
+            summary: "Whether a session can be controlled from app.lunos.tech",
+            description: "XCOD-338: on, with the link and its URL and expiry, or off.",
+          }),
+        ),
+        HttpApiEndpoint.post("sessionRemoteSet", ExperimentalPaths.sessionRemote, {
+          params: { sessionID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: SessionRemotePayload,
+          success: described(SessionRemoteStatus, "Whether the session is remote now"),
+          error: [InvalidRequestError, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "experimental.session.remoteSet",
+            summary: "Turn remote control of a session on or off",
+            description:
+              "XCOD-338: on makes the session available at app.lunos.tech to the signed-in Lunos account, through one outgoing connection to Lunos Cloud (no port is opened), for at most 12 hours; off ends it at once. Refused (with the reason) when offline, signed out, the device's sync is off, the residency policy or the organisation's policy (remote_control: false or sync: false, locked) doesn't allow it. Audited as remote.on, remote.off and remote.denied.",
           }),
         ),
         HttpApiEndpoint.get("sessionQueued", ExperimentalPaths.sessionQueued, {

@@ -592,6 +592,57 @@ export function Session() {
       },
     },
     {
+      // XCOD-338: follow and steer this session from app.lunos.tech (a phone, another computer).
+      title: "Remote control (app.lunos.tech)",
+      value: "session.remote",
+      category: "Session",
+      slash: {
+        name: "remote",
+      },
+      run: async () => {
+        dialog.clear()
+        const sessionID = route.sessionID
+        const current = await sdk.client.experimental.session.remote({ sessionID }).catch(() => undefined)
+        const fail = (res: { error?: unknown }, fallback: string) => {
+          const body = res.error as { message?: unknown; data?: { message?: unknown } } | undefined
+          const message =
+            typeof body?.message === "string"
+              ? body.message
+              : typeof body?.data?.message === "string"
+                ? body.data.message
+                : fallback
+          toast.show({ message, variant: "error", duration: 8000 })
+        }
+        if (current?.data?.on) {
+          const ok = await DialogConfirm.show(
+            dialog,
+            "Remote control is on",
+            `This session can be followed and steered at ${current.data.url}. Turn remote control off? It ends at once.`,
+          )
+          dialog.clear()
+          if (ok !== true) return
+          const res = await sdk.client.experimental.session.remoteSet({ sessionID, on: false })
+          if (res.error) return fail(res, "Couldn't turn remote control off")
+          toast.show({ message: "Remote control is off.", variant: "info" })
+          return
+        }
+        const ok = await DialogConfirm.show(
+          dialog,
+          "Turn remote control on?",
+          "You (signed in to your Lunos account) can then follow this session at app.lunos.tech, answer its approvals and questions, send prompts and stop it, for up to 12 hours. It still runs here, under this computer's policy. Lunos keeps one outgoing connection to Lunos Cloud (EU); no port is opened. Run /remote again to turn it off.",
+        )
+        dialog.clear()
+        if (ok !== true) return
+        const res = await sdk.client.experimental.session.remoteSet({ sessionID, on: true })
+        if (res.error || !res.data?.url) return fail(res, "Couldn't turn remote control on")
+        const url = res.data.url
+        await clipboard
+          .write?.(url)
+          .then(() => toast.show({ message: `Remote control is on: ${url} (copied)`, variant: "success", duration: 8000 }))
+          .catch(() => toast.show({ message: `Remote control is on: ${url}`, variant: "success", duration: 8000 }))
+      },
+    },
+    {
       title: "Answer a dismissed question",
       value: "session.answer",
       category: "Session",

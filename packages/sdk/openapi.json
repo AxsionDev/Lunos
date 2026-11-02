@@ -5125,7 +5125,7 @@
                   },
                   "via": {
                     "type": "string",
-                    "enum": ["local", "peer"]
+                    "enum": ["local", "peer", "remote"]
                   },
                   "model": {
                     "type": "object",
@@ -5271,6 +5271,178 @@
           {
             "lang": "js",
             "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.session.takeover({\n  ...\n})"
+          }
+        ]
+      }
+    },
+    "/experimental/session/{sessionID}/remote": {
+      "get": {
+        "tags": ["experimental"],
+        "operationId": "experimental.session.remote",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the session is remote",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionRemoteStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "description": "XCOD-338: on, with the link and its URL and expiry, or off.",
+        "summary": "Whether a session can be controlled from app.lunos.tech",
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.session.remote({\n  ...\n})"
+          }
+        ]
+      },
+      "post": {
+        "tags": ["experimental"],
+        "operationId": "experimental.session.remoteSet",
+        "parameters": [
+          {
+            "name": "sessionID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "directory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "workspace",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Whether the session is remote now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionRemoteStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InvalidRequestError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundError"
+                }
+              }
+            }
+          }
+        },
+        "description": "XCOD-338: on makes the session available at app.lunos.tech to the signed-in Lunos account, through one outgoing connection to Lunos Cloud (no port is opened), for at most 12 hours; off ends it at once. Refused (with the reason) when offline, signed out, the device's sync is off, the residency policy or the organisation's policy (remote_control: false or sync: false, locked) doesn't allow it. Audited as remote.on, remote.off and remote.denied.",
+        "summary": "Turn remote control of a session on or off",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "on": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["on"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "js",
+            "source": "import { createOpencodeClient } from \"@opencode-ai/sdk\n\nconst client = createOpencodeClient()\nawait client.experimental.session.remoteSet({\n  ...\n})"
           }
         ]
       }
@@ -28245,6 +28417,9 @@
           "sync": {
             "$ref": "#/components/schemas/SyncConfig"
           },
+          "remote_control": {
+            "type": "boolean"
+          },
           "subagent": {
             "$ref": "#/components/schemas/SubagentConfig"
           },
@@ -30845,6 +31020,26 @@
           }
         },
         "required": ["sent", "discarded"],
+        "additionalProperties": false
+      },
+      "SessionRemoteStatus": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "link": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["on"],
         "additionalProperties": false
       },
       "SessionQueued": {
