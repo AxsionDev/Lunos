@@ -79,6 +79,8 @@ export const CATEGORY: Record<keyof typeof ConfigV1.Info.fields, Category> = {
   sandbox: "Permissions",
   // XCOD-327: Settings › Permissions › Browser & computer.
   browser: "Permissions",
+  // XCOD-339: Settings › Permissions › Browser & computer.
+  computer: "Permissions",
   residency: "Residency & privacy",
   audit: "Residency & privacy",
   share: "Residency & privacy",
@@ -160,6 +162,7 @@ const SUBTAB: Record<string, string> = {
   tools: "Tools",
   sandbox: "Sandbox",
   browser: "Browser & computer",
+  computer: "Browser & computer",
   audit: "Audit",
   share: "Sharing",
   autoshare: "Sharing",
@@ -255,6 +258,11 @@ const DEFAULTS: Record<string, unknown> = {
   "browser.headless": false,
   "browser.port": 47615,
   "browser.screenshots": false,
+  // XCOD-339: computer control is off until the user turns it on.
+  "computer.enabled": false,
+  "computer.deny_categories": ["banking", "payment", "password_manager", "system_settings", "terminal"],
+  "computer.stop_key": "ctrl+alt+escape",
+  "computer.screenshots": false,
   "sandbox.required": false,
   "sandbox.workspace": "copy",
   "sandbox.on_finish": "destroy",

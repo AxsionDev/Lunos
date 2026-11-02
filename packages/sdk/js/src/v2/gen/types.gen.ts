@@ -1858,6 +1858,15 @@ export type BrowserConfig = {
   screenshots?: boolean
 }
 
+export type ComputerConfig = {
+  enabled?: boolean
+  allow?: Array<string>
+  deny?: Array<string>
+  deny_categories?: Array<"banking" | "payment" | "password_manager" | "system_settings" | "terminal">
+  stop_key?: string
+  screenshots?: boolean
+}
+
 export type CloudConfig = {
   issuer?: string
   client_id?: string
@@ -2352,6 +2361,7 @@ export type Config = {
   default_agent?: string
   external?: ExternalConfig
   browser?: BrowserConfig
+  computer?: ComputerConfig
   cloud?: CloudConfig
   auth?: AuthConfig
   sync?: SyncConfig

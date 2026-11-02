@@ -5,12 +5,11 @@ import { Config } from "@/config/config"
 import { Agent } from "@/agent/agent"
 import { Permission } from "@/permission"
 import { Control } from "@/control"
+import { ControlApproval } from "@/control/approval"
 import { Browser } from "@/browser"
 import { BrowserDriver } from "@/browser/driver"
 import { BrowserLaunch } from "@/browser/launch"
 import { ConfigBrowser } from "@opencode-ai/core/config/browser"
-import { Residency } from "@opencode-ai/core/residency"
-import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 
 // XCOD-327: the browser tool. Every action goes through the same gates, in this order:
 // 1. control isn't stopped or paused by the user (else ask to resume);
@@ -71,7 +70,7 @@ type Approved = "allow list" | "asked" | "approved earlier" | "not needed"
 type Gate = { refused: string } | { refused?: undefined; approved: Approved; host: string }
 
 /** Sites approved "once", which holds until the user's next message. */
-const once = new Map<string, { turn: string; sites: Set<string> }>()
+const once = new ControlApproval.Once()
 
 export const BrowserTool = Tool.define(
   ID,
@@ -90,7 +89,7 @@ export const BrowserTool = Tool.define(
           if (!ConfigBrowser.enabled(settings)) throw new Error("Browser control is turned off in /settings.")
           const agent = yield* agents.get(ctx.agent)
           const onceKey = `${ctx.sessionID}:${ctx.agent}`
-          const turn = ctx.messages.findLast((message) => message.info.role === "user")?.info.id ?? ctx.messageID
+          const turn = ControlApproval.turn(ctx)
           const mode = Browser.mode(settings)
           const audit = (fields: Record<string, string | undefined>) =>
             Control.audit("browser", "action", {
@@ -101,45 +100,23 @@ export const BrowserTool = Tool.define(
               ...fields,
             })
 
-          const ask = (input: {
-            kind: "site" | "confirm" | "resume"
-            pattern: string
-            title: string
-            detail: string
-            always?: boolean
-            ruleset: PermissionV1.Ruleset
-            host?: string
-          }) =>
-            permission
-              .ask({
-                permission: input.kind === "site" ? "browser" : "browser_confirm",
-                patterns: [input.pattern],
-                always: input.always ? [input.pattern] : [],
-                sessionID: ctx.sessionID,
-                tool: { messageID: ctx.messageID, callID: ctx.callID ?? "" },
-                ruleset: input.ruleset,
-                metadata: {
-                  manual: true,
-                  kind: input.kind,
-                  title: input.title,
-                  detail: input.detail,
-                  choices: [
-                    { id: "once", label: input.kind === "site" ? "Allow once" : "Yes, do it", reply: "once" },
-                    ...(input.always
-                      ? [{ id: "always", label: `Always allow ${input.pattern}`, reply: "always" }]
-                      : []),
-                    { id: "deny", label: input.kind === "site" ? "Deny" : "No", reply: "reject" },
-                  ],
-                },
-              })
-              .pipe(
-                Effect.tapError(() =>
-                  Effect.sync(() =>
-                    audit({ host: input.host, approved: "refused", outcome: "refused", reason: "user" }),
-                  ),
-                ),
-                Effect.orDie,
-              )
+          const ask = ControlApproval.asker({
+            permission,
+            ctx,
+            kind: "browser",
+            refused: (request) =>
+              audit({
+                host:
+                  request.kind === "resume"
+                    ? undefined
+                    : request.kind === "target"
+                      ? request.pattern
+                      : request.pattern.split(": ")[0],
+                approved: "refused",
+                outcome: "refused",
+                reason: "user",
+              }),
+          })
 
           // The agent's own `browser` rules (its defaults and the user's per-site rules), without
           // wildcard permissions: `"*": "allow"` is not an approval of every website.
@@ -166,20 +143,16 @@ export const BrowserTool = Tool.define(
               return { refused: `Refused: the ${ctx.agent} agent's browser rules deny ${host}.` } as Gate
             }
             if (rule.action === "allow") return { approved: "allow list", host } as Gate
-            const held = once.get(onceKey)
-            if (held?.turn === turn && held.sites.has(host)) return { approved: "approved earlier", host } as Gate
+            if (once.has(onceKey, turn, host)) return { approved: "approved earlier", host } as Gate
             yield* ask({
-              kind: "site",
+              kind: "target",
               pattern: host,
-              host,
               always: true,
               title: `Let the ${ctx.agent} agent use ${host} in the browser`,
               detail: `It wants to ${describeAction(params)} on ${url.origin}${url.pathname === "/" ? "" : url.pathname}.`,
               ruleset: siteRules,
             })
-            const entry = held?.turn === turn ? held : { turn, sites: new Set<string>() }
-            entry.sites.add(host)
-            once.set(onceKey, entry)
+            once.add(onceKey, turn, host)
             return { approved: "asked", host } as Gate
           })
 
@@ -187,7 +160,6 @@ export const BrowserTool = Tool.define(
             ask({
               kind: "confirm",
               pattern: `${host}: ${what}`,
-              host,
               title: what,
               detail: `On ${host}. The agent asked for this; check it is what you want before saying yes.`,
               ruleset: [],
@@ -327,21 +299,10 @@ export const BrowserTool = Tool.define(
             }
 
             if (params.action === "screenshot") {
-              const model = modelOf(ctx.extra)
-              if (model && !model.image) {
-                audit({ host, approved: checked.approved, outcome: "refused", reason: "text-only model" })
-                return refusal(
-                  "Refused: this model can't see images. Use read (the accessibility tree) or text instead: they work with any model.",
-                )
-              }
-              const blocked = model
-                ? Residency.blocked(model.providerID, model.baseURL, Residency.resolve(cfg.residency))
-                : undefined
+              const blocked = Control.screenshot(Control.model(ctx.extra), cfg.residency)
               if (blocked) {
-                audit({ host, approved: checked.approved, outcome: "refused", reason: "residency" })
-                return refusal(
-                  `Refused: a screenshot can't go to this model under the data-residency policy. ${blocked.reason}`,
-                )
+                audit({ host, approved: checked.approved, outcome: "refused", reason: blocked.reason })
+                return refusal(blocked.message)
               }
               const data = yield* wait(() => driver.screenshot())
               audit({ host, approved: checked.approved, outcome: "ok" })
@@ -518,14 +479,6 @@ export function parseUrl(input: string | undefined) {
   const url = URL.parse(withScheme)
   if (!url) throw new Error(`"${input}" isn't a URL.`)
   return url
-}
-
-function modelOf(extra: Tool.Context["extra"]) {
-  const model = extra?.["model"] as
-    | { providerID?: string; api?: { url?: string }; capabilities?: { input?: { image?: boolean } } }
-    | undefined
-  if (!model?.providerID) return undefined
-  return { providerID: model.providerID, baseURL: model.api?.url, image: model.capabilities?.input?.image === true }
 }
 
 function race<T>(promise: Promise<T>, signal: AbortSignal) {

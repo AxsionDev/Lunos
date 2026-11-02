@@ -1258,19 +1258,36 @@ export function DialogSettings(props: {
         })),
         ...list,
       ]
-    // XCOD-327: Permissions › Browser & computer says so when the organisation turned it off.
+    // XCOD-327 / XCOD-339: Permissions › Browser & computer says so when the organisation turned
+    // browser or computer control off.
     if (props.area === "Permissions" && sub() === "Browser & computer" && !query()) {
-      const enabled = rows().find((row) => row.key === "browser.enabled")
-      if (enabled?.locked && enabled.value !== true)
-        return [
-          {
-            title: "Turned off by your organisation",
-            value: "+browser.organisation",
-            description:
-              "Browser control is turned off in your organisation's policy, so agents don't get the browser tool.",
-          },
-          ...list,
-        ]
+      const off = (key: string) => {
+        const row = rows().find((item) => item.key === key)
+        return row?.locked === true && row.value !== true
+      }
+      const notices = [
+        ...(off("browser.enabled")
+          ? [
+              {
+                title: "Turned off by your organisation",
+                value: "+browser.organisation",
+                description:
+                  "Browser control is turned off in your organisation's policy, so agents don't get the browser tool.",
+              },
+            ]
+          : []),
+        ...(off("computer.enabled")
+          ? [
+              {
+                title: "Computer control: turned off by your organisation",
+                value: "+computer.organisation",
+                description:
+                  "Computer control is turned off in your organisation's policy, so agents don't get the computer tool.",
+              },
+            ]
+          : []),
+      ]
+      if (notices.length) return [...notices, ...list]
     }
     // XCOD-281: Permissions › Sandbox starts with the last failure, while it holds the sandbox off.
     const failure = sandboxFailure()
@@ -1418,6 +1435,13 @@ export function DialogSettings(props: {
         <text fg={theme.warning} wrapMode="word">
           🔒 Turned off by your organisation (managed config). Agents don't get the browser tool, and it can't be turned
           on here.
+        </text>
+      )
+    if (synthetic === "+computer.organisation")
+      return (
+        <text fg={theme.warning} wrapMode="word">
+          🔒 Turned off by your organisation (managed config). Agents don't get the computer tool, and it can't be
+          turned on here.
         </text>
       )
     if (synthetic === "+memory.advanced")

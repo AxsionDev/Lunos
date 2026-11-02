@@ -9,7 +9,7 @@ Lunos can operate a web browser for you. It can check the app it just built, cli
 - you can stop it at once;
 - every action is in the audit log.
 
-Computer control (desktop apps, mouse and keyboard) isn't available yet. It will use the same approvals, stop key and audit trail.
+Lunos can also operate desktop apps on macOS and Windows, with screenshots, the mouse, the keyboard and the clipboard. It uses the same approvals, stop key and audit trail. See [Computer control](#computer-control) below.
 
 ## Turn it on
 
@@ -124,3 +124,89 @@ Every action writes a `browser.action` line to the audit log: action, site, agen
 ## Sandbox
 
 When the session runs in a sandbox, the agent uses the Lunos browser inside the sandbox, headless. The sandbox image needs Chromium installed. My browser is on your computer, outside the sandbox, so it's refused with a message saying so.
+
+## Computer control
+
+Computer control lets the agent operate desktop apps for tasks with no API or command line: a desktop admin tool, an installer, or a native app under test. It sees the screen, moves and clicks the mouse, types, presses keys, opens apps and uses the clipboard. It's a separate switch from browser control, and the same rules keep you in control.
+
+### Turn it on
+
+`/settings` › **Permissions** › **Browser & computer** › `computer.enabled` → `true`. Or:
+
+```json
+{ "computer": { "enabled": true } }
+```
+
+Only the **qa** and **general** agents get the `computer` tool. An organisation turns it off by locking it:
+
+```json
+{ "computer": { "enabled": false }, "$locked": ["computer.enabled"] }
+```
+
+The tool is then absent for every agent, and `/settings` says it was turned off by your organisation. `computer.allow`, `computer.deny`, `computer.deny_categories` and `computer.screenshots` can be locked too.
+
+### Set up, per OS
+
+Run `lunos computer status` to see what's missing, and `lunos computer setup` to fix it.
+
+- **macOS:** two permissions, granted to the app Lunos runs in (your terminal, or the Lunos desktop app), not to Lunos itself:
+  - **Accessibility** (System Settings › Privacy & Security › Accessibility) lets Lunos move the mouse, type, and read app windows;
+  - **Screen & System Audio Recording** lets it take screenshots.
+
+  Turn both on, then quit and reopen that app. `lunos computer setup` opens the right page. Under tmux or a terminal multiplexer, the app is the one that started it: `lunos computer status` names it.
+
+- **Windows:** no permission is needed. Lunos uses SendInput for the mouse and keyboard, UI Automation to read windows, and GDI for screenshots. Apps running as administrator can't be controlled from a normal Lunos.
+- **Linux:** not supported yet. On Wayland, apps can't be driven from outside without the desktop's permission portals; X11 support isn't built. Lunos says so instead of trying.
+
+### Text first
+
+The agent reads an app's window through the accessibility tree (`read`): its buttons, fields, values and where each one is. That works with any model, including text-only EU models. A screenshot needs a model that can see images; with a text-only model, Lunos refuses the screenshot and says why, and the agent reads the window instead. Under a residency policy, only models it allows are offered in `/models`.
+
+### Apps
+
+The first time the agent acts on an app, Lunos asks: **Allow once** (until your next message), **Always allow** (until Lunos restarts) or **Deny**. Apps are named by their bundle id on macOS (`com.apple.TextEdit`) or executable on Windows (`notepad.exe`), which an app can't fake the way it can a window title.
+
+```json
+{ "computer": { "allow": ["com.apple.TextEdit", "com.example.*"], "deny": ["com.example.admin"] } }
+```
+
+Refused by default (`computer.deny_categories`): banking, payment, password-manager (including Keychain Access and Passwords), system-settings and terminal apps. Typing into a terminal would run commands outside Lunos's own shell rules. An app you name in `allow` is allowed even in one of those categories. **The app Lunos runs in is always refused**, whatever the config says: the agent could otherwise answer its own approval prompts.
+
+The app is checked before every action: for a click, the app whose window is under the pointer; for typing, the app with keyboard focus. Lunos checks again while it types, and stops if focus moves to another app. A click that brings a refused app to the front is reported, and nothing more is done there. A screenshot is refused while a password manager, banking or deny-listed app is visible anywhere on screen.
+
+### Always asks first
+
+- a click on anything that submits, sends, buys, pays, deletes, publishes or accepts, as read from the accessibility tree;
+- Return in a window whose default button does one of those;
+- key combinations that delete (Cmd+Backspace, Shift+Delete…);
+- anything the agent itself says can't be undone;
+- every clipboard read and write. A key or card number on the clipboard is never sent to the model.
+
+These prompts are always answered by you, even in Auto-approve. `lunos run --auto` refuses them.
+
+### Never done
+
+Whatever the agent is told, and whatever is on screen, it never types into a password field, or anywhere while macOS secure keyboard entry is on. Secure keyboard entry turns on whenever a password field anywhere has focus, and some apps (Terminal's "Secure Keyboard Entry", password managers) turn it on themselves. It never types or copies a password, card number, IBAN, ID number, or API key or token. It never solves CAPTCHAs, never opens system settings and never presses the stop key.
+
+### The screen is data, not instructions
+
+What the agent reads from a window is marked as untrusted. When a screenshot is taken, Lunos also reads the front window's text and checks it. Instructions aimed at an AI agent are shown to you in the session ("the screen has instructions for the agent (not followed)"), the agent is told not to follow them, and a `computer.injection` audit line is written.
+
+### Stop
+
+- **The stop key**, anywhere on the computer: `ctrl+alt+escape` by default (`computer.stop_key`). Lunos checks it every 40 ms, so control ends well within 200 ms. It stops browser control too.
+- **Stop** on the "Lunos is controlling your computer" strip at the top of the screen, shown while the agent is in control. The strip never takes keyboard focus.
+- **Move the mouse yourself** and the agent pauses (on Windows, any input you make).
+- `Esc` in Lunos interrupts the session as usual.
+
+Input is sent a character or a click at a time, and nothing more is sent once you stop. The next action asks you before control resumes. On macOS, reading the stop key may need **Input Monitoring** for the app Lunos runs in, on some versions.
+
+### Audit and what leaves your computer
+
+Every action writes a `computer.action` line: the action, the app, the agent, how it was approved and the outcome. Refused apps write `computer.denied`, stops write `computer.stop`, and planted instructions write `computer.injection`. The log never holds what was typed, the clipboard or screenshots.
+
+Screenshots and window text go to the session's model, under the same `residency` policy as everything else; a screenshot to a model the policy doesn't allow, or to a model Lunos can't identify, is refused before it's taken. Screenshots are held in memory for the next model request and never stored (`computer.screenshots: true` keeps them in the session). On macOS the image passes through a temporary file readable only by you, deleted before the tool returns; on Windows it never touches the disk.
+
+### Sandbox
+
+Computer control acts on your computer, outside any sandbox, so it's refused while the session runs in one, with a message saying so. The browser tool works inside the sandbox.

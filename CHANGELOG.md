@@ -33,6 +33,18 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   and never solves CAPTCHAs. Instructions planted on a page are shown to you, not followed. Stop it
   at once with the on-page Stop or Ctrl+Alt+Esc. Every action is in the audit log, and screenshots
   aren't kept. Off by default; an organisation can turn it off. See docs/browser-control.md.
+- **Lunos can operate desktop apps on macOS and Windows.** Turn on computer control in /settings ›
+  Permissions › Browser & computer, and the qa and general agents can read an app's window, take
+  screenshots, click, type, press keys, open apps and use the clipboard, for tasks with no API.
+  It asks before it acts on each app, and before anything that submits, sends, buys or deletes,
+  and every clipboard read or write, even in Auto-approve. Password managers, Keychain, banking,
+  payment, system-settings and terminal apps are refused, and so is the app Lunos runs in. It
+  never types passwords, card numbers or keys, or into a password field. Instructions on screen
+  are shown to you, not followed. Press Ctrl+Alt+Esc anywhere, or Stop on the on-screen strip, to
+  stop it at once; moving the mouse pauses it. Every action is in the audit log, and screenshots
+  aren't kept. On macOS, `lunos computer setup` grants the Accessibility and Screen Recording
+  permissions. Off by default; an organisation can turn it off. Linux isn't supported yet.
+  <!-- XCOD-339 -->
 
 ## [1.19.0] - 2026-11-02
 

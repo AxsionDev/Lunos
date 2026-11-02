@@ -101,6 +101,13 @@ export const KNOWN = [
   "browser.deny",
   "browser.deny_categories",
   "browser.screenshots",
+  // XCOD-339: the same for computer control (lock `computer.enabled` to false to turn it off).
+  "computer",
+  "computer.enabled",
+  "computer.allow",
+  "computer.deny",
+  "computer.deny_categories",
+  "computer.screenshots",
 ] as const
 
 /** `permission.<tool>` names any tool, including ones from plugins and MCP servers. */

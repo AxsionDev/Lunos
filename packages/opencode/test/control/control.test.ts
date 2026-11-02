@@ -125,3 +125,73 @@ describe("stop", () => {
     })
   })
 })
+
+// XCOD-339: apps, for computer control.
+describe("Control.app", () => {
+  const app = (id: string, name = id) => ({ id, name })
+
+  test("a new app is asked about", () => {
+    expect(Control.app(app("com.apple.TextEdit", "TextEdit"), {})).toEqual({ action: "ask" })
+    expect(Control.app(app("notepad.exe", "Notepad"), {})).toEqual({ action: "ask" })
+  })
+
+  test("password managers, Keychain, system settings, banking and terminals are refused by default", () => {
+    for (const [id, category] of [
+      ["com.1password.1password", "password_manager"],
+      ["com.apple.keychainaccess", "password_manager"],
+      ["com.apple.systempreferences", "system_settings"],
+      ["systemsettings.exe", "system_settings"],
+      ["com.example.mybank", "banking"],
+      ["com.apple.Terminal", "terminal"],
+      ["powershell.exe", "terminal"],
+    ] as const) {
+      const decision = Control.app(app(id), {})
+      expect(decision.action).toBe("deny")
+      if (decision.action === "deny") expect(decision.audit).toBe(`category:${category}`)
+    }
+    expect(Control.app(app("com.example.thing", "Revolut Business"), {}).action).toBe("deny")
+  })
+
+  test("the app Lunos runs in is refused even when allowed", () => {
+    const decision = Control.app(app("com.mitchellh.ghostty"), { allow: ["com.mitchellh.ghostty"] }, [
+      "com.mitchellh.ghostty",
+    ])
+    expect(decision.action).toBe("deny")
+    if (decision.action === "deny") expect(decision.audit).toBe("self")
+  })
+
+  test("allow lifts a category; deny wins; prefixes match a bundle family; unknown apps are refused", () => {
+    expect(Control.app(app("com.apple.Terminal"), { allow: ["com.apple.terminal"] }).action).toBe("allow")
+    expect(Control.app(app("com.example.a"), { allow: ["com.example.*"], deny: ["com.example.a"] }).action).toBe("deny")
+    expect(Control.app(app("com.example.b"), { allow: ["com.example.*"] }).action).toBe("allow")
+    expect(Control.app(app("com.apple.Terminal"), { deny_categories: ["banking"] })).toEqual({ action: "ask" })
+    expect(Control.app(app(""), {}).action).toBe("deny")
+  })
+})
+
+describe("Control.screenshot", () => {
+  test("a text-only model, a residency-denied model and (strictly) an unknown model are refused", () => {
+    expect(Control.screenshot({ providerID: "mistral", image: false, baseURL: undefined }, undefined)?.reason).toBe(
+      "text-only model",
+    )
+    expect(
+      Control.screenshot({ providerID: "anthropic", image: true, baseURL: undefined }, { allow: ["eu"] } as never)
+        ?.reason,
+    ).toBe("residency")
+    expect(Control.screenshot(undefined, undefined)).toBeUndefined()
+    expect(Control.screenshot(undefined, undefined, true)?.reason).toBe("unknown model")
+    expect(Control.screenshot({ providerID: "anthropic", image: true, baseURL: undefined }, undefined)).toBeUndefined()
+  })
+})
+
+describe("Control.stopAll", () => {
+  test("the OS-wide stop key ends browser and computer control together", () => {
+    const browser = Control.begin("browser")
+    const computer = Control.begin("computer")
+    Control.stopAll("stop key")
+    expect(browser.signal.aborted).toBe(true)
+    expect(computer.signal.aborted).toBe(true)
+    expect(Control.held("browser")?.origin).toBe("stop key")
+    expect(Control.held("computer")?.origin).toBe("stop key")
+  })
+})

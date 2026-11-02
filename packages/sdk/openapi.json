@@ -26898,6 +26898,40 @@
         },
         "additionalProperties": false
       },
+      "ComputerConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "deny_categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["banking", "payment", "password_manager", "system_settings", "terminal"]
+            }
+          },
+          "stop_key": {
+            "type": "string"
+          },
+          "screenshots": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "CloudConfig": {
         "type": "object",
         "properties": {
@@ -28290,6 +28324,9 @@
           },
           "browser": {
             "$ref": "#/components/schemas/BrowserConfig"
+          },
+          "computer": {
+            "$ref": "#/components/schemas/ComputerConfig"
           },
           "cloud": {
             "$ref": "#/components/schemas/CloudConfig"

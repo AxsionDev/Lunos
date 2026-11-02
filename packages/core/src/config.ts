@@ -33,6 +33,7 @@ import { ConfigAuth } from "./config/auth"
 import { ConfigSync } from "./config/sync"
 import { ConfigExternal } from "./config/external"
 import { ConfigBrowser } from "./config/browser"
+import { ConfigComputer } from "./config/computer"
 import { ConfigMemory } from "./config/memory"
 import { ConfigSandbox } from "./config/sandbox"
 import { ConfigBudget } from "./config/budget"
@@ -138,6 +139,10 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   browser: ConfigBrowser.Info.pipe(Schema.optional).annotate({
     description:
       "Browser control: the agent operates a browser, off by default, asking per site, with a stop key and an audit trail",
+  }),
+  computer: ConfigComputer.Info.pipe(Schema.optional).annotate({
+    description:
+      "Computer control: the agent operates desktop apps with screenshots, mouse, keyboard and clipboard, off by default, asking per app, with a stop key and an audit trail",
   }),
   cloud: ConfigCloud.Info.pipe(Schema.optional).annotate({
     description: "Lunos Cloud sign-in: the identity provider lunos login uses (XCOD-185)",
