@@ -118,4 +118,12 @@ export type ElectronAPI = {
   setForceFocus: (enabled: boolean) => Promise<void>
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   setNativeTranslations: (bundle: DesktopNativeBundle) => Promise<void>
+  // XCOD-336: voice input, transcribed by whisper.cpp in the main process.
+  voiceStatus: (model?: string) => Promise<VoiceStatus>
+  voiceDownload: (model?: string) => Promise<void>
+  onVoiceDownloadProgress: (cb: (percent: number) => void) => () => void
+  voiceTranscribe: (pcm: ArrayBuffer, options: { model?: string; language?: string }) => Promise<string>
+  voiceMicAccess: () => Promise<boolean>
 }
+
+export type VoiceStatus = { whisper: boolean; model: boolean; size: number; offline: boolean }

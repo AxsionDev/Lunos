@@ -416,6 +416,18 @@ export const dict = {
   "prompt.action.stop": "Остановить",
   "prompt.escape.again": "Ещё раз Esc, чтобы очистить",
   "prompt.toast.cleared": "Запрос очищен · {{key}} — восстановить",
+  "prompt.voice.start": "Голосовой ввод: удерживайте, чтобы говорить, или нажмите для начала и остановки",
+  "prompt.voice.recording": "Слушаю… отпустите или нажмите для расшифровки, Esc для отмены",
+  "prompt.voice.transcribing": "Расшифровка на этом компьютере…",
+  "prompt.voice.missing": "Для голосового ввода нужен whisper.cpp (whisper-cli) на этом компьютере",
+  "prompt.voice.micDenied": "Разрешите Lunos использовать микрофон в настройках конфиденциальности системы",
+  "prompt.voice.offline": "Автономный режим блокирует загрузку речевой модели. Установите модель вручную",
+  "prompt.voice.download.title": "Загрузить речевую модель?",
+  "prompt.voice.download.message":
+    "Речь расшифровывается на этом компьютере моделью {{model}} whisper.cpp ({{size}} МБ), загруженной один раз с huggingface.co и проверенной по SHA-256. Ваш голос никогда не покидает этот компьютер.",
+  "prompt.voice.download.confirm": "Загрузить",
+  "prompt.voice.download.progress": "Загрузка речевой модели… {{percent}}%",
+  "prompt.voice.error": "Ошибка голосового ввода: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "Неподдерживаемое вложение",
   "prompt.toast.attachmentDuplicate.title": "Этот файл уже загружен",

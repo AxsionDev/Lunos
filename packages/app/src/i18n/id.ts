@@ -418,6 +418,18 @@ export const dict = {
   "prompt.action.stop": "Hentikan",
   "prompt.escape.again": "Esc lagi untuk menghapus",
   "prompt.toast.cleared": "Prompt dihapus · {{key}} untuk memulihkan",
+  "prompt.voice.start": "Input suara: tahan untuk berbicara, atau klik untuk mulai dan berhenti",
+  "prompt.voice.recording": "Mendengarkan… lepaskan atau klik untuk mentranskripsi, Esc untuk membatalkan",
+  "prompt.voice.transcribing": "Mentranskripsi di komputer ini…",
+  "prompt.voice.missing": "Input suara memerlukan whisper.cpp (whisper-cli) di komputer ini",
+  "prompt.voice.micDenied": "Izinkan Lunos menggunakan mikrofon di pengaturan privasi sistem",
+  "prompt.voice.offline": "Mode offline memblokir unduhan model ucapan. Instal model secara manual",
+  "prompt.voice.download.title": "Unduh model ucapan?",
+  "prompt.voice.download.message":
+    "Suara ditranskripsi di komputer ini dengan model {{model}} dari whisper.cpp ({{size}} MB), diunduh sekali dari huggingface.co dan diperiksa dengan SHA-256. Suara Anda tidak pernah meninggalkan komputer ini.",
+  "prompt.voice.download.confirm": "Unduh",
+  "prompt.voice.download.progress": "Mengunduh model ucapan… {{percent}}%",
+  "prompt.voice.error": "Input suara gagal: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "Lampiran tidak didukung",
   "prompt.toast.pasteUnsupported.description": "Hanya gambar, PDF, atau berkas teks yang dapat dilampirkan di sini.",

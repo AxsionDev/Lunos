@@ -318,6 +318,18 @@ export const dict = {
   "prompt.action.stop": "Stop",
   "prompt.escape.again": "Esc again to clear",
   "prompt.toast.cleared": "Prompt cleared · {{key}} to restore",
+  "prompt.voice.start": "Voice input: hold to talk, or click to start and stop",
+  "prompt.voice.recording": "Listening… release or click to transcribe, Esc to cancel",
+  "prompt.voice.transcribing": "Transcribing on this computer…",
+  "prompt.voice.missing": "Voice input needs whisper.cpp (whisper-cli) on this computer",
+  "prompt.voice.micDenied": "Allow Lunos to use the microphone in your system's privacy settings",
+  "prompt.voice.offline": "Offline mode blocks the speech model download. Install the model by hand",
+  "prompt.voice.download.title": "Download the speech model?",
+  "prompt.voice.download.message":
+    "Voice is transcribed on this computer with whisper.cpp's {{model}} model ({{size}} MB), downloaded once from huggingface.co and checked against its SHA-256. Your voice never leaves this computer.",
+  "prompt.voice.download.confirm": "Download",
+  "prompt.voice.download.progress": "Downloading the speech model… {{percent}}%",
+  "prompt.voice.error": "Voice input failed: {{error}}",
 
   "prompt.toast.pasteUnsupported.title": "Unsupported attachment",
   "prompt.toast.pasteUnsupported.description": "Only images, PDFs, or text files can be attached here.",

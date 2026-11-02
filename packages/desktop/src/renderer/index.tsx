@@ -190,6 +190,17 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
           },
         }),
 
+    // XCOD-336: whisper.cpp runs in the main process; the samples cross IPC and nothing else.
+    voice: {
+      status: (model) => window.api.voiceStatus(model),
+      async download(model, onProgress) {
+        const off = window.api.onVoiceDownloadProgress(onProgress)
+        await window.api.voiceDownload(model).finally(off)
+      },
+      transcribe: (pcm, options) => window.api.voiceTranscribe(Int16Array.from(pcm).buffer, options),
+      microphone: () => window.api.voiceMicAccess(),
+    },
+
     async openDirectoryPickerDialog(opts) {
       return window.api.openDirectoryPicker({
         multiple: opts?.multiple ?? false,

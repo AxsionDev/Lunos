@@ -1845,6 +1845,13 @@ export type ExternalConfig = {
   }
 }
 
+export type VoiceConfig = {
+  enabled?: boolean
+  model?: "tiny" | "base" | "small" | "medium"
+  language?: string
+  auto_send?: number
+}
+
 export type BrowserConfig = {
   enabled?: boolean
   mode?: "lunos" | "extension"
@@ -2360,6 +2367,7 @@ export type Config = {
   }
   default_agent?: string
   external?: ExternalConfig
+  voice?: VoiceConfig
   browser?: BrowserConfig
   computer?: ComputerConfig
   cloud?: CloudConfig

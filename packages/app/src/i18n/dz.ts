@@ -395,6 +395,19 @@ export const dict: Record<string, string> = {
   "prompt.action.stop": "བཀག་པ",
   "prompt.escape.again": "བསལ་ནིའི་དོན་ལུ་ Esc ལོག་སྟེ་ནོན།",
   "prompt.toast.cleared": "འདྲི་བ་བསལ་ཡོདཔ། · སླར་གསོ་ལུ་ {{key}}",
+  "prompt.voice.start": "སྐད་ཀྱི་ནང་བཙུགས། སླབ་ནིའི་དོན་ལུ་ཨེབ་ཏེ་བཞག ཡང་ན་འགོ་བཙུགས་ནི་དང་བཀག་ནིའི་དོན་ལུ་ཨེབ།",
+  "prompt.voice.recording": "ཉན་དོ… ཡི་གེར་བསྒྱུར་ནིའི་དོན་ལུ་བཏང་ ཡང་ན་ཨེབ། ཆ་མེད་གཏང་ནིའི་དོན་ལུ་ Esc",
+  "prompt.voice.transcribing": "གློག་རིག་འདི་གུ་ཡི་གེར་བསྒྱུར་དོ…",
+  "prompt.voice.missing": "སྐད་ཀྱི་ནང་བཙུགས་ལུ་གློག་རིག་འདི་གུ་ whisper.cpp (whisper-cli) དགོཔ་ཨིན།",
+  "prompt.voice.micDenied": "རིམ་ལུགས་ཀྱི་སྒེར་གསང་སྒྲིག་སྟངས་ནང་ Lunos ལུ་སྐད་སྒྲ་ཟུང་ཆས་ལག་ལེན་འཐབ་ནིའི་གནང་བ་བྱིན།",
+  "prompt.voice.offline":
+    "ཡོངས་འབྲེལ་མེད་པའི་ཐབས་ལམ་གྱིས་སྐད་ཀྱི་དཔེ་གཞི་ཕབ་ལེན་བཀག་ཡོདཔ་ཨིན། དཔེ་གཞི་ལག་ལས་གཞི་བཙུགས་འབད།",
+  "prompt.voice.download.title": "སྐད་ཀྱི་དཔེ་གཞི་ཕབ་ལེན་འབད་ནི་ཨིན་ན?",
+  "prompt.voice.download.message":
+    "སྐད་འདི་གློག་རིག་འདི་གུ་ whisper.cpp གི་ {{model}} དཔེ་གཞི་ ({{size}} MB) གིས་ཡི་གེར་བསྒྱུརཝ་ཨིན། དེ་ huggingface.co ལས་ཚར་གཅིག་ཕབ་ལེན་འབད་དེ་ SHA-256 གིས་བརྟག་ཞིབ་འབདཝ་ཨིན། ཁྱོད་ཀྱི་སྐད་འདི་གློག་རིག་འདི་ལས་ནམ་ཡང་ཕྱིར་མི་འགྱོ།",
+  "prompt.voice.download.confirm": "ཕབ་ལེན།",
+  "prompt.voice.download.progress": "སྐད་ཀྱི་དཔེ་གཞི་ཕབ་ལེན་འབད་དོ… {{percent}}%",
+  "prompt.voice.error": "སྐད་ཀྱི་ནང་བཙུགས་འཐུས་ཤོར་བྱུང་ཡོད། {{error}}",
   "prompt.toast.pasteUnsupported.title": "རྒྱབ་སྐྱོར་མེད་པའི་མཉམ་སྦྲགས།",
   "prompt.toast.pasteUnsupported.description":
     "པར་རིས་དང་པི་ཌི་ཨེཕ་ ཡང་ན་ ཚིག་ཡིག་ཡིག་སྣོད་ཚུ་རྐྱངམ་ཅིག་ ནཱ་ལུ་མཉམ་སྦྲགས་འབད་བཏུབ།",

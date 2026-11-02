@@ -300,6 +300,20 @@ export const dict = {
   "prompt.action.stop": "Stoppen",
   "prompt.escape.again": "Erneut Esc zum Leeren",
   "prompt.toast.cleared": "Eingabe geleert · {{key}} zum Wiederherstellen",
+  "prompt.voice.start": "Spracheingabe: zum Sprechen gedrückt halten oder zum Starten und Stoppen klicken",
+  "prompt.voice.recording": "Höre zu… loslassen oder klicken zum Transkribieren, Esc zum Abbrechen",
+  "prompt.voice.transcribing": "Transkription auf diesem Computer…",
+  "prompt.voice.missing": "Die Spracheingabe benötigt whisper.cpp (whisper-cli) auf diesem Computer",
+  "prompt.voice.micDenied":
+    "Erlauben Sie Lunos den Zugriff auf das Mikrofon in den Datenschutzeinstellungen des Systems",
+  "prompt.voice.offline":
+    "Der Offline-Modus blockiert den Download des Sprachmodells. Installieren Sie das Modell manuell",
+  "prompt.voice.download.title": "Sprachmodell herunterladen?",
+  "prompt.voice.download.message":
+    "Die Sprache wird auf diesem Computer mit dem whisper.cpp-Modell {{model}} ({{size}} MB) transkribiert, einmalig von huggingface.co geladen und per SHA-256 geprüft. Ihre Stimme verlässt diesen Computer nie.",
+  "prompt.voice.download.confirm": "Herunterladen",
+  "prompt.voice.download.progress": "Sprachmodell wird heruntergeladen… {{percent}}%",
+  "prompt.voice.error": "Spracheingabe fehlgeschlagen: {{error}}",
   "prompt.toast.pasteUnsupported.title": "Nicht unterstützter Anhang",
   "prompt.toast.attachmentDuplicate.title": "Diese Datei wurde bereits hochgeladen",
   "prompt.toast.pasteUnsupported.description": "Hier können nur Bilder, PDFs oder Textdateien angehängt werden.",

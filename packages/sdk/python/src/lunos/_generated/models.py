@@ -2441,6 +2441,54 @@ class ExternalConfig(BaseModel):
     share: Share1 | None = None
 
 
+class VoiceConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='allow',
+    )
+    enabled: bool | None = None
+    model: Literal['tiny', 'base', 'small', 'medium'] | None = None
+    language: str | None = None
+    auto_send: Annotated[int | None, Field(ge=0)] = None
+
+
+class BrowserConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='allow',
+    )
+    enabled: bool | None = None
+    mode: Literal['lunos', 'extension'] | None = None
+    allow: list[str] | None = None
+    deny: list[str] | None = None
+    deny_categories: (
+        list[Literal['banking', 'payment', 'password_manager', 'system_settings']]
+        | None
+    ) = None
+    stop_key: str | None = None
+    headless: bool | None = None
+    executable: str | None = None
+    port: Annotated[int | None, Field(gt=0)] = None
+    screenshots: bool | None = None
+
+
+class ComputerConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='allow',
+    )
+    enabled: bool | None = None
+    allow: list[str] | None = None
+    deny: list[str] | None = None
+    deny_categories: (
+        list[
+            Literal[
+                'banking', 'payment', 'password_manager', 'system_settings', 'terminal'
+            ]
+        ]
+        | None
+    ) = None
+    stop_key: str | None = None
+    screenshots: bool | None = None
+
+
 class CloudConfig(BaseModel):
     model_config = ConfigDict(
         extra='allow',
@@ -2488,6 +2536,7 @@ class SubagentConfig(BaseModel):
     background: bool | None = None
     delegate: bool | None = None
     max_parallel: Annotated[int | None, Field(gt=0)] = None
+    isolation: Literal['worktree', 'shared'] | None = None
     fun_names: bool | None = None
     mascots: bool | None = None
     model: str | None = None
@@ -11943,6 +11992,9 @@ class Config(BaseModel):
     recommended: dict[str, str] | None = None
     default_agent: str | None = None
     external: ExternalConfig | None = None
+    voice: VoiceConfig | None = None
+    browser: BrowserConfig | None = None
+    computer: ComputerConfig | None = None
     cloud: CloudConfig | None = None
     auth: AuthConfig | None = None
     sync: SyncConfig | None = None

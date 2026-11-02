@@ -31,6 +31,11 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
   is recorded in your audit log as coming from remote, `/remote off` or one tap on the web ends it at
   once, and it ends by itself after 12 hours. Off by default, and off wherever your organisation keeps
   session sync off. See docs/remote-control.md. <!-- XCOD-338 -->
+- **Dictate your prompt, transcribed on your computer.** Hold `ctrl+space` in the TUI, or the mic button
+  in the desktop app, and speak: whisper.cpp turns it into text in the prompt for you to edit. The audio
+  never leaves your computer and is never written to disk; the speech model downloads once, with your
+  consent, checked against its SHA-256. Organisations can turn it off with `voice.enabled`. See
+  docs/voice-input.md. <!-- XCOD-336 -->
 - **Lunos in JetBrains IDEs and Visual Studio (preview).** There are now plugins for IntelliJ IDEA,
   Rider and Visual Studio 2022, built from `sdks/jetbrains` and `sdks/visualstudio`. They aren't on
   the marketplaces yet. Each one gives you a chat panel and a session picker, and lists the same

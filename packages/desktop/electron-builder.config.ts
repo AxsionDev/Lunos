@@ -81,6 +81,11 @@ const getBase = (appId: string): Configuration => ({
     gatekeeperAssess: false,
     entitlements: "resources/entitlements.plist",
     entitlementsInherit: "resources/entitlements.plist",
+    // XCOD-336: macOS stops an app that opens the microphone without saying why.
+    extendInfo: {
+      NSMicrophoneUsageDescription:
+        "Lunos listens only while you hold the voice input button, and transcribes on this Mac.",
+    },
     notarize: true,
     target: ["dmg", "zip"],
   },
