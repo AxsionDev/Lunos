@@ -1,0 +1,8 @@
+{
+  "name": "fully-local",
+  "title": "Just me, fully local",
+  "description": "Memory on this computer, with facts extracted by a model running on this computer (Ollama, LM Studio).",
+  "leaves": "nothing",
+  "requires": ["local-model"],
+  "memory": { "backend": { "type": "embedded" }, "encryption": "os-keychain", "model": "{local-model}" }
+}

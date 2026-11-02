@@ -118,9 +118,21 @@ export class SyncAbortedError extends Schema.TaggedErrorClass<SyncAbortedError>(
   cause: Schema.optional(Schema.Defect()),
 }) {}
 
+// XCOD-158: a sandbox's changes come back only through its handoff (sandbox.results: a branch, a
+// patch, or nothing), and its seed already holds the host's uncommitted changes. Copying file
+// changes across a warp would bypass the first and double-apply the second, in either direction.
+export class SandboxCopyRefusedError extends Schema.TaggedErrorClass<SandboxCopyRefusedError>()(
+  "WorkspaceSandboxCopyRefusedError",
+  {
+    message: Schema.String,
+    workspaceID: WorkspaceV2.ID,
+  },
+) {}
+
 type CreateError = Auth.AuthError
 type SessionWarpError =
   | WorkspaceNotFoundError
+  | SandboxCopyRefusedError
   | SessionEventsNotFoundError
   | SessionWarpHttpError
   | Vcs.PatchApplyError
@@ -564,6 +576,20 @@ const layer = Layer.effect(
           .where(eq(SessionTable.id, input.sessionID))
           .get()
           .pipe(Effect.orDie)
+
+        if (input.copyChanges) {
+          for (const id of [current?.workspaceID, input.workspaceID]) {
+            const space = id ? yield* get(id) : undefined
+            if (space?.type === "docker")
+              return yield* new SandboxCopyRefusedError({
+                message:
+                  "File changes can't be copied into or out of a sandbox: its changes come back as sandbox.results " +
+                  "says (a branch, a patch, or not at all) when it ends, and it already started from your uncommitted changes. " +
+                  "Warp without copying changes.",
+                workspaceID: space.id,
+              })
+          }
+        }
 
         if (current?.workspaceID) {
           const previous = yield* get(current.workspaceID)

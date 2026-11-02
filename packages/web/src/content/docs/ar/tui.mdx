@@ -163,6 +163,18 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### marketplace
+
+تصفّح الإضافات والمهارات والخطافات وخوادم MCP من أسواقك وثبّتها. أضف اسم تبويب (`plugins` أو `skills` أو `hooks` أو `mcp`) لفتحه، أو `installed` لعرض ما هو مثبّت مع تمييز التحديثات المتاحة، أو أي كلمات أخرى للبحث. _الاسم المستعار_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 اعرض النماذج المتاحة.
@@ -187,6 +199,16 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### plugins
+
+اعرض الإضافات المثبّتة وشغّلها أو أوقفها.
+
+```bash frame="none"
+/plugins
+```
+
+---
+
 ### redo
 
 أعِد تنفيذ رسالة تم التراجع عنها سابقا. متاح فقط بعد استخدام `/undo`.
@@ -207,10 +229,20 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ### sessions
 
-اعرض الجلسات وبدّل بينها. _الأسماء المستعارة_: `/resume`, `/continue`
+كل الجلسات على هذا الجهاز عبر جميع مشاريعك: حالتها ومشروعها ونموذجها وآخر نشاط وتكلفتها، ضمن مجموعاتك الخاصة.
 
 ```bash frame="none"
 /sessions
+```
+
+---
+
+### resume
+
+اعرض جلسات هذا المشروع وبدّل بينها. _الأسماء المستعارة_: `/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **اختصار لوحة المفاتيح:** `ctrl+x l`

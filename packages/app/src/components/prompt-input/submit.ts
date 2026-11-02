@@ -1,5 +1,6 @@
 import type { Message, Session } from "@opencode-ai/sdk/v2/client"
 import { showToast } from "@/utils/toast"
+import { useAccount } from "@/context/account"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router"
@@ -23,6 +24,7 @@ import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
 import { Event } from "@opencode-ai/schema/event"
 import { blobDataUrl } from "@/utils/draft-store"
+import type { SessionTakeover } from "./takeover"
 
 type PendingPrompt = {
   abort: AbortController
@@ -229,6 +231,8 @@ type PromptSubmitInput = {
   onAbort?: () => void
   onSubmit?: () => void
   model?: ModelSelection
+  /** XCOD-267: asks first when a Lunos that closed left prompts queued for the session. */
+  takeover?: SessionTakeover
 }
 
 export function createPromptSubmit(input: PromptSubmitInput) {
@@ -244,6 +248,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const params = useParams()
   const [search] = useSearchParams<{ draftId?: string }>()
   const tabs = useTabs()
+  const account = useAccount()
   const pendingKey = (sessionID: string) => ScopedKey.from(sdk().scope, sessionID)
 
   const errorMessage = (err: unknown) => {
@@ -335,9 +340,12 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       return
     }
 
+    // XCOD-312: a disabled Lunos account sends nothing; the draft stays, and the toast says why.
+    if (account && !account.allowSend()) return
+
     const modelSelection = input.model ?? local.model
     const currentModel = modelSelection.current()
-    const currentAgent = local.agent.current()
+    const currentAgent = local.mode.current()
     const variant = modelSelection.variant.current()
     if (!currentModel || !currentAgent) {
       showToast({
@@ -346,6 +354,11 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       })
       return
     }
+
+    // XCOD-267: a Lunos that closed left prompts queued for this session: they go first or are
+    // discarded, as the user chooses, before this one runs. Cancel keeps the text.
+    const takeover = params.id && input.takeover ? await input.takeover.ask(params.id) : undefined
+    if (takeover === "cancel") return
 
     input.addToHistory(currentPrompt, mode)
     input.resetHistoryNavigation()
@@ -477,6 +490,63 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         input.queueScroll()
       })
       return true
+    }
+
+    if (takeover === "send") {
+      // The request the paths below would make, run once the queued prompts have; no optimistic
+      // message, which would show it above them.
+      const files = await Promise.all(
+        images.map(async (attachment) => ({
+          type: "file" as const,
+          mime: attachment.mime,
+          url: await blobDataUrl(attachment.blob, attachment.mime),
+          filename: attachment.filename,
+        })),
+      )
+      const [cmdName, ...args] = text.split(" ")
+      const command = text.startsWith("/") && sync().data.command.find((c) => c.name === cmdName!.slice(1))
+      const request =
+        mode === "shell"
+          ? { kind: "shell" as const, body: { command: text, agent, model } }
+          : command
+            ? {
+                kind: "command" as const,
+                body: {
+                  command: command.name,
+                  arguments: args.join(" "),
+                  agent,
+                  model: `${model.providerID}/${model.modelID}`,
+                  ...(variant ? { variant } : {}),
+                  parts: files,
+                },
+              }
+            : {
+                kind: "prompt" as const,
+                body: {
+                  agent,
+                  model,
+                  ...(variant ? { variant } : {}),
+                  parts: buildRequestParts({
+                    prompt: currentPrompt,
+                    context,
+                    images: await Promise.all(
+                      images.map(async (attachment) => ({
+                        ...attachment,
+                        dataUrl: await blobDataUrl(attachment.blob, attachment.mime),
+                      })),
+                    ),
+                    text,
+                    sessionID: session.id,
+                    messageID: Identifier.ascending("message"),
+                    sessionDirectory,
+                  }).requestParts.map(({ id: _, ...part }) => part),
+                },
+              }
+      input.onSubmit?.()
+      clearContext(submission.target())
+      clearInput()
+      if (!(await input.takeover!.send(session.id, text, request))) restoreInput()
+      return
     }
 
     if (!isNewSession && mode === "normal" && input.shouldQueue?.()) {

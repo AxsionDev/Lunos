@@ -1,0 +1,50 @@
+[
+  {
+    "model": "openai/gpt-5.3-codex",
+    "date": "2026-10-04",
+    "report": "specs/eval/2026-10-04.md",
+    "status": "complete",
+    "tasks": 33,
+    "passRate": 0.9,
+    "costPerSolved": 0.09,
+    "upstreamHosts": ["api.openai.com"]
+  },
+  {
+    "model": "scaleway/qwen3-coder-30b-a3b-instruct",
+    "date": "2026-11-02",
+    "report": "specs/eval/2026-11-02.md",
+    "status": "complete",
+    "tasks": 33,
+    "passRate": 0.6,
+    "costPerSolved": 0.05,
+    "upstreamHosts": ["api.scaleway.ai"]
+  },
+  {
+    "model": "ovhcloud/qwen3-coder-30b-a3b-instruct",
+    "date": "2026-11-02",
+    "report": "specs/eval/2026-11-02.md",
+    "status": "complete",
+    "tasks": 33,
+    "passRate": 0.5,
+    "costPerSolved": 0.02,
+    "upstreamHosts": ["oai.endpoints.kepler.ai.cloud.ovh.net"]
+  },
+  {
+    "model": "stackit/openai/gpt-oss-120b",
+    "date": "2026-11-02",
+    "report": "specs/eval/2026-11-02.md",
+    "status": "incomplete",
+    "tasks": 33,
+    "upstreamHosts": ["api.openai-compat.model-serving.eu01.onstackit.cloud"]
+  },
+  {
+    "model": "mistral/devstral-medium-latest",
+    "date": "2026-11-02",
+    "report": "specs/eval/2026-11-02.md",
+    "status": "complete",
+    "tasks": 33,
+    "passRate": 0.95,
+    "costPerSolved": 0.04,
+    "upstreamHosts": ["api.mistral.ai"]
+  }
+]

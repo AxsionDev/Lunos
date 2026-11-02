@@ -2,7 +2,7 @@ import { type Accessor, createMemo, For, type JSX, onCleanup, Show, splitProps }
 import { createStore } from "solid-js/store"
 import { DragDropProvider, PointerSensor } from "@dnd-kit/solid"
 import { isSortable, useSortable } from "@dnd-kit/solid/sortable"
-import { AutoScroller, Feedback, PointerActivationConstraints } from "@dnd-kit/dom"
+import { AutoScroller, Feedback, KeyboardSensor, PointerActivationConstraints } from "@dnd-kit/dom"
 import { RestrictToVerticalAxis } from "@dnd-kit/abstract/modifiers"
 import { RestrictToElement } from "@dnd-kit/dom/modifiers"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
@@ -311,13 +311,25 @@ type HomeProjectListProps = HomeProjectsViewProps &
     items: LocalProject[]
   }
 
+const HOME_PROJECT_KEYBOARD_CODES = {
+  start: ["Space"],
+  cancel: ["Escape"],
+  end: ["Space", "Enter", "Tab"],
+  up: ["ArrowUp"],
+  down: ["ArrowDown"],
+  left: ["ArrowLeft"],
+  right: ["ArrowRight"],
+}
+
 function HomeProjectList(props: HomeProjectListProps) {
   let listRef!: HTMLDivElement
 
   return (
     <DragDropProvider
       sensors={(defaults) => [
-        ...defaults.filter((sensor) => sensor !== PointerSensor),
+        ...defaults.filter((sensor) => sensor !== PointerSensor && sensor !== KeyboardSensor),
+        // The handle is the project's select button, so Enter must keep selecting; Space picks it up.
+        KeyboardSensor.configure({ keyboardCodes: HOME_PROJECT_KEYBOARD_CODES }),
         PointerSensor.configure({
           activationConstraints: (event) =>
             event.pointerType === "touch"
@@ -481,6 +493,9 @@ function HomeProjectRow(
       }}
     >
       <HomeProjectNavButton
+        // The select button is the drag handle. Without a handle dnd-kit makes the whole row a
+        // role="button" drag activator that wraps this button and the menu trigger (XCOD-141).
+        ref={sortable.handleRef}
         type="button"
         data-component="home-project-row"
         class="pr-16 disabled:opacity-60"

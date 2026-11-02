@@ -1,0 +1,122 @@
+{
+  "tool": "claude",
+  "version": "2.1.292",
+  "fake": true,
+  "scenarios": {
+    "start-models": {
+      "steps": [
+        {
+          "file": "start-models.1.jsonl",
+          "kind": "models",
+          "home": {
+            "added": [],
+            "changed": [],
+            "removed": []
+          }
+        }
+      ]
+    },
+    "resume-model-switch": {
+      "steps": [
+        {
+          "file": "resume-model-switch.1.jsonl",
+          "kind": "turn",
+          "home": {
+            "added": [],
+            "changed": [],
+            "removed": []
+          },
+          "prompt": "Say ok and nothing else.",
+          "decide": "allow",
+          "model": "sonnet"
+        },
+        {
+          "file": "resume-model-switch.2.jsonl",
+          "kind": "turn",
+          "home": {
+            "added": [],
+            "changed": [],
+            "removed": []
+          },
+          "prompt": "Say ok and nothing else.",
+          "decide": "allow",
+          "model": "haiku",
+          "resume": true
+        }
+      ]
+    },
+    "bridge-call": {
+      "steps": [
+        {
+          "file": "bridge-call.1.jsonl",
+          "kind": "turn",
+          "home": {
+            "added": [],
+            "changed": [],
+            "removed": []
+          },
+          "prompt": "Call the say tool of the lunos MCP server once with the text \"ok\", then say ok.",
+          "decide": "allow",
+          "bridge": true
+        }
+      ]
+    },
+    "native-approval": {
+      "steps": [
+        {
+          "file": "native-approval.1.jsonl",
+          "kind": "turn",
+          "home": {
+            "added": [],
+            "changed": [],
+            "removed": []
+          },
+          "prompt": "Create a file named ok.txt containing the word ok. Nothing else.",
+          "decide": "allow"
+        }
+      ]
+    },
+    "hook-denied": {
+      "steps": [
+        {
+          "file": "hook-denied.1.jsonl",
+          "kind": "turn",
+          "home": {
+            "added": [],
+            "changed": [],
+            "removed": []
+          },
+          "prompt": "Run the shell command `touch denied.txt`. Nothing else.",
+          "decide": "hook-deny"
+        }
+      ]
+    },
+    "compact": {
+      "steps": [
+        {
+          "file": "compact.1.jsonl",
+          "kind": "turn",
+          "home": {
+            "added": [],
+            "changed": [],
+            "removed": []
+          },
+          "prompt": "Say ok and nothing else.",
+          "decide": "allow"
+        },
+        {
+          "file": "compact.2.jsonl",
+          "kind": "turn",
+          "home": {
+            "added": [],
+            "changed": [],
+            "removed": []
+          },
+          "prompt": "/compact",
+          "decide": "allow",
+          "resume": true
+        }
+      ]
+    }
+  }
+}

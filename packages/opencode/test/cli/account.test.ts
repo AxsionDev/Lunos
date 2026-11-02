@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import stripAnsi from "strip-ansi"
 
-import { defaultConsoleUrl, formatAccountLabel, formatOrgLine } from "../../src/cli/cmd/account"
+import { NO_ACCOUNT_SERVER, formatAccountLabel, formatOrgLine } from "../../src/cli/cmd/account"
 
 describe("console account display", () => {
-  test("uses opencode.ai/console as the default login URL", () => {
-    expect(defaultConsoleUrl).toBe("https://opencode.ai/console")
+  test("has no default login URL and says why", () => {
+    expect(NO_ACCOUNT_SERVER).toContain("Lunos Cloud accounts aren't available yet")
+    expect(NO_ACCOUNT_SERVER).not.toContain("opencode.ai")
   })
 
   test("includes the account url in account labels", () => {

@@ -631,6 +631,10 @@ namespace TestLLMServer {
     readonly inputs: Effect.Effect<Record<string, unknown>[]>
     readonly pending: Effect.Effect<number>
     readonly misses: Effect.Effect<Hit[]>
+    /** The next title request's answer (default "E2E Title"), sent once `wait` settles. */
+    readonly title: (value: string, wait?: PromiseLike<unknown>) => Effect.Effect<void>
+    /** The title requests seen. */
+    readonly titles: Effect.Effect<Hit[]>
   }
 }
 
@@ -645,6 +649,8 @@ export class TestLLMServer extends Context.Service<TestLLMServer, TestLLMServer.
       let list: Queue[] = []
       let waits: Wait[] = []
       let misses: Hit[] = []
+      let titles: Hit[] = []
+      let titleNext: { text: string; wait?: PromiseLike<unknown> } | undefined
 
       const queue = (...input: (Item | Reply)[]) => {
         list = [...list, ...input.map((value) => ({ item: item(value) }))]
@@ -675,8 +681,16 @@ export class TestLLMServer extends Context.Service<TestLLMServer, TestLLMServer.
         const current = hit(req.originalUrl, body)
         if (isTitleRequest(body)) {
           hits = [...hits, current]
+          titles = [...titles, current]
           yield* notify()
-          const auto: Sse = { type: "sse", head: [role()], tail: [textLine("E2E Title"), finishLine("stop")] }
+          const next = titleNext
+          titleNext = undefined
+          const auto: Sse = {
+            type: "sse",
+            head: [role()],
+            tail: [textLine(next?.text ?? "E2E Title"), finishLine("stop")],
+            wait: next?.wait,
+          }
           if (mode === "responses") return send(responses(auto, modelFrom(body)))
           return send(auto)
         }
@@ -761,6 +775,8 @@ export class TestLLMServer extends Context.Service<TestLLMServer, TestLLMServer.
           list = []
           waits = []
           misses = []
+          titles = []
+          titleNext = undefined
         }),
         hits: Effect.sync(() => [...hits]),
         calls: Effect.sync(() => hits.length),
@@ -773,6 +789,10 @@ export class TestLLMServer extends Context.Service<TestLLMServer, TestLLMServer.
         inputs: Effect.sync(() => hits.map((hit) => hit.body)),
         pending: Effect.sync(() => list.length),
         misses: Effect.sync(() => [...misses]),
+        title: Effect.fn("TestLLMServer.title")(function* (value: string, wait?: PromiseLike<unknown>) {
+          titleNext = { text: value, wait }
+        }),
+        titles: Effect.sync(() => [...titles]),
       })
     }),
   ).pipe(Layer.provide(HttpRouter.layer), Layer.provide(NodeHttpServer.layer(() => Http.createServer(), { port: 0 })))

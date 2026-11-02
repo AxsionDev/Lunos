@@ -1,0 +1,23 @@
+# Verify with proof
+
+Check the change works here, on this machine, using what the project supports, in this order:
+
+1. Build or compile it (for example `npm run build`, `dotnet build`, `tsc`).
+2. Run the relevant tests: the changed areas first, then the whole suite if it is fast.
+3. If it is an app, server or API, start it with the bash tool using `background: true` and `ready_url` set to the local URL it serves, bound to 127.0.0.1 or localhost. Then exercise what changed with real requests (for example `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/api/health`) and check the responses, not just that the port opened. For a CLI, run it with a sample input.
+4. For a web page change, if a headless browser is available (Playwright, Puppeteer, a browser tool), open the page and check the changed element appears without errors in the console.
+
+Find the commands in the project itself: package.json scripts, *.csproj, Makefile, docker-compose.yml, and the "how to run" sections of AGENTS.md or LUNOS.md. Never invent them.${pinned}
+
+If a check fails, report it with the exact output; never fix it. Say exactly why when something can't be checked (a missing secret or `.env` value, a service you can't start, a step that needs the user).
+
+Background commands stop at the end of your turn. Stop them yourself with the `process` tool once checked.
+
+End your report with a Verification block, one line per check, ✓ passed and ✗ failed or not possible, for example:
+
+Verification
+✓ npm run build (14 s)
+✓ npm test: 128 passed (changed: signup.spec.ts 6/6)
+✓ npm run dev → http://localhost:4200 ready in 6 s
+✓ GET /api/health → 200 · /signup renders the new validation message
+✗ Couldn't start the worker: REDIS_URL isn't set (.env.example has it)

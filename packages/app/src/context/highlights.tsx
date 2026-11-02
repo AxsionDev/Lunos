@@ -7,7 +7,8 @@ import { useSettings } from "@/context/settings"
 import { persisted } from "@/utils/persist"
 import { DialogReleaseNotes, type Highlight } from "@/components/dialog-release-notes"
 
-const CHANGELOG_URL = "https://opencode.ai/changelog.json"
+// XCOD-174: release highlights come from lunos.tech, generated from the site's /changelog entries.
+const CHANGELOG_URL = "https://lunos.tech/changelog.json"
 
 type Store = {
   version?: string

@@ -163,6 +163,18 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### marketplace
+
+从你的市场浏览并安装插件、技能、钩子和 MCP 服务器。加上标签页名称（`plugins`、`skills`、`hooks`、`mcp`）可打开该标签页，加上 `installed` 可查看已安装的内容并标出可用更新，加上其他任何词则进行搜索。_别名_：`/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 列出可用模型。
@@ -187,6 +199,16 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ---
 
+### plugins
+
+列出已安装的插件并启用或停用它们。
+
+```bash frame="none"
+/plugins
+```
+
+---
+
 ### redo
 
 重做之前撤销的消息。仅在使用 `/undo` 后可用。
@@ -207,10 +229,20 @@ How is auth handled in @packages/functions/src/api/index.ts?
 
 ### sessions
 
-列出会话并在会话之间切换。_别名_：`/resume`、`/continue`
+本机所有项目中的全部会话：状态、项目、模型、最近活动和费用，按你自己的分组显示。
 
 ```bash frame="none"
 /sessions
+```
+
+---
+
+### resume
+
+列出本项目的会话并在会话之间切换。_别名_：`/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **快捷键：** `ctrl+x l`

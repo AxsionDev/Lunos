@@ -1,0 +1,43 @@
+{
+  "model": "openai/gpt-5.3-codex",
+  "date": "2026-10-19",
+  "judgements": [
+    {
+      "name": "opencode-devcontainers",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 3 warning: repository is archived (no active maintainer).",
+        "Criterion 5 info: no egress declared, so network behavior cannot be verified yet."
+      ],
+      "user_note": "This plugin can remain listed in community with a warning until maintainership and egress declaration are addressed."
+    },
+    {
+      "name": "opencode-dynamic-context-pruning",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 1 warning: license is AGPL-3.0-or-later (OSI-approved copyleft) and should be clearly disclosed to users",
+        "Criterion 5 info: no egress is declared, which is required before network behavior can be verified"
+      ],
+      "user_note": "This plugin is available, but note it uses AGPL copyleft terms and has not yet declared egress for verification."
+    },
+    {
+      "name": "opencode-conductor",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Warning (criterion 6): runs a postinstall script on install (`node scripts/postinstall.cjs`), so it needs review before verification.",
+        "Info (criterion 5): no egress is declared, which is needed before network behavior can be verified."
+      ],
+      "user_note": "This plugin can remain listed in community status, but users should review the postinstall script and treat network behavior as unverified until egress is declared."
+    },
+    {
+      "name": "opencode-sentry-monitor",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "warn (criterion 2): no public source repository found",
+        "info (criterion 5): no egress declared (needed before it can be verified)"
+      ],
+      "user_note": "This plugin can remain listed in community status, but it should disclose a public source repository and declared egress before stronger trust status is considered."
+    }
+  ],
+  "dropped": []
+}

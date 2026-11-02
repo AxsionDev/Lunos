@@ -1,0 +1,37 @@
+name: changelog-drift
+
+# XCOD-261: fail when lunos.tech/changelog doesn't list the latest published release
+# (script/changelog-drift.ts). A release less than an hour old only warns, while the site rebuilds
+# from the dispatch publish.yml sends. Daily, not on pull requests: the site's state isn't something
+# a PR can fix. A failed scheduled run notifies by GitHub's usual workflow-failure email.
+
+on:
+  schedule:
+    - cron: "30 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    if: github.repository == 'AxsionDev/Lunos'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      # No `bun install`: the script imports nothing outside script/.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      # The latest published release, not dev's CHANGELOG.md: dev gets a version's section before
+      # the release exists, and a failed release dispatch leaves it there.
+      - name: Compare lunos.tech/changelog with the latest release
+        timeout-minutes: 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r tag published < <(gh release view --repo "$GITHUB_REPOSITORY" --json tagName,publishedAt --jq '"\(.tagName) \(.publishedAt)"')
+          bun script/changelog-drift.ts --expected "$tag" --published-at "$published"

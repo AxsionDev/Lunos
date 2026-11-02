@@ -8,7 +8,7 @@ function View(props: { api: TuiPluginApi }) {
   const [open, setOpen] = createSignal(true)
   const theme = () => props.api.theme.current
   const list = createMemo(() => props.api.state.lsp())
-  const off = createMemo(() => !props.api.state.config.lsp)
+  const off = createMemo(() => props.api.state.config.lsp === false)
 
   return (
     <box>
@@ -30,13 +30,21 @@ function View(props: { api: TuiPluginApi }) {
               <text
                 flexShrink={0}
                 style={{
-                  fg: item.status === "connected" ? theme().success : theme().error,
+                  fg:
+                    item.status === "connected"
+                      ? theme().success
+                      : item.status === "starting"
+                        ? theme().warning
+                        : theme().error,
                 }}
               >
-                •
+                {/* XCOD-107: a distinct glyph, so the state doesn't rely on colour alone. */}
+                {item.status === "connected" ? "•" : item.status === "starting" ? "…" : "✕"}
               </text>
-              <text fg={theme().textMuted}>
+              {/* XCOD-257: a failed server says why; selecting it opens /lsp. */}
+              <text fg={theme().textMuted} onMouseUp={() => props.api.command?.trigger("lsp.panel")}>
                 {item.id} {item.root}
+                {item.reason ? ` — ${item.reason}` : ""}
               </text>
             </box>
           )}

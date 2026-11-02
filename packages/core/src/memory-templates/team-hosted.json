@@ -1,0 +1,18 @@
+{
+  "name": "team-hosted",
+  "title": "Team database we host",
+  "description": "Neo4j or PostgreSQL on your own server: TLS required, credentials from environment variables, and the region you enter.",
+  "leaves": "the fact text, to your database",
+  "requires": [],
+  "ask": ["vendor", "url", "jurisdiction"],
+  "memory": {
+    "backend": {
+      "type": "{vendor}",
+      "url": "{url}",
+      "username": "{env:{VENDOR}_USER}",
+      "password": "{env:{VENDOR}_PASSWORD}",
+      "jurisdiction": "{jurisdiction}"
+    },
+    "encryption": "off"
+  }
+}

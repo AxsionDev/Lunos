@@ -53,6 +53,34 @@ export async function openEditor(input: { value: string; renderer: CliRenderer; 
   }
 }
 
+/**
+ * Open an existing file in $VISUAL/$EDITOR, editing it in place (XCOD-84). Returns false when no
+ * editor is configured, so the caller can fall back (for example to copying the path).
+ */
+export async function openFileInEditor(input: { file: string; renderer: CliRenderer; cwd?: string }) {
+  const editor = process.env.VISUAL || process.env.EDITOR
+  if (!editor) return false
+  input.renderer.suspend()
+  input.renderer.currentRenderBuffer.clear()
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const parts = editor.split(" ")
+      const child = spawn(parts[0]!, [...parts.slice(1), input.file], {
+        cwd: input.cwd && existsSync(input.cwd) ? input.cwd : process.cwd(),
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      })
+      child.on("error", reject)
+      child.on("exit", () => resolve())
+    })
+    return true
+  } finally {
+    input.renderer.currentRenderBuffer.clear()
+    input.renderer.resume()
+    input.renderer.requestRender()
+  }
+}
+
 export function discoverEditorConnection(directory: string) {
   const root = path.join(os.homedir(), ".claude", "ide")
   const contains = (parent: string) => {

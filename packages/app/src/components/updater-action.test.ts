@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { updaterAction } from "./updater-action"
+import { updaterAction, updaterProgress } from "./updater-action"
 
 describe("updaterAction", () => {
   test("disables update actions when the platform has no updater", () => {
@@ -22,5 +22,24 @@ describe("updaterAction", () => {
     expect(updaterAction({ status: "installing", version: "2.0.0" })).toEqual({
       label: "settings.updates.action.installing",
     })
+  })
+})
+
+describe("updaterProgress (XCOD-247)", () => {
+  test("shows a step while checking, downloading or installing, and nothing otherwise", () => {
+    expect(updaterProgress({ status: "checking" })).toEqual({ label: "settings.updates.action.checking" })
+    expect(updaterProgress({ status: "downloading", version: "2.0.0" })).toEqual({
+      label: "settings.updates.action.downloading",
+      version: "2.0.0",
+      percent: undefined,
+    })
+    expect(updaterProgress({ status: "downloading", version: "2.0.0", percent: 41.6 })?.percent).toBe(42)
+    expect(updaterProgress({ status: "installing", version: "2.0.0" })).toEqual({
+      label: "settings.updates.action.installing",
+      version: "2.0.0",
+    })
+    expect(updaterProgress({ status: "ready", version: "2.0.0" })).toBeUndefined()
+    expect(updaterProgress({ status: "idle" })).toBeUndefined()
+    expect(updaterProgress(undefined)).toBeUndefined()
   })
 })

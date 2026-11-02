@@ -163,6 +163,18 @@ Crie ou atualize o arquivo `AGENTS.md`. [Saiba mais](/docs/rules).
 
 ---
 
+### marketplace
+
+Navegue e instale plugins, skills, hooks e servidores MCP dos seus marketplaces. Adicione o nome de uma aba (`plugins`, `skills`, `hooks`, `mcp`) para abri-la, `installed` para ver o que está instalado com as atualizações disponíveis marcadas, ou quaisquer outras palavras para pesquisar. _Alias_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 Liste os modelos disponíveis.
@@ -187,6 +199,16 @@ Inicie uma nova sessão. _Alias_: `/clear`
 
 ---
 
+### plugins
+
+Liste os plugins instalados e ative-os ou desative-os.
+
+```bash frame="none"
+/plugins
+```
+
+---
+
 ### redo
 
 Refaça uma mensagem anteriormente desfeita. Disponível apenas após usar `/undo`.
@@ -207,10 +229,20 @@ Internamente, isso usa Git para gerenciar as alterações de arquivo. Portanto, 
 
 ### sessions
 
-Liste e alterne entre sessões. _Aliases_: `/resume`, `/continue`
+Todas as sessões nesta máquina, de todos os seus projetos: estado, projeto, modelo, última atividade e custo, em seus próprios grupos.
 
 ```bash frame="none"
 /sessions
+```
+
+---
+
+### resume
+
+Liste e alterne entre as sessões deste projeto. _Aliases_: `/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **Atalho:** `ctrl+x l`

@@ -916,6 +916,43 @@ describe("workspace CRUD", () => {
   )
 
   it.instance(
+    "sessionWarp refuses to copy file changes into or out of a sandbox, and leaves the session where it was",
+    () => {
+      return Effect.gen(function* () {
+        const instance = yield* requireInstance
+        const workspace = yield* Workspace.Service
+        const sessionSvc = yield* SessionNs.Service
+        // No adapter is registered for it: the refusal must come before anything touches the sandbox.
+        const sandbox = workspaceInfo(instance.project.id, "docker")
+        yield* insertWorkspace(sandbox)
+        const session = yield* sessionSvc.create({})
+        const { db } = yield* Database.Service
+        const owner = () =>
+          db
+            .select({ workspaceID: SessionTable.workspace_id })
+            .from(SessionTable)
+            .where(eq(SessionTable.id, session.id))
+            .get()
+            .pipe(Effect.orDie)
+
+        const into = yield* Effect.flip(
+          workspace.sessionWarp({ workspaceID: sandbox.id, sessionID: session.id, copyChanges: true }),
+        )
+        expect(into).toBeInstanceOf(Workspace.SandboxCopyRefusedError)
+        expect((yield* owner())?.workspaceID).toBeNull()
+
+        yield* attachSessionToWorkspace(session.id, sandbox.id)
+        const outOf = yield* Effect.flip(
+          workspace.sessionWarp({ workspaceID: null, sessionID: session.id, copyChanges: true }),
+        )
+        expect(outOf).toBeInstanceOf(Workspace.SandboxCopyRefusedError)
+        expect((yield* owner())?.workspaceID).toBe(sandbox.id)
+      })
+    },
+    { git: true },
+  )
+
+  it.instance(
     "sessionWarp detaches a session to the local project and claims project ownership",
     () => {
       return Effect.gen(function* () {

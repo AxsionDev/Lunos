@@ -1,0 +1,21 @@
+schema_version = "1.1"
+
+[task]
+name = "lunos/xcod-77-piped-output"
+description = "`bun /app/print.ts | jq length` fails with a JSON parse error. Run in a terminal the output is complete, but when it is "
+keywords = ["lunos"]
+
+[metadata]
+category = "bugfix"
+source = "Lunos XCOD-77"
+
+[verifier]
+timeout_sec = 120.0
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+build_timeout_sec = 600.0
+cpus = 1
+memory_mb = 2048

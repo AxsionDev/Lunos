@@ -6,9 +6,12 @@ import { Snapshot } from "../snapshot"
 import * as Project from "./project"
 import * as Vcs from "./vcs"
 import { InstanceState } from "@/effect/instance-state"
+import { ShareNext } from "@/share/share-next"
+import { CloudSync } from "@/cloud/sync"
 import { Effect, Layer } from "effect"
 import { Config } from "@/config/config"
 import { Service } from "./bootstrap-service"
+import { Global } from "@opencode-ai/core/global"
 
 export { Service } from "./bootstrap-service"
 export type { Interface } from "./bootstrap-service"
@@ -24,6 +27,8 @@ const layer = Layer.effect(
     const lsp = yield* LSP.Service
     const plugin = yield* Plugin.Service
     const project = yield* Project.Service
+    const shareNext = yield* ShareNext.Service
+    const cloudSync = yield* CloudSync.Service
     const snapshot = yield* Snapshot.Service
     const vcs = yield* Vcs.Service
 
@@ -32,12 +37,23 @@ const layer = Layer.effect(
       yield* Effect.logInfo("bootstrapping", { directory: ctx.directory })
       // everything depends on config so eager load it for nice traces
       yield* config.get()
+      // XCOD-332: subagent worktrees and `lunos/*` branches a crashed Lunos left behind. Never the
+      // user's own branches or stashes, nor another running Lunos's worktrees.
+      if (ctx.project.vcs === "git")
+        yield* Effect.promise(async () => {
+          const { SubagentIsolation } = await import("@/session/isolation")
+          const root = await SubagentIsolation.toplevel(ctx.directory)
+          await SubagentIsolation.sweep({ root, dataDir: Global.Path.data })
+        }).pipe(
+          Effect.catchCause((cause) => Effect.logWarning("subagent worktree sweep failed", { cause })),
+          Effect.withSpan("InstanceBootstrap.sweepWorktrees"),
+        )
       // Plugin can mutate config so it has to be initialized before anything else.
       yield* plugin.init()
       // Each service self-manages its own slow work via Effect.forkScoped against
       // its per-instance state scope. We just await materialization here.
       yield* Effect.forEach(
-        [lsp, format, vcs, snapshot, project],
+        [lsp, shareNext, cloudSync, format, vcs, snapshot, project],
         (s) => s.init().pipe(Effect.catchCause((cause) => Effect.logWarning("init failed", { cause }))),
         { concurrency: "unbounded", discard: true },
       ).pipe(Effect.withSpan("InstanceBootstrap.init"))
@@ -50,7 +66,17 @@ const layer = Layer.effect(
 export const node = makeGlobalNode({
   service: Service,
   layer: layer,
-  deps: [Config.node, Format.node, LSP.node, Plugin.node, Project.node, Snapshot.node, Vcs.node],
+  deps: [
+    Config.node,
+    Format.node,
+    LSP.node,
+    Plugin.node,
+    Project.node,
+    ShareNext.node,
+    CloudSync.node,
+    Snapshot.node,
+    Vcs.node,
+  ],
 })
 
 export * as InstanceBootstrap from "./bootstrap"

@@ -3,6 +3,8 @@ import { afterEach, describe, expect } from "bun:test"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Cause, Effect, Exit, Layer, Stream } from "effect"
 import path from "path"
+import os from "os"
+import { existsSync } from "fs"
 import { Agent } from "../../src/agent/agent"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -216,6 +218,22 @@ describe("tool.read external_directory permission", () => {
       expect(read).toBeDefined()
       expect(read!.patterns).toEqual([path.join("src", "secret.ts")])
     }),
+  )
+
+  // XCOD-100: on a case-insensitive filesystem, "SRC/Secret.TS" is src/secret.ts. The read
+  // permission must be checked against that spelling, or a rule on it could be sidestepped.
+  ;(existsSync(os.tmpdir().toUpperCase()) && existsSync(os.tmpdir().toLowerCase()) ? it.live : it.live.skip)(
+    "checks read permission against the on-disk spelling of a wrong-case path",
+    () =>
+      Effect.gen(function* () {
+        const dir = yield* tmpdirScoped({ git: true })
+        yield* put(path.join(dir, "src", "secret.ts"), "shh")
+
+        const { items, next } = asks()
+        yield* exec(dir, { filePath: path.join(dir, "SRC", "Secret.TS") }, next)
+        expect(items.find((item) => item.permission === "external_directory")).toBeUndefined()
+        expect(items.find((item) => item.permission === "read")!.patterns).toEqual([path.join("src", "secret.ts")])
+      }),
   )
 
   it.live("asks for directory-scoped external_directory permission when reading external directory", () =>

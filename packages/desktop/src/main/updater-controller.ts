@@ -8,6 +8,8 @@ export type UpdaterBackend = {
   checkForUpdates(): Promise<{ isUpdateAvailable?: boolean; updateInfo?: { version?: string } } | null | undefined>
   downloadUpdate(): Promise<unknown>
   quitAndInstall(): void
+  /** XCOD-247: the download's progress in percent, while `downloadUpdate` runs. Returns an unsubscribe. */
+  onDownloadProgress?(listener: (percent: number) => void): () => void
 }
 
 type UpdaterPersistence = {
@@ -50,7 +52,13 @@ export function createUpdaterController(input: {
       }
 
       transition({ status: "downloading", version })
-      await input.backend.downloadUpdate()
+      // Whole percents only, so the renderer and the log see at most a hundred updates.
+      const off = input.backend.onDownloadProgress?.((percent) => {
+        const rounded = Math.floor(percent)
+        if (state.status !== "downloading" || state.percent === rounded) return
+        transition({ status: "downloading", version, percent: rounded })
+      })
+      await input.backend.downloadUpdate().finally(() => off?.())
       await input.persistence.set({ version })
       return transition({ status: "ready", version })
     })()

@@ -1,0 +1,215 @@
+{
+  "tool": "codex",
+  "version": "0.160.1",
+  "note": "Real replies of codex app-server 0.160.1 (2026-10-21) to initialize, config/read {includeLayers, cwd} and an ephemeral thread/start (no turn), against a throwaway CODEX_HOME holding config.toml with legacy [profiles.*] tables and two MCP servers, a project .codex/config.toml, and AGENTS.md in both. projects.* trust entries dropped.",
+  "replies": {
+    "initialize": {
+      "codexHome": "<codex_home>",
+      "platformFamily": "unix",
+      "platformOs": "macos"
+    },
+    "config/read": {
+      "config": {
+        "model": "gpt-5.5",
+        "approval_policy": "on-request",
+        "sandbox_mode": "read-only",
+        "model_reasoning_effort": null,
+        "profile": null,
+        "profiles": {
+          "fast": {
+            "model": "gpt-5.5-mini",
+            "sandbox_mode": "workspace-write"
+          },
+          "deep": {
+            "model_reasoning_effort": "high"
+          }
+        },
+        "mcp_servers": {
+          "projtool": {
+            "command": "projtool",
+            "args": [],
+            "environment_id": "local",
+            "enabled": true,
+            "tool_timeout_sec": null
+          },
+          "remote": {
+            "url": "https://mcp.example.com/mcp?key=SECRET",
+            "environment_id": "local",
+            "enabled": true,
+            "tool_timeout_sec": null
+          },
+          "docs": {
+            "command": "npx",
+            "args": ["-y", "docs-mcp", "--token=SECRET"],
+            "environment_id": "local",
+            "enabled": true,
+            "tool_timeout_sec": null
+          }
+        },
+        "model_providers": {}
+      },
+      "origins": {
+        "sandbox_mode": {
+          "name": {
+            "type": "project",
+            "dotCodexFolder": "<project>/.codex"
+          },
+          "version": "sha256:e6d3f2c477a2ee6f3194ca1f01865be3783340d0fba95490311da1548415c929"
+        },
+        "mcp_servers.docs.args.2": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "model": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "mcp_servers.projtool.command": {
+          "name": {
+            "type": "project",
+            "dotCodexFolder": "<project>/.codex"
+          },
+          "version": "sha256:e6d3f2c477a2ee6f3194ca1f01865be3783340d0fba95490311da1548415c929"
+        },
+        "mcp_servers.docs.command": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "profiles.fast.model": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "mcp_servers.remote.url": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "profiles.fast.sandbox_mode": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "mcp_servers.docs.args.0": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "mcp_servers.docs.args.1": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "profiles.deep.model_reasoning_effort": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        },
+        "approval_policy": {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904"
+        }
+      },
+      "layers": [
+        {
+          "name": {
+            "type": "project",
+            "dotCodexFolder": "<project>/.codex"
+          },
+          "version": "sha256:e6d3f2c477a2ee6f3194ca1f01865be3783340d0fba95490311da1548415c929",
+          "config": {
+            "sandbox_mode": "read-only",
+            "mcp_servers": {
+              "projtool": {
+                "command": "projtool"
+              }
+            }
+          }
+        },
+        {
+          "name": {
+            "type": "user",
+            "file": "<codex_home>/config.toml",
+            "profile": null
+          },
+          "version": "sha256:1d20bcec4557020561bc9218d204667771e4bda4beb2c5cb483cf889c22ab904",
+          "config": {
+            "model": "gpt-5.5",
+            "approval_policy": "on-request",
+            "profiles": {
+              "fast": {
+                "model": "gpt-5.5-mini",
+                "sandbox_mode": "workspace-write"
+              },
+              "deep": {
+                "model_reasoning_effort": "high"
+              }
+            },
+            "mcp_servers": {
+              "docs": {
+                "command": "npx",
+                "args": ["-y", "docs-mcp", "--token=SECRET"]
+              },
+              "remote": {
+                "url": "https://mcp.example.com/mcp?key=SECRET"
+              }
+            }
+          }
+        },
+        {
+          "name": {
+            "type": "system",
+            "file": "/etc/codex/config.toml"
+          },
+          "version": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "config": {}
+        }
+      ]
+    },
+    "thread/start": {
+      "model": "gpt-5.5",
+      "modelProvider": "openai",
+      "cwd": "<project>",
+      "instructionSources": ["<codex_home>/AGENTS.md", "<project>/AGENTS.md"],
+      "approvalPolicy": "untrusted",
+      "sandbox": {
+        "type": "readOnly",
+        "networkAccess": false
+      }
+    }
+  }
+}

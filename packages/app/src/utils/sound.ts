@@ -1,3 +1,5 @@
+import { clampVolume } from "@opencode-ai/ui/sounds"
+
 let files: Record<string, () => Promise<string>> | undefined
 let loads: Record<SoundID, () => Promise<string>> | undefined
 
@@ -86,10 +88,14 @@ export function soundSrc(id: string | undefined) {
   return next
 }
 
-export function playSound(src: string | undefined) {
+/** XCOD-311: `volume` 0–1 (Settings › Sounds › Volume); 0 plays nothing. */
+export function playSound(src: string | undefined, volume = 1) {
   if (typeof Audio === "undefined") return
   if (!src) return
+  const level = clampVolume(volume)
+  if (level <= 0) return
   const audio = new Audio(src)
+  audio.volume = level
   audio.play().catch(() => undefined)
   return () => {
     audio.pause()
@@ -97,6 +103,6 @@ export function playSound(src: string | undefined) {
   }
 }
 
-export function playSoundById(id: string | undefined) {
-  return soundSrc(id).then((src) => playSound(src))
+export function playSoundById(id: string | undefined, volume?: number) {
+  return soundSrc(id).then((src) => playSound(src, volume))
 }

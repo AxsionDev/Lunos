@@ -1,0 +1,38 @@
+{
+  "name": "crlf",
+  "file": "src/crlf.txt",
+  "before": "one\r\ntwo\r\nthree\r\nfour\r\nfive\r\n",
+  "after": "one\r\nTWO\r\nthree\r\nfour\r\nFIVE\r\n",
+  "patch": "Index: src/crlf.txt\n===================================================================\n--- src/crlf.txt\t\n+++ src/crlf.txt\t\n@@ -1,5 +1,5 @@\n one\r\n-two\r\n+TWO\r\n three\r\n four\r\n-five\r\n+FIVE\r\n",
+  "hunks": 2,
+  "cases": [
+    {
+      "accept": [
+        false,
+        false
+      ],
+      "expected": "one\r\ntwo\r\nthree\r\nfour\r\nfive\r\n"
+    },
+    {
+      "accept": [
+        true,
+        false
+      ],
+      "expected": "one\r\nTWO\r\nthree\r\nfour\r\nfive\r\n"
+    },
+    {
+      "accept": [
+        false,
+        true
+      ],
+      "expected": "one\r\ntwo\r\nthree\r\nfour\r\nFIVE\r\n"
+    },
+    {
+      "accept": [
+        true,
+        true
+      ],
+      "expected": "one\r\nTWO\r\nthree\r\nfour\r\nFIVE\r\n"
+    }
+  ]
+}

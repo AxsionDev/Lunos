@@ -1,0 +1,47 @@
+{
+  "source": "codex app-server generate-json-schema (codex-cli 0.160.1), recorded 2026-10-21 for XCOD-285",
+  "fileChange": [
+    {
+      "decision": "accept",
+      "description": "User approved the file changes."
+    },
+    {
+      "decision": "acceptForSession",
+      "description": "User approved the file changes and future changes to the same files should run without prompting."
+    },
+    {
+      "decision": "decline",
+      "description": "User denied the file changes. The agent will continue the turn."
+    },
+    {
+      "decision": "cancel",
+      "description": "User denied the file changes. The turn will also be immediately interrupted."
+    }
+  ],
+  "commandExecution": [
+    {
+      "decision": "accept",
+      "description": "User approved the command."
+    },
+    {
+      "decision": "acceptForSession",
+      "description": "User approved the command and future prompts in the same session-scoped approval cache should run without prompting."
+    },
+    {
+      "decision": "acceptWithExecpolicyAmendment",
+      "description": "User approved the command, and wants to apply the proposed execpolicy amendment so future matching commands can run without prompting."
+    },
+    {
+      "decision": "applyNetworkPolicyAmendment",
+      "description": "User chose a persistent network policy rule (allow/deny) for this host."
+    },
+    {
+      "decision": "decline",
+      "description": "User denied the command. The agent will continue the turn."
+    },
+    {
+      "decision": "cancel",
+      "description": "User denied the command. The turn will also be immediately interrupted."
+    }
+  ]
+}

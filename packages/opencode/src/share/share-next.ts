@@ -1,0 +1,430 @@
+import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import path from "path"
+import { Global } from "@opencode-ai/core/global"
+import { Residency } from "@opencode-ai/core/residency"
+import { AuditLog } from "@/audit/log"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
+import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
+import type * as SDK from "@opencode-ai/sdk/v2"
+import { serviceUse } from "@opencode-ai/core/effect/service-use"
+import { Effect, Exit, Layer, Option, Schema, Scope, Context, Stream } from "effect"
+import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import { Account } from "@/account/account"
+import { EventV2Bridge } from "@/event-v2-bridge"
+import { InstanceState } from "@/effect/instance-state"
+import { Provider } from "@/provider/provider"
+
+import { Session } from "@/session/session"
+import { MessageV2 } from "@/session/message-v2"
+import type { SessionID } from "@/session/schema"
+import { Database } from "@opencode-ai/core/database/database"
+import { eq } from "drizzle-orm"
+import { Config } from "@/config/config"
+import { SessionShareTable } from "@opencode-ai/core/share/sql"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
+import { EventV2 } from "@opencode-ai/core/event"
+import { Offline } from "@opencode-ai/core/offline"
+
+const disabled =
+  process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1" || Offline.enabled()
+
+export type Api = {
+  create: string
+  sync: (shareID: string) => string
+  remove: (shareID: string) => string
+  data: (shareID: string) => string
+}
+
+export type Req = {
+  headers: Record<string, string>
+  api: Api
+  baseUrl: string
+}
+
+const ShareSchema = Schema.Struct({
+  id: Schema.String,
+  url: Schema.String,
+  secret: Schema.String,
+})
+export type Share = typeof ShareSchema.Type
+
+type State = {
+  queue: Map<SessionID, Map<string, Data>>
+  scope: Scope.Closeable
+  shared: Map<SessionID, Share | null>
+}
+
+type Data =
+  | {
+      type: "session"
+      data: SDK.Session
+    }
+  | {
+      type: "message"
+      data: SDK.Message
+    }
+  | {
+      type: "part"
+      data: SDK.Part
+    }
+  | {
+      type: "session_diff"
+      data: SDK.SnapshotFileDiff[]
+    }
+  | {
+      type: "model"
+      data: SDK.Model[]
+    }
+
+export interface Interface {
+  readonly init: () => Effect.Effect<void, unknown>
+  readonly url: () => Effect.Effect<string, unknown>
+  readonly request: () => Effect.Effect<Req, unknown>
+  readonly create: (sessionID: SessionID) => Effect.Effect<Share, unknown>
+  readonly remove: (sessionID: SessionID) => Effect.Effect<void, unknown>
+}
+
+export class Service extends Context.Service<Service, Interface>()("@opencode/ShareNext") {}
+
+/** A share upload the residency policy refused (XCOD-80). A plain refusal, not a fault. */
+export class ResidencyDeniedError extends Schema.TaggedErrorClass<ResidencyDeniedError>()("ShareResidencyDeniedError", {
+  message: Schema.String,
+}) {}
+
+/**
+ * XCOD-266: upstream shut its hosted share service down in v1.19.3, so there is no default host
+ * any more. Without an organisation's console or `enterprise.url` nothing is uploaded.
+ */
+export const NO_TARGET_MESSAGE = `Sharing needs enterprise.url in config, or "share": "cloud" to share with your organisation's Lunos console (after lunos login).`
+
+/** Sharing is on, but there is nowhere to upload to (XCOD-266). A plain refusal, not a fault. */
+export class NoTargetError extends Schema.TaggedErrorClass<NoTargetError>()("ShareNoTargetError", {
+  message: Schema.String,
+}) {}
+
+export const isNoTarget = (error: unknown): error is NoTargetError => error instanceof NoTargetError
+
+export const use = serviceUse(Service)
+
+function api(resource: string): Api {
+  return {
+    create: `/api/${resource}`,
+    sync: (shareID) => `/api/${resource}/${shareID}/sync`,
+    remove: (shareID) => `/api/${resource}/${shareID}`,
+    data: (shareID) => `/api/${resource}/${shareID}/data`,
+  }
+}
+
+const legacyApi = api("share")
+const consoleApi = api("shares")
+
+function key(item: Data) {
+  switch (item.type) {
+    case "session":
+      return "session"
+    case "message":
+      return `message/${item.data.id}`
+    case "part":
+      return `part/${item.data.messageID}/${item.data.id}`
+    case "session_diff":
+      return "session_diff"
+    case "model":
+      return "model"
+  }
+}
+
+const layer = Layer.effect(
+  Service,
+  Effect.gen(function* () {
+    const account = yield* Account.Service
+    const events = yield* EventV2Bridge.Service
+    const cfg = yield* Config.Service
+    const { db } = yield* Database.Service
+    const http = yield* HttpClient.HttpClient
+    const httpOk = HttpClient.filterStatusOk(http)
+    const provider = yield* Provider.Service
+    const session = yield* Session.Service
+
+    function sync(sessionID: SessionID, data: Data[]) {
+      return Effect.gen(function* () {
+        if (disabled) return
+        const share = yield* getCached(sessionID)
+        if (!share) return
+
+        const s = yield* InstanceState.get(state)
+        const existing = s.queue.get(sessionID)
+        if (existing) {
+          for (const item of data) {
+            existing.set(key(item), item)
+          }
+          return
+        }
+
+        const next = new Map(data.map((item) => [key(item), item]))
+        s.queue.set(sessionID, next)
+        yield* flush(sessionID).pipe(
+          Effect.delay(1000),
+          Effect.catchCause((cause) => Effect.logError("share flush failed", { sessionID: sessionID, cause: cause })),
+          Effect.forkIn(s.scope),
+        )
+      })
+    }
+
+    const state: InstanceState.InstanceState<State> = yield* InstanceState.make<State>(
+      Effect.fn("ShareNext.state")(function* (_ctx) {
+        const cache: State = { queue: new Map(), scope: yield* Scope.make(), shared: new Map() }
+
+        yield* Effect.addFinalizer(() =>
+          Scope.close(cache.scope, Exit.void).pipe(
+            Effect.andThen(
+              Effect.sync(() => {
+                cache.queue.clear()
+                cache.shared.clear()
+              }),
+            ),
+          ),
+        )
+
+        if (disabled) return cache
+
+        const watch = <D extends EventV2.Definition>(
+          def: D,
+          fn: (data: EventV2.Data<D>) => Effect.Effect<void, unknown>,
+        ) =>
+          events.listen((event) => {
+            if (event.type !== def.type || event.location?.directory !== _ctx.directory) return Effect.void
+            return fn(event.data as EventV2.Data<D>).pipe(
+              Effect.catchCause((cause) =>
+                Effect.logError("share subscriber failed", { type: def.type, cause: cause }),
+              ),
+            )
+          })
+
+        yield* watch(Session.Event.Updated, (data) =>
+          Effect.gen(function* () {
+            const info = data.info
+            yield* sync(info.id, [{ type: "session", data: structuredClone(info) as SDK.Session }])
+          }),
+        )
+        yield* watch(MessageV2.Event.Updated, (data) =>
+          Effect.gen(function* () {
+            const info = data.info
+            yield* sync(info.sessionID, [{ type: "message", data: structuredClone(info) as SDK.Message }])
+            if (info.role !== "user") return
+            const model = yield* provider.getModel(info.model.providerID, info.model.modelID)
+            yield* sync(info.sessionID, [{ type: "model", data: [model] }])
+          }),
+        )
+        yield* watch(MessageV2.Event.PartUpdated, (data) =>
+          sync(data.part.sessionID, [{ type: "part", data: structuredClone(data.part) as SDK.Part }]),
+        )
+        yield* watch(Session.Event.Diff, (data) =>
+          sync(data.sessionID, [{ type: "session_diff", data: structuredClone(data.diff) as SDK.SnapshotFileDiff[] }]),
+        )
+        yield* watch(Session.Event.Deleted, (data) => remove(data.sessionID))
+
+        return cache
+      }),
+    )
+
+    // XCOD-80: every share upload (create, sync, remove) goes through here, so this is where the
+    // residency policy applies. A denied target fails closed and is written to the audit log,
+    // exactly like a denied model provider.
+    const enforce = Effect.fnUntraced(function* (target: string, baseUrl: string) {
+      const residency = AuditLog.residency(yield* cfg.get())
+      if (!residency) return
+      yield* Effect.try({
+        try: () =>
+          Residency.enforce({
+            providerID: target,
+            baseURL: baseUrl,
+            resolved: residency,
+            defaultAuditPath: path.join(Global.Path.log, "residency-egress.log"),
+            fetch: undefined,
+          }),
+        catch: (error) =>
+          error instanceof Residency.DeniedError
+            ? new ResidencyDeniedError({
+                message: `Session sharing to ${new URL(baseUrl).host} is blocked by the data-residency policy. ${error.decision.reason}`,
+              })
+            : error,
+      })
+      // Allowed share uploads are audited too, so the log answers "what left, and where to".
+      Residency.audit(residency, path.join(Global.Path.log, "residency-egress.log"), target, baseUrl, true)
+    })
+
+    const request = Effect.fn("ShareNext.request")(function* () {
+      const headers: Record<string, string> = {}
+      const active = yield* account.active()
+      if (Option.isNone(active) || !active.value.active_org_id) {
+        const enterprise = (yield* cfg.get()).enterprise?.url
+        if (!enterprise) return yield* new NoTargetError({ message: NO_TARGET_MESSAGE })
+        yield* enforce(Jurisdiction.SHARE_ENTERPRISE, enterprise)
+        return { headers, api: legacyApi, baseUrl: enterprise } satisfies Req
+      }
+      yield* enforce(Jurisdiction.SHARE_OPNCD, active.value.url)
+
+      const token = yield* account.token(active.value.id)
+      if (Option.isNone(token)) {
+        throw new Error("No active account token available for sharing")
+      }
+
+      headers.authorization = `Bearer ${token.value}`
+      headers["x-org-id"] = active.value.active_org_id
+      return { headers, api: consoleApi, baseUrl: active.value.url } satisfies Req
+    })
+
+    const get = Effect.fnUntraced(function* (sessionID: SessionID) {
+      const row = yield* db
+        .select()
+        .from(SessionShareTable)
+        .where(eq(SessionShareTable.session_id, sessionID))
+        .get()
+        .pipe(Effect.orDie)
+      if (!row) return
+      return { id: row.id, secret: row.secret, url: row.url } satisfies Share
+    })
+
+    const getCached = Effect.fnUntraced(function* (sessionID: SessionID) {
+      const s = yield* InstanceState.get(state)
+      if (s.shared.has(sessionID)) {
+        const cached = s.shared.get(sessionID)
+        return cached === null ? undefined : cached
+      }
+
+      const share = yield* get(sessionID)
+      s.shared.set(sessionID, share ?? null)
+      return share
+    })
+
+    const flush = Effect.fn("ShareNext.flush")(function* (sessionID: SessionID) {
+      if (disabled) return
+      const s = yield* InstanceState.get(state)
+      const queued = s.queue.get(sessionID)
+      if (!queued) return
+
+      s.queue.delete(sessionID)
+
+      const share = yield* getCached(sessionID)
+      if (!share) return
+
+      // A share made before XCOD-266 may point at upstream's closed service: with no host left, skip it.
+      const req = yield* request().pipe(Effect.catchIf(isNoTarget, () => Effect.succeed(undefined)))
+      if (!req) return
+      const res = yield* HttpClientRequest.post(`${req.baseUrl}${req.api.sync(share.id)}`).pipe(
+        HttpClientRequest.setHeaders(req.headers),
+        HttpClientRequest.bodyJson({ secret: share.secret, data: Array.from(queued.values()) }),
+        Effect.flatMap((r) => http.execute(r)),
+      )
+
+      if (res.status >= 400) {
+        yield* Effect.logWarning("failed to sync share", {
+          sessionID: sessionID,
+          shareID: share.id,
+          status: res.status,
+        })
+      }
+    })
+
+    const full = Effect.fn("ShareNext.full")(function* (sessionID: SessionID) {
+      yield* Effect.logInfo("full sync", { sessionID: sessionID })
+      const info = yield* session.get(sessionID)
+      const diffs = yield* session.diff(sessionID)
+      const messages = yield* session.messages({ sessionID })
+      const models = yield* Effect.forEach(
+        Array.from(
+          new Map(
+            messages
+              .filter((msg) => msg.info.role === "user")
+              .map((msg) => (msg.info as SDK.UserMessage).model)
+              .map((item) => [`${item.providerID}/${item.modelID}`, item] as const),
+          ).values(),
+        ),
+        (item) => provider.getModel(ProviderV2.ID.make(item.providerID), ModelV2.ID.make(item.modelID)),
+        { concurrency: 8 },
+      )
+
+      yield* sync(sessionID, [
+        { type: "session", data: info },
+        ...messages.map((item) => ({ type: "message" as const, data: item.info })),
+        ...messages.flatMap((item) => item.parts.map((part) => ({ type: "part" as const, data: part }))),
+        { type: "session_diff", data: diffs },
+        { type: "model", data: models },
+      ])
+    })
+
+    const init = Effect.fn("ShareNext.init")(function* () {
+      if (disabled) return
+      yield* InstanceState.get(state)
+    })
+
+    const url = Effect.fn("ShareNext.url")(function* () {
+      return (yield* request()).baseUrl
+    })
+
+    const create = Effect.fn("ShareNext.create")(function* (sessionID: SessionID) {
+      if (disabled) return { id: "", url: "", secret: "" }
+      yield* Effect.logInfo("creating share", { sessionID: sessionID })
+      const req = yield* request()
+      const result = yield* HttpClientRequest.post(`${req.baseUrl}${req.api.create}`).pipe(
+        HttpClientRequest.setHeaders(req.headers),
+        HttpClientRequest.bodyJson({ sessionID }),
+        Effect.flatMap((r) => httpOk.execute(r)),
+        Effect.flatMap(HttpClientResponse.schemaBodyJson(ShareSchema)),
+      )
+      yield* db
+        .insert(SessionShareTable)
+        .values({ session_id: sessionID, id: result.id, secret: result.secret, url: result.url })
+        .onConflictDoUpdate({
+          target: SessionShareTable.session_id,
+          set: { id: result.id, secret: result.secret, url: result.url },
+        })
+        .run()
+        .pipe(Effect.orDie)
+      const s = yield* InstanceState.get(state)
+      s.shared.set(sessionID, result)
+      yield* full(sessionID).pipe(
+        Effect.catchCause((cause) => Effect.logError("share full sync failed", { sessionID: sessionID, cause: cause })),
+        Effect.forkIn(s.scope),
+      )
+      return result
+    })
+
+    const remove = Effect.fn("ShareNext.remove")(function* (sessionID: SessionID) {
+      if (disabled) return
+      yield* Effect.logInfo("removing share", { sessionID: sessionID })
+      const s = yield* InstanceState.get(state)
+      const share = yield* getCached(sessionID)
+      if (!share) {
+        s.shared.delete(sessionID)
+        s.queue.delete(sessionID)
+        return
+      }
+
+      const req = yield* request().pipe(Effect.catchIf(isNoTarget, () => Effect.succeed(undefined)))
+      // No host to tell (a share on upstream's closed service, XCOD-266): forget it here all the same,
+      // so it can still be unshared.
+      if (req)
+        yield* HttpClientRequest.delete(`${req.baseUrl}${req.api.remove(share.id)}`).pipe(
+          HttpClientRequest.setHeaders(req.headers),
+          HttpClientRequest.bodyJson({ secret: share.secret }),
+          Effect.flatMap((r) => httpOk.execute(r)),
+        )
+
+      yield* db.delete(SessionShareTable).where(eq(SessionShareTable.session_id, sessionID)).run().pipe(Effect.orDie)
+      s.shared.delete(sessionID)
+      s.queue.delete(sessionID)
+    })
+
+    return Service.of({ init, url, request, create, remove })
+  }),
+)
+
+export const node = LayerNode.make({
+  service: Service,
+  layer: layer,
+  deps: [Account.node, EventV2Bridge.node, Config.node, Database.node, httpClient, Provider.node, Session.node],
+})
+
+export * as ShareNext from "./share-next"

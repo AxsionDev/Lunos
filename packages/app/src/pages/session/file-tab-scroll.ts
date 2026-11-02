@@ -56,8 +56,11 @@ export const createFileTabListSync = (input: { el: HTMLDivElement; contextOpen: 
   }
 
   input.el.addEventListener("wheel", onWheel, { passive: false })
-  const observer = new MutationObserver(schedule)
-  observer.observe(input.el, { childList: true })
+  // Tabs sit one level down, inside the inner tablist wrapper; deeper changes (tab labels) are ignored.
+  const observer = new MutationObserver((mutations) => {
+    if (mutations.some((m) => m.target === input.el || m.target.parentNode === input.el)) schedule()
+  })
+  observer.observe(input.el, { childList: true, subtree: true })
 
   return () => {
     input.el.removeEventListener("wheel", onWheel)

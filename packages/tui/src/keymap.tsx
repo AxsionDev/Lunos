@@ -34,6 +34,9 @@ type CommandSlashEntry = {
   display: string
   description?: string
   aliases?: string[]
+  /** One-line hint shown when a command is picked by typing a renamed alias, keyed by "/alias". */
+  aliasHints?: Record<string, string>
+  muted?: boolean
   onSelect: () => void
 }
 type Command = ReturnType<OpenTuiKeymap["getCommands"]>[number]
@@ -257,6 +260,13 @@ export function useCommandShortcut(command: string): Accessor<string> {
   )
 }
 
+function aliasHints(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== "object") return
+  const hints = Object.entries(value).filter((item): item is [string, string] => typeof item[1] === "string")
+  if (!hints.length) return
+  return Object.fromEntries(hints.map(([alias, hint]) => [`/${alias}`, hint]))
+}
+
 export function useCommandSlashes(): Accessor<readonly CommandSlashEntry[]> {
   const keymap = useOpencodeKeymap()
   const entries = useKeymapSelector((keymap: OpenTuiKeymap) =>
@@ -283,6 +293,9 @@ export function useCommandSlashes(): Accessor<readonly CommandSlashEntry[]> {
         aliases: Array.isArray(slashAliases)
           ? slashAliases.filter((alias): alias is string => typeof alias === "string").map((alias) => `/${alias}`)
           : undefined,
+        aliasHints: aliasHints(entry.command.slashAliasHints),
+        // XCOD-250: greyed out with its reason, but still selectable so choosing it can say how to fix it.
+        muted: entry.command.slashMuted === true,
         onSelect: () => keymap.dispatchCommand(entry.command.name),
       }
     }),

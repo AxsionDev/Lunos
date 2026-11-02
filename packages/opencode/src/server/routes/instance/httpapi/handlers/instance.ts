@@ -89,6 +89,22 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       return yield* lsp.status()
     })
 
+    const lspServers = Effect.fn("InstanceHttpApi.lspServers")(function* () {
+      return yield* lsp.overview()
+    })
+
+    const lspStop = Effect.fn("InstanceHttpApi.lspStop")(function* (ctx: {
+      params: { serverID: string }
+      payload: { restart?: boolean }
+    }) {
+      yield* lsp.stop(ctx.params.serverID, ctx.payload.restart === true)
+      return true
+    })
+
+    const lspLog = Effect.fn("InstanceHttpApi.lspLog")(function* (ctx: { params: { serverID: string } }) {
+      return yield* lsp.log(ctx.params.serverID)
+    })
+
     const getFormatter = Effect.fn("InstanceHttpApi.formatter")(function* () {
       return yield* format.status()
     })
@@ -105,6 +121,9 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("agent", getAgent)
       .handle("skill", getSkill)
       .handle("lsp", getLsp)
+      .handle("lspServers", lspServers)
+      .handle("lspStop", lspStop)
+      .handle("lspLog", lspLog)
       .handle("formatter", getFormatter)
   }),
 )

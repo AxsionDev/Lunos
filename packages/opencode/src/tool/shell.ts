@@ -21,6 +21,9 @@ import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { ShellPrompt, type Parameters } from "./shell/prompt"
 import { BashArity } from "@/permission/arity"
+import { Global } from "@opencode-ai/core/global"
+import { BackgroundShell } from "./shell/background"
+import { checkReady, ID as ProcessToolID, report } from "./process"
 
 export { Parameters } from "./shell/prompt"
 
@@ -74,6 +77,15 @@ type Scan = {
   dirs: Set<string>
   patterns: Set<string>
   always: Set<string>
+}
+
+type Metadata = {
+  output: string
+  exit: number | null
+  truncated: boolean
+  outputPath?: string
+  /** XCOD-288: set when the command was started with `background: true`. */
+  background?: { id: string; pid: number | undefined; status: BackgroundShell.Status; log: string }
 }
 
 type Chunk = {
@@ -363,7 +375,8 @@ export const ShellTool = Tool.define(
         }
         return FSUtil.normalizePath(path.resolve(root, FSUtil.windowsPath(text)))
       }
-      return path.resolve(root, text)
+      // Spelled as on disk, so a wrong-case project path isn't treated as external.
+      return FSUtil.onDiskCase(path.resolve(root, text))
     })
 
     const argPath = Effect.fn("ShellTool.argPath")(function* (arg: string, cwd: string, ps: boolean, shell: string) {
@@ -582,16 +595,76 @@ export const ShellTool = Tool.define(
       if (meta.length > 0) {
         output += "\n\n<shell_metadata>\n" + meta.join("\n") + "\n</shell_metadata>"
       }
-      return {
-        title: input.command,
-        metadata: {
-          output: last || preview(output),
-          exit: code,
-          truncated: cut,
-          ...(cut && file ? { outputPath: file } : {}),
-        },
-        output,
+      const metadata: Metadata = {
+        output: last || preview(output),
+        exit: code,
+        truncated: cut,
+        ...(cut && file ? { outputPath: file } : {}),
       }
+      return { title: input.command, metadata, output }
+    })
+
+    // XCOD-288: start a long-running command, wait until it answers (or exits, or the timeout
+    // passes) and return. The process lives on in BackgroundShell, owned by this session.
+    const background = Effect.fn("ShellTool.background")(function* (
+      input: {
+        shell: string
+        command: string
+        cwd: string
+        directory: string
+        env: NodeJS.ProcessEnv
+        timeout: number
+        readyUrl: URL | undefined
+      },
+      ctx: Tool.Context,
+    ) {
+      // Something already answers there: starting another would either fail on the port or, worse,
+      // "pass" its readiness check against the wrong process. Often it is this session's own
+      // server from an earlier attempt, still running the old code; say so, so it gets restarted
+      // rather than moved to another port.
+      if (input.readyUrl && (yield* Effect.promise(() => BackgroundShell.answers(input.readyUrl!)))) {
+        const url = input.readyUrl
+        const mine = BackgroundShell.list(ctx.sessionID).find(
+          (item) => item.status === "running" && BackgroundShell.owns(item, url) !== false,
+        )
+        throw new Error(
+          mine
+            ? `Not started: your background process ${mine.id} (${mine.command}) is already serving ${url.href}. If it should run your latest changes, stop it with the ${ProcessToolID} tool, then start again.`
+            : `Not started: ${url.href} already answers, so a process this session didn't start is listening there. Use another port, or ask the user before stopping that process; never stop it yourself.`,
+        )
+      }
+      const info = BackgroundShell.start({
+        sessionID: ctx.sessionID,
+        directory: input.directory,
+        command: input.command,
+        shell: input.shell,
+        cwd: input.cwd,
+        env: input.env,
+        logDir: path.join(Global.Path.tmp, "background"),
+      })
+      const extra: string[] = []
+      if (input.readyUrl) {
+        extra.push(...(yield* Effect.promise(() => checkReady(info, input.readyUrl!, input.timeout, ctx.abort))))
+      } else {
+        yield* Effect.promise(() => BackgroundShell.settle(info))
+      }
+      if (ctx.abort.aborted) {
+        yield* Effect.promise(() => BackgroundShell.stop(info.id))
+        extra.push("User aborted the command; the background process was stopped.")
+      }
+      if (info.status === "running") {
+        extra.push(
+          `It keeps running after this call, until the end of this turn unless kept. Use the ${ProcessToolID} tool (id ${info.id}) to read its output, wait for it, stop it, or keep it running for the user.`,
+        )
+      }
+      const output = report(info, extra)
+      const metadata: Metadata = {
+        output: preview(output),
+        exit: info.status === "running" ? null : (info.exitCode ?? null),
+        truncated: false,
+        background: { id: info.id, pid: info.pid, status: info.status, log: info.log },
+      }
+      return { title: input.command, metadata, output }
     })
 
     return () =>
@@ -615,7 +688,13 @@ export const ShellTool = Tool.define(
               if (params.timeout !== undefined && params.timeout < 0) {
                 throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
               }
-              const timeout = params.timeout ?? defaultTimeoutMs
+              if (params.ready_url !== undefined && !params.background) {
+                throw new Error("ready_url only applies with background: true.")
+              }
+              const timeout =
+                params.timeout ?? (params.background ? BackgroundShell.READY_TIMEOUT_MS : defaultTimeoutMs)
+              // Checked before asking for permission: a bad URL shouldn't cost the user a prompt.
+              const readyUrl = params.ready_url ? BackgroundShell.parseReadyUrl(params.ready_url) : undefined
               const ps = Shell.ps(shell)
               yield* Effect.scoped(
                 Effect.gen(function* () {
@@ -627,6 +706,21 @@ export const ShellTool = Tool.define(
                   yield* ask(ctx, scan, params)
                 }),
               )
+
+              if (params.background) {
+                return yield* background(
+                  {
+                    shell,
+                    command: params.command,
+                    cwd,
+                    directory: instanceCtx.directory,
+                    env: yield* shellEnv(ctx, cwd),
+                    timeout,
+                    readyUrl,
+                  },
+                  ctx,
+                )
+              }
 
               return yield* run(
                 {

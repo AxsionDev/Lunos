@@ -1,0 +1,79 @@
+name: publish-retry
+
+# XCOD-283: on 1.18.52 and 1.18.53 GitHub could not find a hosted macOS arm64 runner, cancelled the
+# job ("The job was not acquired by Runner of type hosted even after multiple attempts"), and the
+# release was only saved by someone cancelling the run and typing `gh run rerun --failed`. This does
+# that rerun, once, when it is safe: every job that did not succeed in the first attempt was
+# cancelled for runner capacity. Anything else (a real failure, a human cancel) is left alone.
+# `version` succeeded and is not rerun, so the rerun reuses the same draft release.
+#
+# Like every workflow_run workflow, this only fires from the copy on the default branch (dev).
+
+on:
+  workflow_run:
+    workflows: [publish]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  retry:
+    # run_attempt == 1: retry once. A second capacity cancel ends the run red, with release-gate
+    # naming the job, rather than looping.
+    if: >-
+      github.repository == 'AxsionDev/Lunos' && github.event.workflow_run.run_attempt == 1 &&
+      github.event.workflow_run.conclusion != 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      checks: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUN: ${{ github.event.workflow_run.id }}
+      ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+      # Jobs whose result follows from the others: release-gate fails *because* a build was cancelled.
+      IGNORE: release-gate
+      # Set to anything to print the decision without rerunning.
+      DRY_RUN: ""
+    steps:
+      - name: Re-run jobs GitHub could not find a runner for
+        timeout-minutes: 3
+        run: |
+          jobs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/attempts/$ATTEMPT/jobs?per_page=100" \
+            --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped")
+              | "\(.id)\t\(.conclusion)\t\(.name)"')
+          capacity=""
+          blockers=""
+          while IFS=$'\t' read -r id conclusion name; do
+            [ -n "$id" ] || continue
+            case " $IGNORE " in *" $name "*) continue ;; esac
+            messages=""
+            if [ "$conclusion" = "cancelled" ]; then
+              messages=$(gh api "repos/$GITHUB_REPOSITORY/check-runs/$id/annotations" --jq '.[].message')
+            fi
+            if grep -q "not acquired by Runner" <<<"$messages"; then
+              capacity+="- \`$name\`"$'\n'
+            else
+              blockers+="- \`$name\`: $conclusion"$'\n'
+            fi
+          done <<<"$jobs"
+
+          if [ -n "$blockers" ]; then
+            printf '### Not retrying run %s\n\nThese did not succeed for a reason other than runner capacity:\n\n%s' \
+              "$RUN" "$blockers" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ -z "$capacity" ]; then
+            echo "Run $RUN: no runner-capacity cancellations, nothing to retry." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          printf '### Retrying run %s\n\nCancelled because no runner was acquired:\n\n%s' \
+            "$RUN" "$capacity" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ -n "$DRY_RUN" ]; then
+            echo "DRY_RUN: would run gh run rerun $RUN --failed"
+            exit 0
+          fi
+          gh run rerun "$RUN" --failed --repo "$GITHUB_REPOSITORY"
+          echo "::notice title=Release retried::Re-ran the failed jobs of run $RUN (attempt 2)."

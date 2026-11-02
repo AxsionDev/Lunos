@@ -1,4 +1,5 @@
 import { SessionID, MessageID } from "./schema"
+import { ControlEphemeral } from "@/control/ephemeral"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import {
@@ -300,13 +301,20 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
         if (part.type === "tool") {
           toolNames.add(part.tool)
           if (part.state.status === "completed") {
-            const outputText = part.state.time.compacted
+            const text = part.state.time.compacted
               ? "[Old tool result content cleared]"
               : truncateToolOutput(part.state.output, options?.toolOutputMaxChars)
-            const attachments =
+            // XCOD-327: an ephemeral screenshot is resolved from memory; once it's gone the model
+            // is told, and nothing is sent in its place.
+            const stored =
               part.state.time.compacted || options?.stripMedia
                 ? []
                 : (part.state.attachments ?? []).filter((a) => !rejectedByProvider(a))
+            const expired = stored.filter((a) => ControlEphemeral.resolve(a.url) === undefined).length
+            const attachments = stored.flatMap((a) => {
+              const url = ControlEphemeral.resolve(a.url)
+              return url ? [url === a.url ? a : { ...a, url }] : []
+            })
 
             // For providers that don't support media in tool results, extract media files
             // (images, PDFs) to be sent as a separate user message
@@ -316,6 +324,9 @@ export const toModelMessagesEffect = Effect.fnUntraced(function* (
               media.push(...extractedMedia)
             }
             const finalAttachments = attachments.filter((a) => !isMedia(a.mime) || supportsMediaInToolResult(a))
+            const outputText = expired
+              ? `${text}\n\n[${expired === 1 ? "A screenshot was" : `${expired} screenshots were`} not kept. Take a new one if you still need it.]`
+              : text
 
             const output =
               finalAttachments.length > 0

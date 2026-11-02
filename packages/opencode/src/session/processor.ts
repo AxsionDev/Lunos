@@ -1,4 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { ControlEphemeral } from "@/control/ephemeral"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Image } from "@/image/image"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
@@ -25,6 +26,9 @@ import { isRecord } from "@/util/record"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@opencode-ai/core/database/database"
 import { Usage, type LLMEvent } from "@opencode-ai/llm"
+import { RunBudget } from "@/agent/run-budget"
+import { Budget } from "@/budget"
+import { CloudCostReport } from "@/cloud/cost-report"
 
 const DOOM_LOOP_THRESHOLD = 3
 export type Result = "compact" | "stop" | "continue"
@@ -177,7 +181,9 @@ const layer = Layer.effect(
             metadata: output.metadata,
             title: output.title,
             time: { start: match.part.state.time.start, end: Date.now() },
-            attachments: output.attachments,
+            // XCOD-327: every completed tool call is stored through here (an aborted turn too), so
+            // media a tool marks ephemeral (browser screenshots) never reaches the session as data.
+            attachments: ControlEphemeral.storable(output.metadata, output.attachments),
           },
         })
         yield* settleToolCall(toolCallID)
@@ -456,6 +462,15 @@ const layer = Layer.effect(
             })
             ctx.assistantMessage.finish = value.reason
             ctx.assistantMessage.cost += usage.cost
+            RunBudget.spend(usage.cost)
+            // XCOD-298: counted against the project's budget at the next step, before the database is re-read.
+            Budget.spent(ctx.assistantMessage.sessionID, usage.cost)
+            // XCOD-298: to the organisation's console, only when cloud.cost_report is on (off by default).
+            CloudCostReport.send({
+              cost: usage.cost,
+              model: `${ctx.model.providerID}/${ctx.model.id}`,
+              project: Budget.projectOf(ctx.assistantMessage.sessionID) ?? "unknown",
+            })
             ctx.assistantMessage.tokens = usage.tokens
             yield* session.updatePart({
               id: PartID.ascending(),

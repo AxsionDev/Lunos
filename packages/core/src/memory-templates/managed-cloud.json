@@ -1,0 +1,18 @@
+{
+  "name": "managed-cloud",
+  "title": "Managed cloud database",
+  "description": "Neo4j Aura or a managed PostgreSQL: you pick the region, and your residency policy is checked at this step.",
+  "leaves": "the fact text, to the provider, in the region you pick",
+  "requires": [],
+  "ask": ["vendor", "url", "jurisdiction"],
+  "memory": {
+    "backend": {
+      "type": "{vendor}",
+      "url": "{url}",
+      "username": "{env:{VENDOR}_USER}",
+      "password": "{env:{VENDOR}_PASSWORD}",
+      "jurisdiction": "{jurisdiction}"
+    },
+    "encryption": "off"
+  }
+}

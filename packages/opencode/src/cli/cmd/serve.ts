@@ -17,6 +17,7 @@ export const ServeCommand = effectCmd({
     }
     const opts = yield* resolveNetworkOptions(args)
     const server = yield* Effect.promise(() => Server.listen(opts))
+    // The SDK waits for this exact line (packages/sdk/js/src/server.ts): keep "opencode" (XCOD-127).
     console.log(`opencode server listening on http://${server.hostname}:${server.port}`)
 
     yield* Effect.never

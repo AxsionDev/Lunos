@@ -6,17 +6,21 @@ import { Icon } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
-import { createEffect, createMemo, on, Show } from "solid-js"
+import { createEffect, createMemo, createResource, on, Show } from "solid-js"
+import { useTheme } from "@opencode-ai/ui/theme/context"
+import { useParams } from "@solidjs/router"
 import { ModelSelectorPopoverV2 } from "@/components/dialog-select-model"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
 import type { PromptInputProps } from "@/components/prompt-input/contracts"
 import { normalizePromptHistoryEntry, promptLength, type PromptHistoryComment } from "@/components/prompt-input/history"
 import { createPersistedPromptInputHistory } from "@/components/prompt-input/history-store"
 import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-input/placeholder"
+import { useAccount } from "@/context/account"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
+import { useSessionTakeover } from "@/components/prompt-input/takeover"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import { useComments } from "@/context/comments"
-import { useCommand } from "@/context/command"
+import { formatKeybind, useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePermission } from "@/context/permission"
@@ -44,13 +48,42 @@ export type PromptInputV2ComposerController = PromptInputV2Interaction & {
   readonly model: PromptInputProps["controls"]["model"]
 }
 
+// XCOD-260: the TUI's accents (packages/tui/src/theme, EXTERNAL_ACCENTS), 4.5:1 on light and dark.
+const EXTERNAL = {
+  claude: { name: "Claude Code", dark: "#f0a07c", light: "#a2461f" },
+  codex: { name: "Codex", dark: "#a3bdad", light: "#3d5a4b" },
+} as const
+
 export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
   const dialog = useDialog()
   const command = useCommand()
   const language = useLanguage()
+  const theme = useTheme()
+  const sdk = useSDK()
+  const params = useParams<{ id?: string }>()
+  // XCOD-260: the Claude Code / Codex session this prompt goes to, if it's one. The synced session
+  // list leaves `metadata` out, so the session is asked for once.
+  const [session] = createResource(
+    () => params.id,
+    (sessionID) =>
+      sdk()
+        .client.session.get({ sessionID })
+        .then((result) => result.data)
+        .catch(() => undefined),
+  )
+  const tool = () => {
+    const name = (session()?.metadata as { external?: { tool?: string } } | undefined)?.external?.tool
+    return name === "claude" || name === "codex" ? name : undefined
+  }
+  const external = () => (tool() ? EXTERNAL[tool()!] : undefined)
+  const accent = () => external()?.[theme.mode() === "light" ? "light" : "dark"]
 
   return (
-    <div class="flex flex-col gap-3">
+    <div
+      class="flex flex-col gap-3 rounded-xl"
+      style={accent() ? { "box-shadow": `0 0 0 1.5px ${accent()}` } : undefined}
+      data-external={tool()}
+    >
       <PromptInputV2
         controller={props.controller}
         borderUnderlay={props.borderUnderlay}
@@ -74,6 +107,18 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
           />
         }
       />
+      <Show when={external()}>
+        {(item) => (
+          <span class="px-3 pb-2 -mt-2 self-end text-12-medium" style={{ color: accent() }}>
+            Lunos · {item().name}
+          </span>
+        )}
+      </Show>
+      <Show when={props.controller.escapeArmed()}>
+        <span class="px-3 -mt-2 text-12-regular text-text-weak" role="status">
+          {language.t("prompt.escape.again")}
+        </span>
+      </Show>
     </div>
   )
 }
@@ -89,6 +134,8 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  // XCOD-312: a disabled Lunos account's prompt says why it can't be used.
+  const account = useAccount()
   const prompt = props.state ?? usePrompt()
   let editor: HTMLDivElement | undefined
 
@@ -134,12 +181,16 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
       commentCount: commentCount(),
       example: mode() === "shell" ? "git status" : "",
       suggest: false,
+      accountDisabled: !!account?.disabled(),
       t: (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
     }),
   )
   const designPlaceholder = () =>
-    promptDesignPlaceholder(mode(), placeholder(), (key, params) =>
-      language.t(key as Parameters<typeof language.t>[0], params as never),
+    promptDesignPlaceholder(
+      mode(),
+      placeholder(),
+      (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
+      !!account?.disabled(),
     )
 
   const historyComments = () => {
@@ -190,6 +241,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     )
   }
 
+  const takeover = useSessionTakeover()
   const accepting = createMemo(() => {
     const id = props.controls.session.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk().directory)
@@ -219,6 +271,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     onAbort: props.onAbort,
     onSubmit: props.onSubmit,
     model: props.controls.model.selection,
+    takeover,
   })
 
   const referenceDescription = (reference: ReferenceInfo) =>
@@ -390,7 +443,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
               options: () => props.controls.agents.options.map((name) => ({ id: name, label: name })),
               current: () => props.controls.agents.current,
               onSelect: (value: string) => props.controls.agents.select(value),
-              keybind: () => command.keybindParts("agent.cycle"),
+              keybind: () => command.keybindParts("mode.cycle"),
             }
           : undefined
       },
@@ -406,6 +459,10 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
         onSubmit: () => void submission.handleSubmit(new Event("submit")),
         onStop: () => void submission.abort(),
       },
+      onCleared: () =>
+        showToast({
+          title: language.t("prompt.toast.cleared", { key: formatKeybind("mod+z", language.t) }),
+        }),
     },
   })
   Object.defineProperty(controller, "model", { get: () => props.controls.model })

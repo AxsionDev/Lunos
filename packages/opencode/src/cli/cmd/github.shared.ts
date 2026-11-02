@@ -1,4 +1,6 @@
 import type { SessionV1 } from "@opencode-ai/core/v1/session"
+import { Effect } from "effect"
+import { ShareNext } from "@/share/share-next"
 
 export { parseGitHubRemote } from "@/util/repository"
 
@@ -27,4 +29,15 @@ export function formatPromptTooLargeError(files: { filename: string; content: st
       ? `\n\nFiles in prompt:\n${files.map((f) => `  - ${f.filename} (${((f.content.length * 0.75) / 1024).toFixed(0)} KB)`).join("\n")}`
       : ""
   return `PROMPT_TOO_LARGE: The prompt exceeds the model's context limit.${fileDetails}`
+}
+
+/**
+ * XCOD-266: the share link for the PR comment. With no organisation console or enterprise.url there's
+ * nowhere to share to: `warn` says so and the run carries on without a link. Other failures still fail.
+ */
+export function shareLink<R>(share: Effect.Effect<{ url: string }, unknown, R>, warn: (message: string) => void) {
+  return share.pipe(
+    Effect.map((result): string | undefined => result.url),
+    Effect.catchIf(ShareNext.isNoTarget, (error) => Effect.sync(() => (warn(error.message), undefined))),
+  )
 }

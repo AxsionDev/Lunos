@@ -5,7 +5,9 @@ import { ConfigPaths } from "@/config/paths"
 import { Global } from "@opencode-ai/core/global"
 import { installPlugin, patchPluginConfig, readPluginManifest } from "../../plugin/install"
 import { resolvePluginTarget } from "../../plugin/shared"
+import { listPlugins, searchPlugins, type PluginListEntry, type PluginMarketplaceStatus } from "../../plugin/discover"
 import { errorMessage } from "../../util/error"
+import { resolveByName } from "../../marketplace/resolve"
 import { Filesystem } from "@/util/filesystem"
 import { Process } from "@/util/process"
 import { UI } from "../ui"
@@ -175,9 +177,29 @@ export function createPlugTask(input: PlugInput, dep: PlugDeps = defaultPlugDeps
   }
 }
 
-export const PluginCommand = effectCmd({
-  command: "plugin <module>",
-  aliases: ["plug"],
+function printPlugins(plugins: PluginListEntry[]) {
+  for (const plugin of plugins) {
+    log.info(`${plugin.name} ${UI.Style.TEXT_DIM}(${plugin.marketplace})`)
+    if (plugin.description) log.info(`  ${plugin.description}`)
+    log.info(`  ${UI.Style.TEXT_DIM}lunos plugin ${plugin.spec}`)
+  }
+}
+
+// Surfaces a marketplace that's serving a stale, last-known-good cache instead of silently listing
+// its plugins as if the source were fully healthy (XCOD-13 AC4). Exported so mcp.ts's search
+// command -- which walks the same marketplace list -- reports staleness the same way rather than
+// growing its own copy.
+export function printStaleMarketplaces(marketplaces: PluginMarketplaceStatus[]) {
+  for (const marketplace of marketplaces) {
+    if (!marketplace.stale) continue
+    log.warn(
+      `"${marketplace.name}" refresh failed (${marketplace.stale}) — showing cache from ${new Date(marketplace.fetchedAt).toLocaleString()}`,
+    )
+  }
+}
+
+export const PluginInstallCommand = effectCmd({
+  command: "$0 <module>",
   describe: "install plugin and update config",
   builder: (yargs) =>
     yargs
@@ -227,4 +249,139 @@ export const PluginCommand = effectCmd({
     outro("Done")
     if (!ok) process.exitCode = 1
   }),
+})
+
+export const PluginListCommand = effectCmd({
+  command: "list",
+  describe: "list plugins available across added marketplaces",
+  handler: Effect.fn("Cli.plugin.list")(function* () {
+    UI.empty()
+    intro("Plugins")
+
+    const ctx = yield* InstanceRef
+    if (!ctx) return
+    const { marketplaceCount, marketplaces, plugins } = yield* Effect.promise(() =>
+      listPlugins({ vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }),
+    )
+    printStaleMarketplaces(marketplaces)
+
+    if (!marketplaceCount) {
+      log.warn("No marketplaces added")
+      outro("Add one with: lunos marketplace add <owner/repo | url | path>")
+      return
+    }
+
+    if (!plugins.length) {
+      log.warn("No plugins found in added marketplaces")
+      outro("Done")
+      return
+    }
+
+    printPlugins(plugins)
+    outro(`${plugins.length} plugin(s)`)
+  }),
+})
+
+export const PluginSearchCommand = effectCmd({
+  command: "search <query>",
+  describe: "search plugins across added marketplaces",
+  builder: (yargs) =>
+    yargs.positional("query", {
+      type: "string",
+      describe: "case-insensitive substring match on name/description/tags/category",
+    }),
+  handler: Effect.fn("Cli.plugin.search")(function* (args) {
+    const query = String(args.query ?? "").trim()
+
+    UI.empty()
+    intro(`Search plugins: ${query}`)
+
+    const ctx = yield* InstanceRef
+    if (!ctx) return
+    const { marketplaceCount, marketplaces, plugins } = yield* Effect.promise(() =>
+      searchPlugins(query, { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }),
+    )
+    printStaleMarketplaces(marketplaces)
+
+    if (!marketplaceCount) {
+      log.warn("No marketplaces added")
+      outro("Add one with: lunos marketplace add <owner/repo | url | path>")
+      return
+    }
+
+    if (!plugins.length) {
+      log.warn(`No plugins matched "${query}"`)
+      outro("Done")
+      return
+    }
+
+    printPlugins(plugins)
+    outro(`${plugins.length} plugin(s) matched`)
+  }),
+})
+
+// `lunos plugin <module>` takes a raw npm/GitHub spec; `plugin add <name>` resolves a name through
+// the added marketplaces and hands the resulting spec to the same install task, so the two can't
+// diverge in what an install actually does.
+export const PluginAddCommand = effectCmd({
+  command: "add <name>",
+  describe: "install a plugin by name from an added marketplace",
+  builder: (yargs) =>
+    yargs
+      .positional("name", {
+        type: "string",
+        describe: "plugin name, or <marketplace>/<name> when it appears in more than one",
+      })
+      .option("global", {
+        alias: ["g"],
+        type: "boolean",
+        default: false,
+        describe: "install in global config",
+      })
+      .option("force", {
+        alias: ["f"],
+        type: "boolean",
+        default: false,
+        describe: "replace existing plugin version",
+      }),
+  handler: Effect.fn("Cli.plugin.add")(function* (args) {
+    const name = String(args.name ?? "").trim()
+    const ctx = yield* InstanceRef
+    if (!ctx) return
+    const plugCtx = { vcs: ctx.project.vcs, worktree: ctx.worktree, directory: ctx.directory }
+    const { plugins } = yield* Effect.promise(() => listPlugins(plugCtx))
+    const matches = resolveByName(plugins, name)
+    if (matches.length !== 1) {
+      UI.error(
+        matches.length
+          ? `"${name}" exists in more than one marketplace. Use one of: ${matches.map((m) => `${m.marketplace}/${m.name}`).join(", ")}`
+          : `No plugin named "${name}" in added marketplaces. Try: lunos plugin search ${name}`,
+      )
+      process.exitCode = 1
+      return
+    }
+
+    UI.empty()
+    intro(`Install plugin ${matches[0]!.marketplace}/${matches[0]!.name} (${matches[0]!.spec})`)
+    const ok = yield* Effect.promise(() =>
+      createPlugTask({ mod: matches[0]!.spec, global: Boolean(args.global), force: Boolean(args.force) })(plugCtx),
+    )
+    outro("Done")
+    if (!ok) process.exitCode = 1
+  }),
+})
+
+export const PluginCommand = effectCmd({
+  command: "plugin",
+  aliases: ["plug"],
+  describe: "manage plugins",
+  instance: false,
+  builder: (yargs) =>
+    yargs
+      .command(PluginAddCommand)
+      .command(PluginInstallCommand)
+      .command(PluginListCommand)
+      .command(PluginSearchCommand)
+      .demandCommand(),
+  handler: Effect.fn("Cli.plugin")(function* () {}),
 })

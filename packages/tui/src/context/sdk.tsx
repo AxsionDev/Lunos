@@ -8,6 +8,38 @@ export type EventSource = {
   subscribe: (handler: (event: GlobalEvent) => void) => Promise<() => void>
 }
 
+/**
+ * XCOD-301: a response body whose request was cancelled ends instead of failing. Closing the TUI
+ * cancels its event stream; over HTTP (a sandbox, `lunos attach`) Bun then reports the aborted
+ * body's failure, which nothing awaits, as an unhandled rejection, and the CLI stops on one
+ * ("Lunos stopped because of an unexpected error: AbortError") before it hands a sandbox's
+ * results back.
+ */
+export function quietOnAbort(base: typeof fetch): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined)
+    const response = await base(input, init)
+    // Only the event stream: the one body that stays open until the TUI closes.
+    if (!signal || !response.body || !response.headers.get("content-type")?.includes("text/event-stream"))
+      return response
+    const reader = response.body.getReader()
+    const body = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        try {
+          const chunk = await reader.read()
+          if (chunk.done) controller.close()
+          else controller.enqueue(chunk.value)
+        } catch (error) {
+          if (signal.aborted) controller.close()
+          else controller.error(error)
+        }
+      },
+      cancel: (reason) => reader.cancel(reason).catch(() => {}),
+    })
+    return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers })
+  }) as typeof fetch
+}
+
 export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
   name: "SDK",
   init: (props: {
@@ -25,7 +57,7 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
         baseUrl: props.url,
         signal: abort.signal,
         directory: props.directory,
-        fetch: props.fetch,
+        fetch: quietOnAbort(props.fetch ?? (((input, init) => globalThis.fetch(input, init)) as typeof fetch)),
         headers: props.headers,
       })
     }

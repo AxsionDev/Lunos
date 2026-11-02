@@ -33,11 +33,14 @@ import {
   type JSX,
   lazy,
   onCleanup,
+  onMount,
   type ParentProps,
   Show,
 } from "solid-js"
 import { Dynamic } from "solid-js/web"
 import { makeEventListener } from "@solid-primitives/event-listener"
+import { AccountProvider } from "@/context/account"
+import { DisabledAccountNotice } from "@/components/disabled-account"
 import { CommandProvider, useCommand, type CommandOption } from "@/context/command"
 import { CommentsProvider } from "@/context/comments"
 import { FileProvider } from "@/context/file"
@@ -66,6 +69,8 @@ import { legacySessionHref, legacySessionServer, requireServerKey, sessionHref }
 import { createSessionLineage } from "@/pages/session/session-lineage"
 
 import { SessionPage, SessionRouteErrorBoundary, TargetSessionRouteContent } from "@/pages/session"
+import { SessionsPage } from "@/pages/sessions"
+import { useOpenSession } from "@/pages/sessions/open-session"
 import { NewHome } from "@/pages/home"
 import { LegacyHome } from "@/pages/home/legacy-home"
 
@@ -326,6 +331,31 @@ function DesktopCommands() {
   const command = useCommand()
   const language = useLanguage()
   const platform = usePlatform()
+  const navigate = useNavigate()
+
+  // XCOD-205: the Sessions view. The desktop app opens it in its own window; the web UI navigates.
+  command.register("sessions", () => [
+    {
+      id: "sessions.open",
+      title: language.t("command.sessions.open"),
+      category: language.t("command.category.session"),
+      keybind: "mod+alt+s",
+      onSelect: () => {
+        if (platform.openSessionsWindow) {
+          void platform.openSessionsWindow()
+          return
+        }
+        navigate("/sessions")
+      },
+    },
+  ])
+
+  // XCOD-235: sessions picked in the desktop Sessions window open here, in the main window.
+  const openSession = useOpenSession()
+  onMount(() => {
+    const off = platform.onOpenSession?.((target) => openSession(target))
+    if (off) onCleanup(off)
+  })
 
   command.register("desktop", () => {
     const commands: CommandOption[] = []
@@ -585,26 +615,30 @@ export function AppInterface(props: {
       <GlobalProvider>
         <SettingsProvider>
           <ConnectionGate disableHealthCheck={props.disableHealthCheck} startup={props.startup}>
-            <Show when={useSettings().general.newLayoutDesigns().toString()} keyed>
-              <Dynamic
-                component={props.router ?? Router}
-                root={(routerProps) => (
-                  <TabsProvider>
-                    <PermissionProvider>
-                      <NotificationProvider>
-                        <ServerShell>
-                          <Show when={useSettings().general.newLayoutDesigns()} fallback={routerProps.children}>
-                            <NewAppLayout serverScoped={props.serverScoped}>{routerProps.children}</NewAppLayout>
-                          </Show>
-                        </ServerShell>
-                      </NotificationProvider>
-                    </PermissionProvider>
-                  </TabsProvider>
-                )}
-              >
-                <Routes serverScoped={props.serverScoped} />
-              </Dynamic>
-            </Show>
+            {/* XCOD-312: a disabled Lunos account's notice, in front of either layout. */}
+            <AccountProvider>
+              <DisabledAccountNotice />
+              <Show when={useSettings().general.newLayoutDesigns().toString()} keyed>
+                <Dynamic
+                  component={props.router ?? Router}
+                  root={(routerProps) => (
+                    <TabsProvider>
+                      <PermissionProvider>
+                        <NotificationProvider>
+                          <ServerShell>
+                            <Show when={useSettings().general.newLayoutDesigns()} fallback={routerProps.children}>
+                              <NewAppLayout serverScoped={props.serverScoped}>{routerProps.children}</NewAppLayout>
+                            </Show>
+                          </ServerShell>
+                        </NotificationProvider>
+                      </PermissionProvider>
+                    </TabsProvider>
+                  )}
+                >
+                  <Routes serverScoped={props.serverScoped} />
+                </Dynamic>
+              </Show>
+            </AccountProvider>
           </ConnectionGate>
         </SettingsProvider>
       </GlobalProvider>
@@ -641,6 +675,7 @@ function Routes(props: { serverScoped?: JSX.Element }) {
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
       <Route path="/new-session" component={DraftRoute} />
+      <Route path="/sessions" component={SessionsPage} />
     </>
   )
 }

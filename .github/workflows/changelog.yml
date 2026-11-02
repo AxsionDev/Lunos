@@ -1,0 +1,44 @@
+name: changelog
+
+# XCOD-227: remind a pull request that changes user-facing code to add a CHANGELOG.md line.
+#
+# Rule (script/check-changelog.ts, userFacing): "user-facing code" is source under a package's
+# src/ directory (packages/<pkg>/src/…, packages/<group>/<pkg>/src/…), not tests, fixtures or
+# snapshots. Docs, scripts, workflows and config don't trigger it.
+#
+# The line check only warns (a ::warning:: annotation), and the `no-changelog` label skips it.
+# XCOD-253: the lint step fails the job when CHANGELOG.md has a ticket id outside an HTML comment or
+# a user-facing entry without a bold lead. Upstream-sync PRs will usually warn: upstream changes are noted as one entry per merge, so
+# label them `no-changelog` or add that entry.
+#
+# Runs on ubuntu-latest: the inherited workflows use upstream's Blacksmith runners, which never
+# pick up jobs on this fork.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Check for a CHANGELOG.md line
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: git diff --name-only "$BASE...$HEAD" | bun script/check-changelog.ts --pr
+
+      - name: CHANGELOG.md has no ticket ids in its text
+        run: bun script/check-changelog.ts --lint

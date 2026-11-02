@@ -165,11 +165,57 @@ export function setDockIcon() {
   if (!icon.isEmpty()) app.dock?.setIcon(icon)
 }
 
-export function createMainWindow(id: string = randomUUID()) {
+// XCOD-205: the Sessions window is an ordinary app window with a fixed id, so it is restored
+// across launches like any other, and the renderer opens it on /sessions.
+export const SESSIONS_WINDOW_ID = "sessions"
+
+/** Focuses the Sessions window, opening it first if needed. */
+export function openSessionsWindow() {
+  const existing = BrowserWindow.getAllWindows().find(
+    (win) => !win.isDestroyed() && getWindowID(win) === SESSIONS_WINDOW_ID,
+  )
+  if (existing) {
+    if (existing.isMinimized()) existing.restore()
+    existing.show()
+    existing.focus()
+    return existing
+  }
+  // XCOD-262: wide enough for the composer beside the list of sessions (the Agent Monitor layout).
+  return createMainWindow(SESSIONS_WINDOW_ID, { width: 1120, height: 820 })
+}
+
+/** XCOD-235: sessions waiting for a main window that has just been created, by window id. */
+const pendingOpen = new Map<string, Array<{ directory: string; sessionID: string }>>()
+
+/**
+ * XCOD-235: open a session chosen in the Sessions window in the main window (the most recently
+ * focused window that isn't the Sessions window, or a new one), and bring that window forward.
+ */
+export function openSessionInMainWindow(target: { directory: string; sessionID: string }) {
+  const existing = registry.lastFocusedWhere((id) => id !== SESSIONS_WINDOW_ID)
+  const win = existing && !existing.isDestroyed() ? existing : createMainWindow()
+  if (existing && !existing.isDestroyed()) win.webContents.send("open-session", target)
+  else {
+    const id = getWindowID(win)!
+    pendingOpen.set(id, [...(pendingOpen.get(id) ?? []), target])
+  }
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+
+/** XCOD-235: what a window created to open a session should open, once its page is ready. */
+export function takePendingOpen(id: string) {
+  const items = pendingOpen.get(id) ?? []
+  pendingOpen.delete(id)
+  return items
+}
+
+export function createMainWindow(id: string = randomUUID(), size?: { width: number; height: number }) {
   const state = windowState({
     file: windowStateFile(id),
-    defaultWidth: 1280,
-    defaultHeight: 800,
+    defaultWidth: size?.width ?? 1280,
+    defaultHeight: size?.height ?? 800,
   })
 
   const mode = tone()
@@ -180,7 +226,7 @@ export function createMainWindow(id: string = randomUUID()) {
     height: state.height,
     show: false,
     autoHideMenuBar: true,
-    title: "OpenCode",
+    title: "Lunos",
     icon: iconPath(),
     backgroundColor: backgroundColor ?? defaultBackgroundColor(),
     ...(process.platform === "darwin"

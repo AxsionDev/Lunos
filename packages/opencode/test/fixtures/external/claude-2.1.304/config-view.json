@@ -1,0 +1,300 @@
+{
+  "tool": "claude",
+  "version": "2.1.304",
+  "note": "Real replies of Claude Code 2.1.304 (2026-10-21) to initialize and the get_settings / get_memory_dialog / get_hooks_listing / mcp_status control requests, run with --settings {\"disableAllHooks\":true}. Trimmed to one item per source, paths as <home> and <project>, secrets replaced with SECRET.",
+  "argv": [
+    "-p",
+    "--input-format",
+    "stream-json",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "default",
+    "--permission-prompt-tool",
+    "stdio",
+    "--no-session-persistence",
+    "--settings",
+    "{\"disableAllHooks\":true}"
+  ],
+  "replies": {
+    "initialize": {
+      "claude_code_version": "2.1.304",
+      "current_permission_mode": "default",
+      "output_style": "default",
+      "available_output_styles": ["default", "Proactive", "Concise", "Explanatory", "Learning"],
+      "agents": [
+        {
+          "name": "agent-clarifier",
+          "description": "Use this agent to clarify vague or incomplete bug reports th"
+        },
+        {
+          "name": "claude",
+          "description": "Catch-all for any task that doesn't fit a more specific agen"
+        },
+        {
+          "name": "Explore",
+          "description": "Fast read-only search agent for locating code. Use it to fin"
+        },
+        {
+          "name": "general-purpose",
+          "description": "General-purpose agent for researching complex questions, sea"
+        }
+      ],
+      "models": [
+        {
+          "value": "default",
+          "resolvedModel": "claude-opus-5-5",
+          "displayName": "Default (recommended)"
+        },
+        {
+          "value": "opus",
+          "resolvedModel": "claude-opus-5-5",
+          "displayName": "Opus"
+        },
+        {
+          "value": "claude-fable-5-1[1m]",
+          "resolvedModel": "claude-fable-5-1[1m]",
+          "displayName": "Fable"
+        }
+      ]
+    },
+    "get_settings": {
+      "effective": {
+        "model": "opus[1m]",
+        "permissions": {
+          "defaultMode": "auto"
+        },
+        "env": {
+          "ANTHROPIC_BASE_URL": "<redacted>"
+        },
+        "disableAllHooks": true,
+        "hooks": {
+          "SessionStart": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "echo hi"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "sources": [
+        {
+          "source": "userSettings",
+          "settings": {
+            "model": "opus[1m]",
+            "permissions": {
+              "defaultMode": "auto"
+            },
+            "env": {
+              "ANTHROPIC_BASE_URL": "<redacted>"
+            },
+            "hooks": {
+              "SessionStart": [
+                {
+                  "hooks": [
+                    {
+                      "type": "command",
+                      "command": "echo hi"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "source": "projectSettings",
+          "settings": {}
+        },
+        {
+          "source": "localSettings",
+          "settings": {
+            "permissions": {},
+            "env": {
+              "ANTHROPIC_BASE_URL": "<redacted>"
+            },
+            "hooks": {
+              "SessionStart": [
+                {
+                  "hooks": [
+                    {
+                      "type": "command",
+                      "command": "echo hi"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "source": "flagSettings",
+          "settings": {
+            "disableAllHooks": true
+          }
+        }
+      ],
+      "applied": {
+        "model": "claude-opus-5-5[1m]",
+        "effort": "medium",
+        "advisor": "claude-opus-5-5",
+        "ultracode": false,
+        "ultracodeRequested": false,
+        "ultracodeAvailable": true
+      }
+    },
+    "get_memory_dialog": {
+      "files": [
+        {
+          "kind": "project",
+          "path": "<project>/CLAUDE.md",
+          "label": "Project instructions",
+          "description": "Checked in at ./CLAUDE.md",
+          "exists": true
+        },
+        {
+          "kind": "user",
+          "path": "<home>/.claude/CLAUDE.md",
+          "label": "User instructions",
+          "description": "Saved in ~/.claude/CLAUDE.md",
+          "exists": false
+        }
+      ],
+      "folders": [
+        {
+          "kind": "auto",
+          "path": "<home>/.claude/projects/-project-slug/memory/",
+          "label": "Open auto-memory folder",
+          "description": ""
+        },
+        {
+          "kind": "agent",
+          "path": "<project>/.claude/agent-memory/agent-clarifier/",
+          "label": "Open agent-clarifier agent memory",
+          "description": "project scope"
+        }
+      ]
+    },
+    "get_hooks_listing": {
+      "events": [
+        {
+          "name": "PostToolUse",
+          "summary": "After tool execution",
+          "supportsMatcher": true,
+          "hookCount": 2
+        },
+        {
+          "name": "PostToolUseFailure",
+          "summary": "After tool execution fails",
+          "supportsMatcher": true,
+          "hookCount": 1
+        },
+        {
+          "name": "UserPromptSubmit",
+          "summary": "When the user submits a prompt",
+          "supportsMatcher": false,
+          "hookCount": 2
+        }
+      ],
+      "hooks": [
+        {
+          "event": "PostToolUse",
+          "matcher": "*",
+          "source": "userSettings",
+          "sourceLabel": "User settings (~/.claude/settings.json)",
+          "type": "command",
+          "displayText": "echo hi",
+          "commandText": "echo hi",
+          "contentLabel": "Command",
+          "disabled": true,
+          "editable": {
+            "matcher": "*",
+            "config": {
+              "type": "command",
+              "command": "echo hi"
+            }
+          }
+        },
+        {
+          "event": "PostToolUse",
+          "matcher": "",
+          "source": "pluginHook",
+          "sourceLabel": "Plugin hooks (~/.claude/plugins/*/hooks/hooks.json)",
+          "pluginName": "remember@claude-plugins-official",
+          "type": "command",
+          "displayText": "echo hi",
+          "commandText": "echo hi",
+          "contentLabel": "Command",
+          "disabled": true
+        },
+        {
+          "event": "SessionStart",
+          "matcher": "startup|resume",
+          "source": "localSettings",
+          "sourceLabel": "Local settings (.claude/settings.local.json)",
+          "type": "command",
+          "displayText": "echo hi",
+          "commandText": "echo hi",
+          "contentLabel": "Command",
+          "timeout": 10,
+          "disabled": true,
+          "editable": {
+            "matcher": "startup|resume",
+            "config": {
+              "type": "command",
+              "command": "echo hi"
+            }
+          }
+        }
+      ],
+      "policy": {
+        "disabledByPolicy": false,
+        "managedOnly": false,
+        "pluginOnly": false,
+        "allDisabled": true,
+        "policyHookCount": 0
+      }
+    },
+    "mcp_status": {
+      "mcpServers": [
+        {
+          "name": "plugin:context7:context7",
+          "status": "needs-auth",
+          "config": {
+            "type": "http",
+            "url": "https://mcp.context7.com/mcp?client=claude-code-plugin"
+          },
+          "scope": "dynamic",
+          "source": "plugin"
+        },
+        {
+          "name": "MCP_DOCKER",
+          "status": "pending",
+          "config": {
+            "type": "stdio",
+            "command": "docker",
+            "args": ["--api-key=SECRET", "--stdio"]
+          },
+          "scope": "user",
+          "source": "user"
+        },
+        {
+          "name": "agentvibes",
+          "status": "pending",
+          "config": {
+            "type": "stdio",
+            "command": "npx",
+            "args": ["--api-key=SECRET", "--stdio"]
+          },
+          "scope": "project",
+          "source": "project"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "model": "openai/gpt-5.3-codex",
+    "date": "2026-10-04",
+    "report": "specs/eval/2026-10-04.md",
+    "status": "complete",
+    "tasks": 33,
+    "passRate": 0.64,
+    "costPerSolved": 0.09,
+    "upstreamHosts": ["api.openai.com"]
+  },
+  {
+    "model": "scaleway/qwen3-coder-30b-a3b-instruct",
+    "date": "2026-11-02",
+    "report": "specs/eval/2026-11-02.md",
+    "status": "complete",
+    "tasks": 33,
+    "passRate": 0.4848,
+    "costPerSolved": 0.05,
+    "upstreamHosts": ["api.scaleway.ai"]
+  }
+]

@@ -90,6 +90,13 @@ const api: ElectronAPI = {
     ipcRenderer.on("deep-link", handler)
     return () => ipcRenderer.removeListener("deep-link", handler)
   },
+  openSessionInMain: (directory, sessionID) => ipcRenderer.invoke("open-session-in-main", directory, sessionID),
+  onOpenSession: (cb) => {
+    const handler = (_: unknown, target: { directory: string; sessionID: string }) => cb(target)
+    ipcRenderer.on("open-session", handler)
+    return () => ipcRenderer.removeListener("open-session", handler)
+  },
+  takePendingOpenSession: () => ipcRenderer.invoke("take-pending-open-session"),
 
   openDirectoryPicker: (opts) => ipcRenderer.invoke("open-directory-picker", opts),
   openFilePicker: (opts) => ipcRenderer.invoke("open-file-picker", opts),

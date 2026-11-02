@@ -2,47 +2,66 @@
 export function deactivate() {}
 
 import * as vscode from "vscode"
+import * as path from "path"
+import { execFile } from "child_process"
+import { INSTALL_COMMAND, INSTALL_DOCS, parseVersion, resolveBinary, versionWarning } from "./cli"
 
-const TERMINAL_NAME = "opencode"
+const TERMINAL_NAME = "Lunos"
 
 export function activate(context: vscode.ExtensionContext) {
-  const openNewTerminalDisposable = vscode.commands.registerCommand("opencode.openNewTerminal", async () => {
-    await openTerminal()
-  })
+  const commands: Record<string, () => Promise<void>> = {
+    openNewTerminal: async () => {
+      await openTerminal()
+    },
+    openTerminal: async () => {
+      // A Lunos terminal already exists => focus it
+      const existingTerminal = vscode.window.terminals.find((t) => t.name === TERMINAL_NAME)
+      if (existingTerminal) {
+        existingTerminal.show()
+        return
+      }
 
-  const openTerminalDisposable = vscode.commands.registerCommand("opencode.openTerminal", async () => {
-    // An opencode terminal already exists => focus it
-    const existingTerminal = vscode.window.terminals.find((t) => t.name === TERMINAL_NAME)
-    if (existingTerminal) {
-      existingTerminal.show()
-      return
-    }
+      await openTerminal()
+    },
+    addFilepathToTerminal: async () => {
+      const fileRef = getActiveFile()
+      if (!fileRef) {
+        return
+      }
 
-    await openTerminal()
-  })
+      const terminal = vscode.window.activeTerminal
+      if (!terminal) {
+        return
+      }
 
-  let addFilepathDisposable = vscode.commands.registerCommand("opencode.addFilepathToTerminal", async () => {
-    const fileRef = getActiveFile()
-    if (!fileRef) {
-      return
-    }
+      if (terminal.name === TERMINAL_NAME) {
+        // @ts-ignore
+        const port = terminal.creationOptions.env?.["_EXTENSION_OPENCODE_PORT"]
+        port ? await appendPrompt(parseInt(port), fileRef) : terminal.sendText(fileRef, false)
+        terminal.show()
+      }
+    },
+  }
 
-    const terminal = vscode.window.activeTerminal
-    if (!terminal) {
-      return
-    }
-
-    if (terminal.name === TERMINAL_NAME) {
-      // @ts-ignore
-      const port = terminal.creationOptions.env?.["_EXTENSION_OPENCODE_PORT"]
-      port ? await appendPrompt(parseInt(port), fileRef) : terminal.sendText(fileRef, false)
-      terminal.show()
-    }
-  })
-
-  context.subscriptions.push(openNewTerminalDisposable, openTerminalDisposable, addFilepathDisposable)
+  for (const [name, run] of Object.entries(commands)) {
+    context.subscriptions.push(vscode.commands.registerCommand(`lunos.${name}`, run))
+    // The old command IDs keep custom keybindings working for one release. They aren't
+    // contributed in package.json, so they don't appear in the command palette (XCOD-122).
+    context.subscriptions.push(vscode.commands.registerCommand(`opencode.${name}`, run))
+  }
 
   async function openTerminal() {
+    const binary = resolveBinary({
+      setting: vscode.workspace.getConfiguration("lunos").get<string>("path"),
+      env: process.env,
+      platform: process.platform,
+    })
+    if (!binary) {
+      await showInstallHelp()
+      return
+    }
+    void checkVersion(binary)
+
     // Create a new terminal in split screen
     const port = Math.floor(Math.random() * (65535 - 16384 + 1)) + 16384
     const terminal = vscode.window.createTerminal({
@@ -58,11 +77,13 @@ export function activate(context: vscode.ExtensionContext) {
       env: {
         _EXTENSION_OPENCODE_PORT: port.toString(),
         OPENCODE_CALLER: "vscode",
+        // Put the resolved binary first, so `lunos` below is the one we checked, in every shell.
+        PATH: `${path.dirname(binary)}${path.delimiter}${process.env.PATH ?? ""}`,
       },
     })
 
     terminal.show()
-    terminal.sendText(`opencode --port ${port}`)
+    terminal.sendText(`lunos --port ${port}`)
 
     const fileRef = getActiveFile()
     if (!fileRef) {
@@ -88,6 +109,37 @@ export function activate(context: vscode.ExtensionContext) {
       await appendPrompt(port, `In ${fileRef}`)
       terminal.show()
     }
+  }
+
+  async function showInstallHelp() {
+    const copy = "Copy install command"
+    const docs = "Installation guide"
+    const setPath = "Set lunos.path"
+    const choice = await vscode.window.showErrorMessage(
+      `The Lunos CLI isn't installed, or isn't on your PATH. Install it with: ${INSTALL_COMMAND}`,
+      copy,
+      docs,
+      setPath,
+    )
+    if (choice === copy) await vscode.env.clipboard.writeText(INSTALL_COMMAND)
+    if (choice === docs) await vscode.env.openExternal(vscode.Uri.parse(INSTALL_DOCS))
+    if (choice === setPath) await vscode.commands.executeCommand("workbench.action.openSettings", "lunos.path")
+  }
+
+  /** Says which CLI version started, and warns if it's older than this extension supports. */
+  async function checkVersion(binary: string) {
+    const win = process.platform === "win32"
+    const output = await new Promise<string>((resolve) =>
+      // shell on Windows: npm installs `lunos.cmd`, which only runs through cmd.exe.
+      // Quoted, because with a shell a path like "C:\\Program Files\\..." would split at the space.
+      execFile(win ? `"${binary}"` : binary, ["--version"], { timeout: 10_000, shell: win }, (_error, stdout) =>
+        resolve(String(stdout)),
+      ),
+    )
+    const version = parseVersion(output)
+    vscode.window.setStatusBarMessage(`Started Lunos ${version ? `v${version}` : "(local build)"}`, 10_000)
+    const warning = versionWarning(version)
+    if (warning) void vscode.window.showWarningMessage(warning)
   }
 
   async function appendPrompt(port: number, text: string) {

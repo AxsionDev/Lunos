@@ -35,6 +35,9 @@ jobs:
   # Native runners required: bun install cross-compilation flags (--os/--cpu)
   # do not produce byte-identical node_modules as native installs.
   hash:
+    # Upstream's v1 nix-hash bot. Lunos keeps nix-hashes.yml instead, so this is skipped here (XCOD-118);
+    # compute and publish need this job, so they skip too.
+    if: github.repository == 'anomalyco/opencode'
     strategy:
       fail-fast: false
       matrix:

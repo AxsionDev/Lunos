@@ -1,0 +1,46 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`NO_COLOR: the states and headers read as text 1`] = `
+"▼ Subagents (7 · 2 need you)
+  ▼ Working (3)
+    [B] Subagent 5
+        @general
+        write tests
+        ◐ running
+        <elapsed>
+    [C] Subagent 4
+        @general
+        update docs
+        ◐ running
+        <elapsed>
+    [O] Subagent 3
+        @general · bg
+        lint everything
+        ◌ queued
+        <elapsed>
+  ▼ Waiting for action (2)
+    [H] Subagent 6
+        @general
+        run tests
+        ! approve: bash npm test
+        [approve] [deny]
+        <elapsed>
+    [S] Subagent 7
+        @general
+        pick a name
+        ! asks: Which name?
+        [approve] [deny]
+        <elapsed>
+  ▼ Completed (2)
+    [R] Subagent 2
+        @general
+        deploy preview
+        ✕ failed
+        exit code 1: build failed
+        <elapsed>
+    [S] Subagent 1
+        @general
+        write the summary
+        ✓ done
+        <elapsed>"
+`;

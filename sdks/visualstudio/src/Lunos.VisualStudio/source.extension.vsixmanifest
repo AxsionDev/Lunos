@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+  <Metadata>
+    <Identity Id="Lunos.VisualStudio.4f7c2b1e-3a51-4e8e-9c55-6b0a2d1f3333" Version="0.1.0" Language="en-US" Publisher="Axsion" />
+    <DisplayName>Lunos</DisplayName>
+    <Description xml:space="preserve">Lunos, the EU-sovereign, self-hostable AI coding agent, in Visual Studio: a chat tool window with sessions shared with the Lunos TUI, "Ask Lunos about Selection", Lunos's edits in the VS diff viewer to accept or reject hunk by hunk, and Error List entries as context. Needs the Lunos CLI (npm i -g lunos-ai). Lunos is not affiliated with Microsoft.</Description>
+    <MoreInfo>https://lunos.tech</MoreInfo>
+    <License>Resources\LICENSE.txt</License>
+    <Icon>Resources\lunos.png</Icon>
+    <Tags>ai, coding agent, self-hosted, eu, lunos</Tags>
+  </Metadata>
+  <Installation>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,19.0)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.0,19.0)">
+      <ProductArchitecture>arm64</ProductArchitecture>
+    </InstallationTarget>
+  </Installation>
+  <Dependencies>
+    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.7.2,)" />
+  </Dependencies>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />
+  </Assets>
+</PackageManifest>

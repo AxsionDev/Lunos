@@ -11,6 +11,15 @@ describe("desktop menu", () => {
     expect(items.every((item) => item.type === "item" && item.command === "logs.export" && !item.action)).toBe(true)
   })
 
+  test("Window → Sessions opens the Sessions window with a shortcut (XCOD-205)", () => {
+    const windowMenu = DESKTOP_MENU.find((menu) => menu.id === "window")
+    const item = windowMenu?.items?.find((entry) => entry.type === "item" && entry.action === "window.sessions")
+    expect(item).toMatchObject({
+      labelKey: "desktop.menu.sessions",
+      accelerator: { macos: "Cmd+Option+S", windows: "Ctrl+Alt+S" },
+    })
+  })
+
   test("provides translated labels for role-backed entries", () => {
     const windowMenu = DESKTOP_MENU.find((menu) => menu.role === "windowMenu")
     const roleItems = DESKTOP_MENU.flatMap((menu) => menu.items ?? []).filter(

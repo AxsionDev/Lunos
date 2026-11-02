@@ -31,6 +31,7 @@ import { AgentPlugin } from "./agent"
 import { CommandPlugin } from "./command"
 import { ModelsDevPlugin } from "./models-dev"
 import { ProviderPlugins } from "./provider"
+import { ResidencyPlugin } from "./residency"
 import { SkillPlugin } from "./skill"
 import { VariantPlugin } from "./variant"
 
@@ -115,6 +116,9 @@ const layer = Layer.effectDiscard(
         yield* add(ConfigAgentPlugin.Plugin)
         yield* add(ConfigCommandPlugin.Plugin)
         yield* add(ConfigSkillPlugin.Plugin)
+        // Registered ahead of the provider plugins so its aisdk.sdk hook runs first: a denied
+        // provider throws before any SDK is constructed for it.
+        yield* add(ResidencyPlugin.Plugin)
         for (const item of ProviderPlugins) yield* add(item)
         yield* add(ConfigExternalPlugin.Plugin)
         yield* add(ConfigProviderPlugin.Plugin)

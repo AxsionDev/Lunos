@@ -1,3 +1,5 @@
+import { CloudBeta } from "@/cloud/beta"
+import { CloudDisabled } from "@/cloud/disabled"
 import { Config } from "@/config/config"
 import { GlobalBus, type GlobalEvent as GlobalBusEvent } from "@/bus/global"
 import { EffectBridge } from "@/effect/bridge"
@@ -11,7 +13,7 @@ import { HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import * as Sse from "effect/unstable/encoding/Sse"
 import { RootHttpApi } from "../api"
-import { GlobalUpgradeInput } from "../groups/global"
+import { GlobalFeedbackInput, GlobalUpgradeInput } from "../groups/global"
 
 function eventData(data: unknown): Sse.Event {
   return {
@@ -90,20 +92,29 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       const method = yield* installation.method()
       if (method === "unknown") {
         return HttpServerResponse.jsonUnsafe(
-          { success: false as const, error: "Unknown installation method" },
+          { success: false as const, error: Installation.unpublishedMessage(method) },
           { status: 400 },
         )
       }
-      const target = ctx.payload.target
-      const result = yield* installation.upgrade(method, target).pipe(
-        Effect.as({ success: true as const, version: target }),
-        Effect.catch((err) =>
-          Effect.succeed({
-            success: false as const,
-            error: err instanceof Error ? err.message : String(err),
-          }),
-        ),
-      )
+      // XCOD-247: the step goes out as an event, so the TUI and desktop can show it while this runs.
+      const progress = (step: "checking" | "installing" | "verifying", version: string) =>
+        GlobalBus.emit("event", {
+          directory: "global",
+          payload: { type: Installation.Event.UpgradeProgress.type, properties: { step, version } },
+        })
+      if (!ctx.payload.target) progress("checking", "")
+      const target = ctx.payload.target ?? (yield* installation.latest(method))
+      const result = yield* installation
+        .upgrade(method, target, (step) => progress(step, target))
+        .pipe(
+          Effect.as({ success: true as const, version: target }),
+          Effect.catch((err) =>
+            Effect.succeed({
+              success: false as const,
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          ),
+        )
       if (!result.success) return HttpServerResponse.jsonUnsafe(result, { status: 500 })
       GlobalBus.emit("event", {
         directory: "global",
@@ -115,6 +126,26 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       return HttpServerResponse.jsonUnsafe(result)
     })
 
+    // XCOD-312: the desktop and web app's disabled-account notice. Never fails: unreadable is "not known".
+    const account = Effect.fn("GlobalHttpApi.account")(function* () {
+      const disabled = yield* Effect.promise(() => CloudDisabled.active().catch(() => undefined))
+      return disabled ? { disabled } : {}
+    })
+
+    // XCOD-318: the app's Feedback button, sent on with this machine's Lunos sign-in.
+    const feedback = Effect.fn("GlobalHttpApi.feedback")(function* (ctx: { payload: typeof GlobalFeedbackInput.Type }) {
+      const result = yield* Effect.promise(() =>
+        CloudBeta.feedback(ctx.payload).then(
+          (sent) => ({ success: true as const, sessionShared: sent.sessionShared }),
+          (error: unknown) => ({
+            success: false as const,
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        ),
+      )
+      return result.success ? result : HttpServerResponse.jsonUnsafe(result, { status: 400 })
+    })
+
     return handlers
       .handle("health", health)
       .handleRaw("event", event)
@@ -122,5 +153,7 @@ export const globalHandlers = HttpApiBuilder.group(RootHttpApi, "global", (handl
       .handle("configUpdate", configUpdate)
       .handle("dispose", dispose)
       .handle("upgrade", upgrade)
+      .handle("account", account)
+      .handle("feedback", feedback)
   }),
 )

@@ -9,6 +9,7 @@ import { MCP } from "../mcp"
 import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
+import PROMPT_SECURITY_REVIEW from "./template/security-review.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
 
 type State = {
@@ -46,6 +47,9 @@ export function hints(template: string) {
 export const Default = {
   INIT: "init",
   REVIEW: "review",
+  SECURITY_REVIEW: "security-review",
+  MEMORY: "memory",
+  WORKFLOWS: "workflows",
 } as const
 
 export interface Interface {
@@ -85,6 +89,34 @@ const layer = Layer.effect(
         },
         subtask: true,
         hints: hints(PROMPT_REVIEW),
+      }
+      // XCOD-334: SessionPrompt.command runs the deterministic scan and fills in its results. Not a
+      // subtask: the main agent asks before fixing and dispatches the fix subagents itself.
+      commands[Default.SECURITY_REVIEW] = {
+        name: Default.SECURITY_REVIEW,
+        description: "security review of changes [--branch <name> | --pr <number>], defaults to uncommitted",
+        source: "command",
+        template: PROMPT_SECURITY_REVIEW,
+        hints: hints(PROMPT_SECURITY_REVIEW),
+      }
+
+      // Handled by SessionPrompt.command itself: it switches memory for the session and never
+      // reaches a model, so the template is only a placeholder.
+      commands[Default.MEMORY] = {
+        name: Default.MEMORY,
+        description:
+          "long-term memory: /memory off | on for this session; /memory sources [off | on <name>] for external sources; /memory alone opens the browser in the TUI",
+        source: "command",
+        template: "",
+        hints: [],
+      }
+      // XCOD-303: handled by SessionPrompt.command too; switches Dynamic workflows for the session.
+      commands[Default.WORKFLOWS] = {
+        name: Default.WORKFLOWS,
+        description: "Dynamic workflows: /workflows off | on for this session; /workflows alone says which applies",
+        source: "command",
+        template: "",
+        hints: [],
       }
 
       for (const [name, command] of Object.entries(cfg.command ?? {})) {

@@ -1307,8 +1307,8 @@ it.instance(
   Effect.gen(function* () {
     const providers = yield* list
     expect(providers[ProviderV2.ID.make("nvidia")].options.headers).toEqual({
-      "HTTP-Referer": "https://opencode.ai/",
-      "X-Title": "opencode",
+      "HTTP-Referer": "https://lunos.tech/",
+      "X-Title": "Lunos",
       "X-BILLING-INVOKE-ORIGIN": "OpenCode",
     })
   }),
@@ -1320,8 +1320,8 @@ it.instance(
   Effect.gen(function* () {
     const providers = yield* list
     expect(providers[ProviderV2.ID.make("nvidia")].options.headers).toEqual({
-      "HTTP-Referer": "https://opencode.ai/",
-      "X-Title": "opencode",
+      "HTTP-Referer": "https://lunos.tech/",
+      "X-Title": "Lunos",
       "X-BILLING-INVOKE-ORIGIN": "OpenCode",
     })
   }),
@@ -2091,6 +2091,19 @@ it.instance(
   }),
 )
 
+// XCOD-221: a keyless first run must not fall back to upstream opencode's hosted free tier.
+it.instance(
+  "with no provider key, nothing is loaded and defaultModel says how to add a provider",
+  Effect.gen(function* () {
+    const providers = yield* list
+    expect(providers[ProviderV2.ID.make("opencode")]).toBeUndefined()
+    expect(Object.keys(providers)).toEqual([])
+    const error = yield* Provider.use.defaultModel().pipe(Effect.flip)
+    expect(error).toBeInstanceOf(Provider.NoProvidersError)
+    expect(error.message).toMatch(/lunos auth login/)
+  }),
+)
+
 it.effect("opencode loader keeps paid models when config apiKey is present", () =>
   Effect.gen(function* () {
     const noneDir = yield* tmpdirScoped()
@@ -2104,10 +2117,11 @@ it.effect("opencode loader keeps paid models when config apiKey is present", () 
         .pipe(provideInstanceEffect(directory))
         .pipe(Effect.provide(instanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
 
-    const none = paid(yield* listIn(noneDir))
+    // XCOD-221: without a key the provider isn't loaded at all, free models included.
+    const none = (yield* listIn(noneDir))[ProviderV2.ID.make("opencode")]
     const keyedCount = paid(yield* listIn(keyedDir))
 
-    expect(none).toBe(0)
+    expect(none).toBeUndefined()
     expect(keyedCount).toBeGreaterThan(0)
   }).pipe(provideMultiInstance),
 )
@@ -2123,7 +2137,8 @@ it.effect("opencode loader keeps paid models when auth exists", () =>
         .pipe(provideInstanceEffect(directory))
         .pipe(Effect.provide(instanceStoreLayer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node)))
 
-    const none = paid(yield* listIn(noneDir))
+    // XCOD-221: without a key the provider isn't loaded at all, free models included.
+    const none = (yield* listIn(noneDir))[ProviderV2.ID.make("opencode")]
 
     const authPath = path.join(Global.Path.data, "auth.json")
     const original = yield* Effect.promise(() => Filesystem.readText(authPath).catch(() => undefined))
@@ -2139,7 +2154,81 @@ it.effect("opencode loader keeps paid models when auth exists", () =>
 
     const keyedCount = paid(yield* listIn(keyedDir))
 
-    expect(none).toBe(0)
+    expect(none).toBeUndefined()
     expect(keyedCount).toBeGreaterThan(0)
   }).pipe(provideMultiInstance),
 )
+
+// XCOD-212: pickers read the tag from the provider list, so it must be there and survive toPublicInfo.
+it.instance(
+  "an EU-only residency policy tags US models as blocked, and EU models not",
+  Effect.gen(function* () {
+    yield* setProcessEnv("ANTHROPIC_API_KEY", "test-api-key")
+    yield* setProcessEnv("MISTRAL_API_KEY", "test-api-key")
+    const providers = yield* list
+    const anthropic = Object.values(providers[ProviderV2.ID.anthropic].models)
+    expect(anthropic.length).toBeGreaterThan(0)
+    for (const model of anthropic) expect(model.blocked).toMatchObject({ policy: "residency", region: "us" })
+    // XCOD-194: Mistral's default host (api.mistral.ai) is global, not EU.
+    for (const model of Object.values(providers[ProviderV2.ID.make("mistral")].models))
+      expect(model.blocked).toMatchObject({ policy: "residency", region: "unknown" })
+    const pub = Provider.toPublicInfo(providers[ProviderV2.ID.anthropic])
+    expect(Object.keys(pub.models)).toEqual(anthropic.map((model) => model.id))
+    expect(Object.values(pub.models)[0].blocked?.reason).toContain("does not allow")
+    expect(Provider.blockedModels(providers).has(`anthropic/${anthropic[0].id}`)).toBe(true)
+  }),
+  { config: { residency: { allow: ["eu"] } } },
+)
+
+it.instance(
+  "XCOD-194: Mistral at its EU endpoint is allowed under an EU-only policy",
+  Effect.gen(function* () {
+    yield* setProcessEnv("MISTRAL_API_KEY", "test-api-key")
+    const providers = yield* list
+    const mistral = Object.values(providers[ProviderV2.ID.make("mistral")].models)
+    expect(mistral.length).toBeGreaterThan(0)
+    for (const model of mistral) expect(model.blocked).toBeUndefined()
+  }),
+  {
+    config: {
+      residency: { allow: ["eu"] },
+      provider: { mistral: { options: { baseURL: "https://api.eu.mistral.ai/v1" } } },
+    },
+  },
+)
+
+it.instance(
+  "audit without a residency policy blocks nothing",
+  Effect.gen(function* () {
+    yield* setProcessEnv("ANTHROPIC_API_KEY", "test-api-key")
+    const providers = yield* list
+    expect(Provider.blockedModels(providers).size).toBe(0)
+  }),
+  { config: { audit: { enabled: true } } },
+)
+
+// XCOD-213: size and the curated reason ride on the provider list; an org's list replaces Lunos's.
+it.instance(
+  "models carry their size, and the configured recommended list replaces the built-in one",
+  Effect.gen(function* () {
+    yield* setProcessEnv("MISTRAL_API_KEY", "test-api-key")
+    const providers = yield* list
+    const mistral = providers[ProviderV2.ID.make("mistral")].models
+    expect(mistral["mistral-large-latest"].size).toBe("large")
+    expect(mistral["mistral-small-latest"].recommended).toBe("Our default")
+    expect(mistral["mistral-large-latest"].recommended).toBeUndefined()
+    expect(Provider.toPublicInfo(providers[ProviderV2.ID.make("mistral")]).models["mistral-small-latest"].size).toBe(
+      "small",
+    )
+  }),
+  { config: { recommended: { "mistral/mistral-small-latest": "Our default" } } },
+)
+
+// XCOD-219: a locked `model` tags other models too, but must not block saving small_model or a subagent model.
+test("blockedModels lists residency blocks only, not models a locked model rules out", () => {
+  const blocked = Provider.blockedModels({
+    mistral: { models: { a: { blocked: { policy: "locked", reason: "model is set by your organisation's policy" } } } },
+    anthropic: { models: { b: { blocked: { policy: "residency", reason: "not in eu" } } } },
+  })
+  expect([...blocked.keys()]).toEqual(["anthropic/b"])
+})

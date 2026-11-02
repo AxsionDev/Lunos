@@ -1,0 +1,59 @@
+# Lunos-owned paths (XCOD-118).
+#
+# Upstream opencode files that Lunos has changed on purpose. When an upstream merge touches one of
+# these, the upstream-sync PR flags it for manual review, even if the merge is clean. One glob per
+# line (Bun.Glob syntax); blank lines and `#` comments are ignored.
+
+# CI, release and publishing: never let an upstream merge change these silently.
+.github/workflows/**
+.github/actions/**
+.github/ISSUE_TEMPLATE/**
+.github/pull_request_template.md
+packages/opencode/script/build.ts
+packages/opencode/script/publish.ts
+packages/opencode/script/postinstall.mjs
+packages/cli/script/build.ts
+packages/cli/script/publish.ts
+install
+
+# Update path (XCOD-91): update checks and upgrades must never track upstream opencode.
+packages/opencode/src/installation/**
+packages/opencode/src/cli/upgrade.ts
+packages/opencode/src/cli/cmd/upgrade.ts
+packages/opencode/src/cli/cmd/uninstall.ts
+packages/core/src/installation/**
+
+# Residency and data flows, and offline mode (XCOD-121).
+packages/core/src/offline.ts
+packages/core/src/npm.ts
+script/offline-calls.ts
+script/offline-egress.ts
+packages/opencode/script/offline-bundles.ts
+packages/opencode/script/offline/**
+packages/opencode/script/release-checksums.ts
+packages/opencode/src/provider/provider.ts
+packages/opencode/src/share/**
+packages/core/src/jurisdiction.ts
+
+# Config, plugins and marketplace.
+packages/opencode/src/config/config.ts
+packages/core/src/v1/config/config.ts
+packages/core/src/config/**
+packages/opencode/src/plugin/**
+packages/core/src/plugin/**
+packages/plugin/src/**
+packages/opencode/src/marketplace/**
+
+# Rebrand surfaces and versioning.
+packages/desktop/**
+packages/app/src/desktop-menu.ts
+sdks/vscode/**
+README.md
+packages/opencode/package.json
+packages/opencode/src/index.ts
+packages/tui/src/component/logo.tsx
+
+# Docs and deployment.
+docs/**
+packages/opencode/src/cli/brand.ts
+packages/opencode/test/cli/brand.test.ts

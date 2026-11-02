@@ -12,6 +12,7 @@ import { TestConfig } from "../fixture/config"
 import { Config } from "@/config/config"
 import { Plugin } from "@/plugin"
 import { Agent } from "@/agent/agent"
+import { Permission } from "@/permission"
 import { InstanceState } from "@/effect/instance-state"
 
 import { ToolJsonSchema } from "@/tool/json-schema"
@@ -57,6 +58,45 @@ const replacements = [
 ] as const
 
 const it = testEffect(LayerNode.compile(root, replacements))
+// XCOD-287: background subagents turned off in config.
+const backgroundOff = testEffect(
+  LayerNode.compile(root, [
+    [
+      Config.node,
+      TestConfig.layer({
+        get: () => Effect.succeed({ subagent: { background: false } }),
+        directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
+      }),
+    ],
+    [RuntimeFlags.node, RuntimeFlags.layer()],
+  ] as const),
+)
+// XCOD-327: browser control turned on in config (off by default, or locked off by an organisation).
+const browserOn = testEffect(
+  LayerNode.compile(root, [
+    [
+      Config.node,
+      TestConfig.layer({
+        get: () => Effect.succeed({ browser: { enabled: true } }),
+        directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
+      }),
+    ],
+    [RuntimeFlags.node, RuntimeFlags.layer()],
+  ] as const),
+)
+// XCOD-339: computer control turned on in config.
+const computerOn = testEffect(
+  LayerNode.compile(root, [
+    [
+      Config.node,
+      TestConfig.layer({
+        get: () => Effect.succeed({ computer: { enabled: true } }),
+        directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
+      }),
+    ],
+    [RuntimeFlags.node, RuntimeFlags.layer()],
+  ] as const),
+)
 const withCodeMode = testEffect(
   LayerNode.compile(root, [
     [Config.node, configLayer],
@@ -150,7 +190,94 @@ describe("tool.registry", () => {
     }),
   )
 
-  it.instance("hides task background parameter unless experimental background subagents are enabled", () =>
+  // XCOD-327: the browser tool is absent unless browser control is on, and only qa and general get it.
+  it.instance("browser tool is absent while browser control is off", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: yield* agents.defaultInfo(),
+      })
+      expect(tools.map((tool) => tool.id)).not.toContain("browser")
+    }),
+  )
+
+  browserOn.instance("browser tool is offered when on, to qa and general only", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const qa = (yield* agents.get("qa"))!
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: qa,
+      })
+      expect(tools.map((tool) => tool.id)).toContain("browser")
+      for (const name of ["qa", "general"])
+        expect(Permission.disabled(["browser"], (yield* agents.get(name))!.permission).has("browser")).toBe(false)
+      for (const name of ["build", "explore", "plan"])
+        expect(Permission.disabled(["browser"], (yield* agents.get(name))!.permission).has("browser")).toBe(true)
+    }),
+  )
+
+  // XCOD-339: the computer tool is absent unless computer control is on (an organisation locks it
+  // off with `computer.enabled`), and only qa and general get it.
+  it.instance("computer tool is absent while computer control is off", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: (yield* agents.get("general"))!,
+      })
+      expect(tools.map((tool) => tool.id)).not.toContain("computer")
+    }),
+  )
+
+  computerOn.instance("computer tool is offered when on, to qa and general only", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: (yield* agents.get("general"))!,
+      })
+      expect(tools.map((tool) => tool.id)).toContain("computer")
+      expect(tools.map((tool) => tool.id)).not.toContain("browser")
+      for (const name of ["qa", "general"])
+        expect(Permission.disabled(["computer"], (yield* agents.get(name))!.permission).has("computer")).toBe(false)
+      for (const name of ["build", "explore", "plan"])
+        expect(Permission.disabled(["computer"], (yield* agents.get(name))!.permission).has("computer")).toBe(true)
+    }),
+  )
+
+  // XCOD-287: background subagents are on by default, so the parameter is offered unless turned off.
+  backgroundOff.instance(
+    "hides task background parameter when subagent.background is false",
+    () =>
+      Effect.gen(function* () {
+        const registry = yield* ToolRegistry.Service
+        const agent = yield* Agent.Service
+        const build = yield* agent.get("build")
+        if (!build) throw new Error("build agent not found")
+        const task = (yield* registry.tools({
+          providerID: ProviderV2.ID.opencode,
+          modelID: ModelV2.ID.make("test"),
+          agent: build,
+        })).find((tool) => tool.id === "task")
+
+        expect(task?.jsonSchema).toBeDefined()
+        expect((task?.jsonSchema?.properties as Record<string, unknown> | undefined)?.background).toBeUndefined()
+        expect(task?.description).not.toContain("Background mode")
+      }),
+    { config: { subagent: { background: false } } },
+  )
+
+  it.instance("offers the task background parameter by default", () =>
     Effect.gen(function* () {
       const registry = yield* ToolRegistry.Service
       const agent = yield* Agent.Service
@@ -161,9 +288,8 @@ describe("tool.registry", () => {
         modelID: ModelV2.ID.make("test"),
         agent: build,
       })).find((tool) => tool.id === "task")
-
-      expect(task?.jsonSchema).toBeDefined()
-      expect((task?.jsonSchema?.properties as Record<string, unknown> | undefined)?.background).toBeUndefined()
+      const schema = task?.jsonSchema ?? (task ? ToolJsonSchema.fromTool(task as never) : undefined)
+      expect((schema?.properties as Record<string, unknown> | undefined)?.background).toBeDefined()
     }),
   )
 

@@ -2,6 +2,7 @@ import path from "path"
 import { Effect, Schema } from "effect"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { Skill } from "../skill"
+import { SkillScope } from "../skill/scope"
 import * as Tool from "./tool"
 import DESCRIPTION from "./skill.txt"
 
@@ -31,6 +32,10 @@ export const SkillTool = Tool.define(
             metadata: {},
           })
 
+          // The turn is the user message this assistant response answers; the scope expires with it.
+          const turn = ctx.messages.findLast((message) => message.info.role === "user")?.info.id
+          if (turn) SkillScope.activate(ctx.sessionID, turn, { name: info.name, allowed: info.allowedTools })
+
           const dir = path.dirname(info.location)
           const base = dir
           const files = yield* ripgrep.find({
@@ -52,6 +57,11 @@ export const SkillTool = Tool.define(
               "",
               `Base directory for this skill: ${base}`,
               "Relative paths in this skill (e.g., scripts/, reference/) are relative to this base directory.",
+              ...(info.allowedTools
+                ? [
+                    `While this skill is active (until the end of this turn), only these tools are available: ${info.allowedTools.join(", ")}.`,
+                  ]
+                : []),
               "Note: file list is sampled.",
               "",
               "<skill_files>",

@@ -56,7 +56,7 @@ export function Footer() {
         <Switch>
           <Match when={store.welcome}>
             <text fg={theme.text}>
-              Get started <span style={{ fg: theme.textMuted }}>/connect</span>
+              Get started <span style={{ fg: theme.textMuted }}>/providers</span>
             </text>
           </Match>
           <Match when={connected()}>
@@ -72,8 +72,9 @@ export function Footer() {
             <Show when={mcp()}>
               <text fg={theme.text}>
                 <Switch>
+                  {/* XCOD-107: the glyph changes too, so the error doesn't rely on colour alone. */}
                   <Match when={mcpError()}>
-                    <span style={{ fg: theme.error }}>⊙ </span>
+                    <span style={{ fg: theme.error }}>✕ </span>
                   </Match>
                   <Match when={true}>
                     <span style={{ fg: theme.success }}>⊙ </span>

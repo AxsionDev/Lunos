@@ -1,4 +1,4 @@
-import { createMemo, createSignal, onMount, Show } from "solid-js"
+import { createMemo, createResource, createSignal, onMount, Show } from "solid-js"
 import { useSync } from "../context/sync"
 import { map, pipe, sortBy } from "remeda"
 import { DialogSelect } from "../ui/dialog-select"
@@ -8,13 +8,14 @@ import { DialogPrompt } from "../ui/dialog-prompt"
 import { Link } from "../ui/link"
 import { useTheme } from "../context/theme"
 import { TextAttributes } from "@opentui/core"
-import type { ProviderAuthAuthorization, ProviderAuthMethod } from "@opencode-ai/sdk/v2"
+import type { ConfiguredProvider, ProviderAuthAuthorization, ProviderAuthMethod } from "@opencode-ai/sdk/v2"
 import { DialogModel } from "./dialog-model"
 import { useToast } from "../ui/toast"
 import { isConsoleManagedProvider } from "../util/provider-origin"
 import { useConnected } from "./use-connected"
 import { useBindings } from "../keymap"
 import { useClipboard } from "../context/clipboard"
+import { useLocal } from "../context/local"
 
 const PROVIDER_PRIORITY: Record<string, number> = {
   opencode: 0,
@@ -227,7 +228,137 @@ export function createDialogProviderOptions() {
 
 export function DialogProvider() {
   const options = createDialogProviderOptions()
-  return <DialogSelect title="Connect a provider" options={options()} />
+  return <DialogSelect title="Add provider" options={options()} />
+}
+
+// Wording shared with `lunos providers list/login/logout` (XCOD-130).
+const METHOD_LABEL: Record<ConfiguredProvider["method"], string> = {
+  api: "API key",
+  oauth: "OAuth",
+  wellknown: "well-known",
+  env: "environment",
+  config: "config",
+  custom: "built-in",
+}
+const REGION_LABEL: Record<ConfiguredProvider["jurisdiction"]["region"], string> = {
+  eu: "EU",
+  us: "US",
+  other: "other",
+  configurable: "region: configurable",
+  unknown: "region: unknown",
+}
+const ADD_PROVIDER = "__lunos_add_provider__"
+
+/** The /providers dialog: configured providers with status and jurisdiction, plus Add provider (XCOD-130). */
+export function DialogProviders() {
+  const sdk = useSDK()
+  const dialog = useDialog()
+  const { theme } = useTheme()
+  const [configured] = createResource(async () => (await sdk.client.provider.configured()).data ?? [])
+
+  const options = createMemo(() => [
+    {
+      title: "Add provider",
+      value: ADD_PROVIDER,
+      description: "API key or OAuth login",
+      category: "Actions",
+      onSelect: () => dialog.replace(() => <DialogProvider />),
+    },
+    ...(configured() ?? []).map((item) => ({
+      title: item.name,
+      value: item.id,
+      description: `${METHOD_LABEL[item.method]} · ${item.status}`,
+      footer: REGION_LABEL[item.jurisdiction.region],
+      category: "Configured providers",
+      gutter: () =>
+        item.status === "connected" ? (
+          <text fg={theme.success}>✓</text>
+        ) : item.status === "expired" ? (
+          <text fg={theme.warning}>!</text>
+        ) : (
+          <text fg={theme.error}>✗</text>
+        ),
+      onSelect: () => dialog.replace(() => <DialogProviderActions provider={item} />),
+    })),
+  ])
+
+  return (
+    <DialogSelect
+      title="Providers"
+      placeholder={configured.loading ? "Loading providers…" : undefined}
+      options={options()}
+    />
+  )
+}
+
+function DialogProviderActions(props: { provider: ConfiguredProvider }) {
+  const sdk = useSDK()
+  const sync = useSync()
+  const local = useLocal()
+  const dialog = useDialog()
+  const toast = useToast()
+
+  async function logout() {
+    const result = await sdk.client.auth.remove({ providerID: props.provider.id })
+    if (result.error) {
+      toast.show({ variant: "error", message: `Couldn't log out of ${props.provider.name}` })
+      return
+    }
+    await sdk.client.instance.dispose()
+    await sync.bootstrap()
+    toast.show({ variant: "info", message: `Logged out of ${props.provider.name}` })
+    dialog.replace(() => <DialogProviders />)
+  }
+
+  function setDefault() {
+    const provider = sync.data.provider.find((item) => item.id === props.provider.id)
+    // A chat model the session can actually use: the provider's default only if it is one,
+    // since catalog defaults can be speech or embedding models.
+    const usable = (id: string | undefined) => {
+      const model = id ? provider?.models[id] : undefined
+      return !!model && model.status !== "deprecated" && model.capabilities.toolcall && model.capabilities.output.text
+    }
+    const fallback = sync.data.provider_default[props.provider.id]
+    const modelID = usable(fallback) ? fallback : Object.keys(provider?.models ?? {}).find(usable)
+    if (!modelID) {
+      toast.show({ variant: "error", message: `${props.provider.name} has no models available` })
+      return
+    }
+    local.model.set({ providerID: props.provider.id, modelID }, { recent: true })
+    toast.show({ variant: "info", message: `Model set to ${props.provider.name} ${modelID}` })
+    dialog.clear()
+  }
+
+  return (
+    <DialogSelect
+      title={props.provider.name}
+      options={[
+        {
+          title: "Set as default for model picker",
+          value: "default",
+          description: "Use one of its chat models",
+          onSelect: setDefault,
+        },
+        {
+          title: "Log out",
+          value: "logout",
+          description: props.provider.stored
+            ? "Remove the stored credential"
+            : `Set by ${METHOD_LABEL[props.provider.method]}; remove it there`,
+          onSelect: () => {
+            if (!props.provider.stored) {
+              toast.show({
+                variant: "info",
+                message: `${props.provider.name} is set by ${METHOD_LABEL[props.provider.method]}; remove it there`,
+              })
+              return
+            }
+            void logout()
+          },
+        },
+      ]}
+    />
+  )
 }
 
 interface AutoMethodProps {
@@ -272,7 +403,7 @@ function AutoMethod(props: AutoMethodProps) {
         variant: "error",
         message:
           "name" in result.error && result.error.name === "ProviderAuthOauthCallbackFailed"
-            ? "OAuth authorization failed. Try /connect again."
+            ? "OAuth authorization failed. Try /providers again."
             : JSON.stringify(result.error),
       })
       dialog.clear()
@@ -366,32 +497,8 @@ function ApiMethod(props: ApiMethodProps) {
     <DialogPrompt
       title={props.title}
       placeholder="API key"
-      description={() =>
-        ({
-          opencode: (
-            <box gap={1}>
-              <text fg={theme.textMuted}>
-                OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API
-                key.
-              </text>
-              <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
-              </text>
-            </box>
-          ),
-          "opencode-go": (
-            <box gap={1}>
-              <text fg={theme.textMuted}>
-                OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding models
-                with generous usage limits.
-              </text>
-              <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/go</span> and enable OpenCode Go
-              </text>
-            </box>
-          ),
-        })[props.providerID] ?? undefined
-      }
+      // XCOD-174: no sign-up pitch for upstream's paid OpenCode Zen and Go plans.
+      description={() => undefined}
       onConfirm={async (value) => {
         if (!value) return
         await sdk.client.auth.set({

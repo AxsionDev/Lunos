@@ -5,6 +5,7 @@ import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/l
 import { Location } from "@opencode-ai/core/location"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { effectCmd } from "../../effect-cmd"
+import { writeStdoutEffect } from "../../stdout"
 
 export const V2Command = effectCmd({
   command: "v2",
@@ -27,7 +28,7 @@ export const V2Command = effectCmd({
           ),
         ),
       }
-      process.stdout.write(JSON.stringify(result, null, 2) + EOL)
+      yield* writeStdoutEffect(JSON.stringify(result, null, 2) + EOL)
     }).pipe(
       Effect.withSpan("Cli.debug.v2"),
       Effect.provide(

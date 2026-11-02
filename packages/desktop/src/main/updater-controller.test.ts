@@ -109,3 +109,41 @@ describe("updater controller", () => {
     expect(failed.getState()).toEqual({ status: "ready", version: "2.0.0" })
   })
 })
+
+describe("updater download progress (XCOD-247)", () => {
+  test("publishes whole-percent download progress, then ready, and stops listening", async () => {
+    let listener: ((percent: number) => void) | undefined
+    let unsubscribed = false
+    const controller = createUpdaterController({
+      enabled: true,
+      currentVersion: "1.0.0",
+      backend: {
+        checkForUpdates: async () => ({ isUpdateAvailable: true, updateInfo: { version: "2.0.0" } }),
+        async downloadUpdate() {
+          for (const percent of [0.4, 12.2, 12.9, 57.5, 100]) listener?.(percent)
+        },
+        quitAndInstall() {},
+        onDownloadProgress(next) {
+          listener = next
+          return () => {
+            unsubscribed = true
+          }
+        },
+      },
+      persistence: { get: () => undefined, set() {}, clear() {} },
+      stop: async () => {},
+    })
+    const states: ReturnType<typeof controller.getState>[] = []
+    controller.subscribe((state) => states.push(state))
+    await controller.start()
+    expect(states.filter((state) => state.status === "downloading")).toEqual([
+      { status: "downloading", version: "2.0.0" },
+      { status: "downloading", version: "2.0.0", percent: 0 },
+      { status: "downloading", version: "2.0.0", percent: 12 },
+      { status: "downloading", version: "2.0.0", percent: 57 },
+      { status: "downloading", version: "2.0.0", percent: 100 },
+    ])
+    expect(controller.getState()).toEqual({ status: "ready", version: "2.0.0" })
+    expect(unsubscribed).toBe(true)
+  })
+})

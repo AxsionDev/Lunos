@@ -106,6 +106,98 @@ export function usePromptWorkspace(sessionID?: string) {
     void openWorkspaceSelect({ dialog, sdk, sync, project, toast, onSelect: warp })
   }
 
+  // XCOD-158: `/sandbox` moves the session into a new sandbox (a docker workspace), by warp. File
+  // changes are never copied across: the sandbox starts from the project with your uncommitted
+  // changes, and its own changes come back only when it ends, as sandbox.results says.
+  const sandboxed = () => {
+    const current = project.workspace.current()
+    return current ? project.workspace.get(current)?.type === "docker" : false
+  }
+
+  async function sandbox() {
+    if (sandboxed()) {
+      toast.show({ variant: "warning", message: "This session is already in a sandbox. `/sandbox end` ends it." })
+      return
+    }
+    const selection = { type: "new" as const, workspaceType: "docker", workspaceName: "Docker sandbox" }
+    setSelection(selection)
+    if (!sessionID) {
+      void create(selection)
+      return
+    }
+    const sourceWorkspaceID = project.workspace.current()
+    const workspace = await create(selection)
+    if (!workspace) return
+    const warped = await warpWorkspaceSession({
+      dialog,
+      sdk,
+      sync,
+      project,
+      toast,
+      sourceWorkspaceID,
+      workspaceID: workspace.id,
+      sessionID,
+      copyChanges: false,
+    })
+    if (warped) showNotice(`sandbox ${workspace.name}`)
+  }
+
+  // `/sandbox end`: the session comes back to this machine first (removing a workspace deletes the
+  // sessions still in it), then the sandbox hands its results back and sandbox.on_finish applies.
+  async function endSandbox() {
+    const current = project.workspace.current()
+    const space = current ? project.workspace.get(current) : undefined
+    if (!sessionID || !current || space?.type !== "docker") {
+      toast.show({ variant: "warning", message: "This session isn't in a sandbox." })
+      return
+    }
+    const id = space.name
+    const settings = await sdk.client.config.settings().catch(() => undefined)
+    const known = settings?.data?.sandbox?.known.find((item) => item.id === id)
+    const results = known?.results ?? "branch"
+    const back = await warpWorkspaceSession({
+      dialog,
+      sdk,
+      sync,
+      project,
+      toast,
+      sourceWorkspaceID: current,
+      workspaceID: null,
+      sessionID,
+      copyChanges: false,
+    })
+    if (!back) return
+    setSelection(undefined)
+    toast.show({ variant: "info", message: `Ending sandbox ${id}: handing its results back…` })
+    const removed = await sdk.client.experimental.workspace.remove({ id: current }).catch((error: unknown) => ({
+      error,
+      data: undefined,
+    }))
+    await project.workspace.sync()
+    if (removed.error) {
+      toast.show({
+        variant: "error",
+        message: `Sandbox ${id} couldn't be ended: ${errorMessage(removed.error)}. \`lunos sandbox list\` shows it.`,
+      })
+      return
+    }
+    const folder = known?.source === "folder"
+    const where =
+      known?.workspace === "mount"
+        ? "the agent's changes are already in your working tree (workspace mount)"
+        : folder && results !== "none"
+          ? `the folder isn't a git repository, so nothing was written into it: \`lunos sandbox apply ${id}\` writes the agent's changes`
+          : results === "patch"
+            ? `the agent's changes are in .opencode/sandbox/${id}/changes.patch (git apply)`
+            : results === "none"
+              ? 'its changes weren\'t handed back (sandbox.results is "none")'
+              : `the agent's changes are on branch ${space.branch ?? `lunos/sandbox/${id}`}`
+    toast.show({
+      variant: "success",
+      message: `Sandbox ${id} ended: ${where}. ${folder ? "Its transcript and summary are in Lunos's state folder." : `Transcript and summary in .opencode/sandbox/${id}/.`}`,
+    })
+  }
+
   createEffect(() => {
     if (!creating()) {
       setCreatingDots(3)
@@ -133,5 +225,5 @@ export function usePromptWorkspace(sessionID?: string) {
     }
   })
 
-  return { selection, creating, creatingDots, notice, label, open, warp, clearNotice }
+  return { selection, creating, creatingDots, notice, label, open, warp, clearNotice, sandbox, endSandbox, sandboxed }
 }

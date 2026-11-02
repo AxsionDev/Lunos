@@ -148,7 +148,7 @@ function stateApi(sync: ReturnType<typeof useSync>): TuiPluginApi["state"] {
       return sync.data.part[messageID] ?? []
     },
     lsp() {
-      return sync.data.lsp.map((item) => ({ id: item.id, root: item.root, status: item.status }))
+      return sync.data.lsp.map((item) => ({ id: item.id, root: item.root, status: item.status, reason: item.reason }))
     },
     mcp() {
       return Object.entries(sync.data.mcp)
@@ -326,6 +326,20 @@ export function createTuiApiAdapters(input: Input): Omit<TuiPluginApi, "lifecycl
           ok: false,
           message: "plugins.install is only available in plugin context",
         }
+      },
+      async discover() {
+        return { marketplaceCount: 0, marketplaces: [], plugins: [] }
+      },
+    },
+    marketplace: {
+      async discover() {
+        return { marketplaceCount: 0, marketplaces: [], items: [] }
+      },
+      async plan() {
+        return { ok: false, message: "marketplace.plan is only available in plugin context" }
+      },
+      async install() {
+        return { ok: false, message: "marketplace.install is only available in plugin context" }
       },
     },
     theme: {

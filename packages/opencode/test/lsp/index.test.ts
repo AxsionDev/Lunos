@@ -50,7 +50,30 @@ describe("lsp.spawn", () => {
     { config: { lsp: true } },
   )
 
-  it.instance("does not spawn builtin LSP for files inside instance when LSP is unset", () =>
+  it.instance(
+    "does not spawn builtin LSP for files inside instance when lsp is false",
+    () =>
+      LSP.Service.use((lsp) =>
+        Effect.gen(function* () {
+          const dir = (yield* TestInstance).directory
+          const spy = spyOn(LSPServer.Typescript, "spawn").mockResolvedValue(undefined)
+
+          try {
+            yield* lsp.hover({
+              file: path.join(dir, "src", "inside.ts"),
+              line: 0,
+              character: 0,
+            })
+            expect(spy).toHaveBeenCalledTimes(0)
+          } finally {
+            spy.mockRestore()
+          }
+        }),
+      ),
+    { config: { lsp: false } },
+  )
+
+  it.instance("would spawn builtin LSP for files inside instance when LSP is unset (XCOD-246)", () =>
     LSP.Service.use((lsp) =>
       Effect.gen(function* () {
         const dir = (yield* TestInstance).directory
@@ -62,7 +85,7 @@ describe("lsp.spawn", () => {
             line: 0,
             character: 0,
           })
-          expect(spy).toHaveBeenCalledTimes(0)
+          expect(spy).toHaveBeenCalledTimes(1)
         } finally {
           spy.mockRestore()
         }

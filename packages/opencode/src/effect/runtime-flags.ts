@@ -8,6 +8,10 @@ const positiveInteger = (name: string) =>
     Config.orElse(() => Config.succeed(undefined)),
   )
 const experimental = bool("OPENCODE_EXPERIMENTAL")
+// XCOD-121: LUNOS_OFFLINE turns off every built-in outbound call; see @opencode-ai/core/offline.
+const offline = bool("LUNOS_OFFLINE")
+const orOffline = (name: string) =>
+  Config.all({ offline, direct: bool(name) }).pipe(Config.map((flags) => flags.offline || flags.direct))
 const enabledByExperimental = (name: string) =>
   Config.all({ experimental, enabled: Config.boolean(name).pipe(Config.option) }).pipe(
     Config.map((flags) => Option.getOrElse(flags.enabled, () => flags.experimental)),
@@ -17,9 +21,9 @@ export class Service extends ConfigService.Service<Service>()("@opencode/Runtime
   autoShare: bool("OPENCODE_AUTO_SHARE"),
   pure: bool("OPENCODE_PURE"),
   disableDefaultPlugins: bool("OPENCODE_DISABLE_DEFAULT_PLUGINS"),
-  disableEmbeddedWebUi: bool("OPENCODE_DISABLE_EMBEDDED_WEB_UI"),
+  disableEmbeddedWebUi: orOffline("OPENCODE_DISABLE_EMBEDDED_WEB_UI"),
   disableExternalSkills: bool("OPENCODE_DISABLE_EXTERNAL_SKILLS"),
-  disableLspDownload: bool("OPENCODE_DISABLE_LSP_DOWNLOAD"),
+  disableLspDownload: orOffline("OPENCODE_DISABLE_LSP_DOWNLOAD"),
   disableClaudeCodePrompt: Config.all({
     broad: bool("OPENCODE_DISABLE_CLAUDE_CODE"),
     direct: bool("OPENCODE_DISABLE_CLAUDE_CODE_PROMPT"),

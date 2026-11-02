@@ -1,4 +1,6 @@
-import { Component, Show, createMemo, createResource } from "solid-js"
+import { Component, For, Show, createMemo, createResource } from "solid-js"
+import { stepVolume } from "@opencode-ai/ui/sounds"
+import { UpdaterProgress } from "@/components/updater-progress"
 import { createMediaQuery } from "@solid-primitives/media"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
@@ -67,7 +69,25 @@ const soundSettings = {
     title: "settings.general.sounds.errors.title",
     description: "settings.general.sounds.errors.description",
   },
+  subagent: {
+    action: "settings-sounds-subagent",
+    title: "settings.general.sounds.subagent.title",
+    description: "settings.general.sounds.subagent.description",
+  },
+  question: {
+    action: "settings-sounds-question",
+    title: "settings.general.sounds.question.title",
+    description: "settings.general.sounds.question.description",
+  },
+  waiting: {
+    action: "settings-sounds-waiting",
+    title: "settings.general.sounds.waiting.title",
+    description: "settings.general.sounds.waiting.description",
+  },
 } as const
+/** XCOD-311: the same event order as the TUI's Settings › Notifications & sounds. */
+const soundKinds = ["agent", "subagent", "permissions", "question", "waiting", "errors"] as const
+const volumeSteps = Array.from({ length: 11 }, (_, index) => index / 10)
 
 const PermissionScopeSetting: Component<{ controller: PermissionScopeController }> = (props) => {
   const language = useLanguage()
@@ -81,7 +101,10 @@ const PermissionScopeSetting: Component<{ controller: PermissionScopeController 
           checked={props.controller.accepting()}
           disabled={!props.controller.enabled()}
           onChange={props.controller.set}
-        />
+          hideLabel
+        >
+          {language.t("command.permissions.autoaccept.enable")}
+        </Switch>
       </div>
     </SettingsRowV2>
   )
@@ -150,7 +173,7 @@ const AppearanceSection: Component<{ controller: AppearanceSettingsController }>
           description={
             <>
               {language.t("settings.general.row.theme.description")}{" "}
-              <ExternalLink class="settings-v2-link" href="https://opencode.ai/docs/themes/">
+              <ExternalLink class="settings-v2-link" href="https://docs.lunos.tech/docs/themes/">
                 {language.t("common.learnMore")}
               </ExternalLink>
             </>
@@ -211,16 +234,36 @@ const SoundsSection: Component<{ controller: SoundSettingsController }> = (props
     <div class="settings-v2-section">
       <h3 class="settings-v2-section-title">{language.t("settings.general.section.sounds")}</h3>
       <SettingsListV2>
-        <SoundSetting kind="agent" channel={props.controller.agent} />
-        <SoundSetting kind="permissions" channel={props.controller.permissions} />
-        <SoundSetting kind="errors" channel={props.controller.errors} />
+        <VolumeSetting volume={props.controller.volume} />
+        <For each={soundKinds}>{(kind) => <SoundSetting kind={kind} channel={props.controller[kind]} />}</For>
       </SettingsListV2>
     </div>
   )
 }
 
+const VolumeSetting: Component<{ volume: SoundSettingsController["volume"] }> = (props) => {
+  const language = useLanguage()
+  return (
+    <SettingsRowV2
+      title={language.t("settings.general.sounds.volume.title")}
+      description={language.t("settings.general.sounds.volume.description")}
+    >
+      <SelectV2
+        appearance="inline"
+        data-action="settings-sounds-volume"
+        options={volumeSteps}
+        current={volumeSteps.find((step) => step === stepVolume(props.volume.current()))}
+        label={(step) => `${Math.round(step * 100)}%`}
+        onSelect={(step) => step !== undefined && step !== null && props.volume.select(step)}
+        placement="bottom-end"
+        gutter={6}
+      />
+    </SettingsRowV2>
+  )
+}
+
 const SoundSetting: Component<{
-  kind: "agent" | "permissions" | "errors"
+  kind: (typeof soundKinds)[number]
   channel: SoundSettingsController["agent"]
 }> = (props) => {
   const language = useLanguage()
@@ -341,7 +384,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.general.showReasoningSummaries()}
               onChange={(checked) => settings.general.setShowReasoningSummaries(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.row.reasoningSummaries.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -353,7 +399,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.general.shellToolPartsExpanded()}
               onChange={(checked) => settings.general.setShellToolPartsExpanded(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.row.shellToolPartsExpanded.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -365,7 +414,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.general.editToolPartsExpanded()}
               onChange={(checked) => settings.general.setEditToolPartsExpanded(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.row.editToolPartsExpanded.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -378,7 +430,10 @@ export const SettingsGeneralV2: Component<{
               <Switch
                 checked={settings.general.mobileTitlebarPosition() === "bottom"}
                 onChange={(checked) => settings.general.setMobileTitlebarPosition(checked ? "bottom" : "top")}
-              />
+                hideLabel
+              >
+                {language.t("settings.general.row.mobileTitlebarBottom.title")}
+              </Switch>
             </div>
           </SettingsRowV2>
         </Show>
@@ -399,7 +454,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.general.showFileTree()}
               onChange={(checked) => settings.general.setShowFileTree(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.row.showFileTree.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -411,7 +469,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.general.showSearch()}
               onChange={(checked) => settings.general.setShowSearch(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.row.showSearch.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -423,7 +484,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.general.showStatus()}
               onChange={(checked) => settings.general.setShowStatus(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.row.showStatus.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -435,7 +499,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.general.showCustomAgents()}
               onChange={(checked) => settings.general.setShowCustomAgents(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.row.showCustomAgents.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
       </SettingsListV2>
@@ -455,7 +522,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.notifications.agent()}
               onChange={(checked) => settings.notifications.setAgent(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.notifications.agent.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -467,7 +537,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.notifications.permissions()}
               onChange={(checked) => settings.notifications.setPermissions(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.notifications.permissions.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -479,7 +552,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.notifications.errors()}
               onChange={(checked) => settings.notifications.setErrors(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.notifications.errors.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
       </SettingsListV2>
@@ -499,7 +575,10 @@ export const SettingsGeneralV2: Component<{
             <Switch
               checked={settings.general.releaseNotes()}
               onChange={(checked) => settings.general.setReleaseNotes(checked)}
-            />
+              hideLabel
+            >
+              {language.t("settings.general.row.releaseNotes.title")}
+            </Switch>
           </div>
         </SettingsRowV2>
 
@@ -507,9 +586,12 @@ export const SettingsGeneralV2: Component<{
           title={language.t("settings.updates.row.check.title")}
           description={language.t("settings.updates.row.check.description")}
         >
-          <ButtonV2 size="normal" variant="neutral" disabled={!updater.action().run} onClick={() => updater.run()}>
-            {language.t(updater.action().label)}
-          </ButtonV2>
+          <div class="flex flex-col items-end gap-2">
+            <ButtonV2 size="normal" variant="neutral" disabled={!updater.action().run} onClick={() => updater.run()}>
+              {language.t(updater.action().label)}
+            </ButtonV2>
+            <UpdaterProgress progress={updater.progress()} />
+          </div>
         </SettingsRowV2>
       </SettingsListV2>
     </div>
@@ -527,7 +609,9 @@ export const SettingsGeneralV2: Component<{
             description={language.t("settings.general.row.pinchZoom.description")}
           >
             <div data-action="settings-pinch-zoom">
-              <Switch checked={pinchZoom.latest} onChange={onPinchZoomChange} />
+              <Switch checked={pinchZoom.latest} onChange={onPinchZoomChange} hideLabel>
+                {language.t("settings.general.row.pinchZoom.title")}
+              </Switch>
             </div>
           </SettingsRowV2>
         </SettingsListV2>

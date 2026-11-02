@@ -1,4 +1,5 @@
 import type { TuiPlugin, TuiPluginApi } from "@opencode-ai/plugin/tui"
+import { versionLabel } from "@opencode-ai/core/installation/version"
 import type { BuiltinTuiPlugin } from "../builtins"
 import { createMemo, Match, Show, Switch } from "solid-js"
 import { abbreviateHome } from "../../runtime"
@@ -37,7 +38,8 @@ function Mcp(props: { api: TuiPluginApi }) {
         <text fg={theme().text}>
           <Switch>
             <Match when={err()}>
-              <span style={{ fg: theme().error }}>⊙ </span>
+              {/* XCOD-141: the glyph changes too, so the error doesn't rely on colour alone. */}
+              <span style={{ fg: theme().error }}>✕ </span>
             </Match>
             <Match when={true}>
               <span style={{ fg: count() > 0 ? theme().success : theme().textMuted }}>⊙ </span>
@@ -51,12 +53,14 @@ function Mcp(props: { api: TuiPluginApi }) {
   )
 }
 
+// XCOD-147: the "new version" notice moved out of this footer to the app-wide bottom-right line
+// (component/update-notice.tsx), so it shows on every screen with the version number.
 function Version(props: { api: TuiPluginApi }) {
   const theme = () => props.api.theme.current
 
   return (
     <box flexShrink={0}>
-      <text fg={theme().textMuted}>{props.api.app.version}</text>
+      <text fg={theme().textMuted}>{versionLabel(props.api.app.version)}</text>
     </box>
   )
 }

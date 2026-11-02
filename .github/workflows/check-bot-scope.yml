@@ -19,6 +19,8 @@ permissions:
 jobs:
   bot-scope:
     name: bot-scope
+    # Upstream's guard for its bot/v1-nix-hashes branch, which Lunos doesn't have (XCOD-118).
+    if: github.repository == 'anomalyco/opencode'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

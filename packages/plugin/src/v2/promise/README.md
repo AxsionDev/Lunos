@@ -1,13 +1,15 @@
-# OpenCode V2 Promise Plugin API
+# Lunos v2 Promise Plugin API
 
 The Promise plugin API is the async/await equivalent of `@opencode-ai/plugin/v2/effect`. It grants plugins the same two in-process capabilities:
 
-- `hook` installs behavior at an OpenCode extension point.
+- `hook` installs behavior at a Lunos extension point.
 - `reload` reruns every transform hook for a stateful domain.
 
 The only difference from the Effect API is the async boundary: hook callbacks, hook registration, `reload`, and `Registration.dispose` use Promises instead of Effects.
 
 ## Defining A Plugin
+
+Everything named below (`define`, `PluginContext`, `Plugin`, `Registration`, `Reload`, every `*Draft` and `*Hooks` type) is exported from the package root, so nothing needs a deep import.
 
 ```ts
 import { define } from "@opencode-ai/plugin/v2/promise"
@@ -23,6 +25,8 @@ export const Plugin = define({
   },
 })
 ```
+
+**The setup key is `setup`, not `effect`.** This is deliberate: the key names what you pass. A Promise plugin passes an async function under `setup`. An [Effect plugin](../effect/README.md) passes an Effect-returning function under `effect`. Using the wrong key is a type error at `define(...)`.
 
 Plugin setup registers hooks imperatively. It does not return a hook object.
 
@@ -61,6 +65,8 @@ ctx.skill.transform
 
 ## Runtime Hooks
 
+> **Where these hooks run today.** Lunos sessions still resolve models through the v1 provider (`packages/opencode/src/provider/provider.ts`), not through v2's `AISDK.language()`. v2 `aisdk` runtime hooks therefore don't run for live sessions yet. Prove a hook fires in a real `lunos run` before relying on it; see XCOD-93. `tool` hooks (below) do run in live sessions, through a bridge from the v1 tool dispatch.
+
 Runtime hooks intercept live operations:
 
 ```ts
@@ -75,6 +81,28 @@ await ctx.aisdk.language((event) => {
   event.language = event.sdk.responses(event.model.api.id)
 })
 ```
+
+## Tool Hooks
+
+`ctx.tool` runs hooks around every tool call the agent makes. As with `aisdk`, the keys are the event names:
+
+```ts
+await ctx.tool["execute.before"]((event) => {
+  // event: { tool, sessionID, callID, args } — args is mutable
+  if (event.tool === "bash" && event.args.command.includes("rm -rf")) {
+    throw new Error("blocked: destructive command")
+  }
+})
+
+await ctx.tool["execute.after"]((event) => {
+  // event: { tool, sessionID, callID, args, output: { title, output, metadata } } — output is mutable
+})
+```
+
+- Hooks run sequentially in registration order, and each one sees the mutations of earlier ones.
+- **A throwing or rejecting `execute.before` hook aborts the tool call.** The model sees the error, and the run continues. This is the same behaviour as a rejecting v1 `tool.execute.before` hook, and it is how guard hooks work. Unlike other domains, these callbacks may fail.
+- **Live sessions run these hooks.** Tool calls are still dispatched by the v1 plugin trigger, which runs v1 hooks first (including config `hooks`) and then v2 `ctx.tool` hooks, on the same event. The first tool call of a run waits until every external v2 plugin has loaded, so a guard can't miss it.
+- The key is `ctx.tool["execute.before"](...)`, not `ctx.tool.hook("execute.before", ...)` as the retired PLAN.md sketched. The shape follows the other domains.
 
 ## Reloading A Domain
 

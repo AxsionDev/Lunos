@@ -1,0 +1,6 @@
+<idea-plugin>
+    <actions>
+        <action id="Lunos.OpenTui" class="tech.lunos.ide.ui.OpenTuiAction"
+                text="Open Lunos TUI in Terminal" description="Open the Lunos TUI on the current session in the IDE's terminal"/>
+    </actions>
+</idea-plugin>

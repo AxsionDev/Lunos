@@ -280,6 +280,7 @@ export function readV1Plugin(
     if (mode === "detect") return
     throw new TypeError(`Plugin ${spec} must default export an object with ${kind}()`)
   }
+  if (mode === "detect" && isV2PluginModule(mod)) return
   if (mode === "detect" && !("id" in value) && !("server" in value) && !("tui" in value)) return
 
   const server = "server" in value ? value.server : undefined
@@ -301,6 +302,18 @@ export function readV1Plugin(
   }
 
   return value
+}
+
+export function isV2PluginModule(mod: Record<string, unknown>) {
+  const value = mod.default
+  if (!isRecord(value)) return false
+  return isV2Plugin(value)
+}
+
+function isV2Plugin(value: Record<string, unknown>) {
+  if (typeof value.id !== "string") return false
+  if ("server" in value || "tui" in value) return false
+  return typeof value.setup === "function" || typeof value.effect === "function"
 }
 
 export async function resolvePluginId(

@@ -2,6 +2,8 @@ import { WorkspaceV2 } from "@opencode-ai/core/workspace"
 import type { Target } from "@/control-plane/types"
 import { Workspace } from "@/control-plane/workspace"
 import { WorkspaceAdapterRuntime } from "@/control-plane/workspace-adapter-runtime"
+import { SandboxConfig } from "@/sandbox/config"
+import { SandboxDocker } from "@/sandbox/docker"
 import { Session } from "@/session/session"
 import { HttpApiProxy } from "./proxy"
 import * as Fence from "@/server/shared/fence"
@@ -82,6 +84,12 @@ function selectedV2WorkspaceID(
   if (Option.isNone(workspaceID)) return InvalidWorkspaceID
   return workspaceID.value
 }
+
+// XCOD-158: a session warped into a sandbox (docker workspace) keeps the host's directory, which
+// doesn't exist in the container, and the proxy drops `directory`; there the project is always the
+// sandbox workspace. Checked once: whether this process is a sandbox can't change while it runs.
+let inSandbox: boolean | undefined
+const sandboxed = () => (inSandbox ??= SandboxConfig.inside())
 
 function defaultDirectory(request: HttpServerRequest.HttpServerRequest, url: URL): string {
   return url.searchParams.get("directory") || request.headers["x-opencode-directory"] || process.cwd()
@@ -179,7 +187,8 @@ function planRequest(
     }
 
     return RequestPlan.Local({
-      directory: session?.directory || defaultDirectory(request, url),
+      directory:
+        envWorkspaceID && sandboxed() ? SandboxDocker.WORKSPACE : session?.directory || defaultDirectory(request, url),
       workspaceID: envWorkspaceID ?? workspaceID,
     })
   })

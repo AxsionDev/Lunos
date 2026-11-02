@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        font:
+          13px system-ui,
+          sans-serif;
+        width: 300px;
+        margin: 12px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        margin: 4px 0 8px;
+        font: inherit;
+      }
+      button {
+        font: inherit;
+        padding: 4px 10px;
+      }
+      #stop {
+        background: #e5484d;
+        color: #fff;
+        border: 0;
+        border-radius: 4px;
+      }
+      .muted {
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <p><b>Lunos</b> · <span id="status">…</span></p>
+    <button id="stop">Stop Lunos controlling this browser</button>
+    <hr />
+    <label
+      >Pairing code (from <code>lunos browser pair</code>)<input id="token" type="password" autocomplete="off"
+    /></label>
+    <label>Port<input id="port" type="number" placeholder="47615" /></label>
+    <button id="connect">Connect</button>
+    <p class="muted">
+      Connects to 127.0.0.1 only. Lunos asks you before it acts on each site, and before anything it sends, buys,
+      downloads or deletes.
+    </p>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

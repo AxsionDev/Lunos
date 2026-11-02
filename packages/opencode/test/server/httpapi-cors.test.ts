@@ -1,6 +1,7 @@
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import { Flag } from "@opencode-ai/core/flag/flag"
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
+import { isAllowedCorsOrigin } from "@opencode-ai/server/cors"
 import { Config, ConfigProvider, Effect, Layer } from "effect"
 import { HttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/unstable/http"
 import * as Socket from "effect/unstable/socket/Socket"
@@ -71,14 +72,14 @@ describe("HttpApi CORS", () => {
       const response = yield* Effect.promise(() =>
         handler(
           new Request(new URL("/global/config", "http://localhost"), {
-            headers: { origin: "https://app.opencode.ai" },
+            headers: { origin: "http://localhost:3000" },
           }),
           HttpApiApp.context,
         ),
       )
 
       expect(response.status).toBe(401)
-      expect(response.headers.get("access-control-allow-origin")).toBe("https://app.opencode.ai")
+      expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:3000")
     }),
   )
 
@@ -119,4 +120,12 @@ describe("HttpApi CORS", () => {
       expect(rejected.headers.get("access-control-allow-origin")).not.toBe("https://evil.example")
     }),
   )
+})
+
+describe("CORS origins (XCOD-174)", () => {
+  test("upstream's hosted pages are not trusted by default", () => {
+    expect(isAllowedCorsOrigin(`https://app.${["opencode", "ai"].join(".")}`)).toBe(false)
+    expect(isAllowedCorsOrigin("http://localhost:3000")).toBe(true)
+    expect(isAllowedCorsOrigin("https://custom.example", { cors: ["https://custom.example"] })).toBe(true)
+  })
 })

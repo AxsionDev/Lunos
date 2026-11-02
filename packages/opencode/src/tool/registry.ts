@@ -5,17 +5,29 @@ import { PlanExitTool } from "./plan"
 import { Session } from "@/session/session"
 import { QuestionTool } from "./question"
 import { ShellTool } from "./shell"
+import { ProcessTool } from "./process"
 import { EditTool } from "./edit"
 import { GlobTool } from "./glob"
+import { SecurityScanTool } from "./security_scan"
 import { GrepTool } from "./grep"
 import { ReadTool } from "./read"
-import { TaskTool } from "./task"
+import { TaskTool, withBackground, withModelParameter } from "./task"
+import { backgroundEnabled } from "@/background/enabled"
+import { ToolJsonSchema } from "./json-schema"
+import { Residency } from "@opencode-ai/core/residency"
+import { SubagentModel } from "../agent/subagent-model"
 import { Database } from "@opencode-ai/core/database/database"
 import { TodoWriteTool } from "./todo"
 import { WebFetchTool } from "./webfetch"
+import { BrowserTool } from "./browser"
+import { ConfigBrowser } from "@opencode-ai/core/config/browser"
+import { ComputerTool } from "./computer"
+import { ConfigComputer } from "@opencode-ai/core/config/computer"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
 import { SkillTool } from "./skill"
+import { ProjectResourcesSearchTool } from "./project-resources-search"
+import { Resource } from "@/resource"
 import * as Tool from "./tool"
 import { Config } from "@/config/config"
 import { type ToolContext as PluginToolContext, type ToolDefinition } from "@opencode-ai/plugin"
@@ -26,6 +38,7 @@ import { Plugin } from "../plugin"
 import { Provider } from "@/provider/provider"
 
 import { WebSearchTool } from "./websearch"
+import { ExternalAgentTool } from "./external"
 import { LspTool } from "./lsp"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
@@ -54,6 +67,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { MCP } from "@/mcp"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { McpCatalog } from "@/mcp/catalog"
+import { Offline } from "@opencode-ai/core/offline"
 
 export function webSearchEnabled(providerID: ProviderV2.ID, flags = { exa: false, parallel: false }) {
   return (
@@ -83,6 +97,8 @@ export interface Interface {
     modelID: ModelV2.ID
     agent: Agent.Info
     permission?: PermissionV1.Ruleset
+    /** XCOD-300: so a resource excluded for this session doesn't count as searchable. */
+    sessionID?: string
   }) => Effect.Effect<Tool.Def[]>
 }
 
@@ -106,14 +122,21 @@ const layer = Layer.effect(
     const lsptool = yield* LspTool
     const plan = yield* PlanExitTool
     const webfetch = yield* WebFetchTool
+    const browser = yield* BrowserTool
+    const computer = yield* ComputerTool
     const websearch = yield* WebSearchTool
+    const externalAgent = yield* ExternalAgentTool
     const shell = yield* ShellTool
+    const processTool = yield* ProcessTool
     const globtool = yield* GlobTool
+    const securityScan = yield* SecurityScanTool
     const writetool = yield* WriteTool
     const edit = yield* EditTool
     const greptool = yield* GrepTool
     const patchtool = yield* ApplyPatchTool
     const skilltool = yield* SkillTool
+    const resourceSearch = yield* ProjectResourcesSearchTool
+    const resources = yield* Resource.Service
     const agent = yield* Agent.Service
     const codeMode = flags.experimentalCodeMode ? yield* Effect.promise(() => import("./code-mode")) : undefined
     const codeModeTool = codeMode ? yield* codeMode.CodeModeTool : undefined
@@ -203,26 +226,32 @@ const layer = Layer.effect(
           }
         }
 
-        yield* config.get()
+        const cfg = yield* config.get()
         const questionEnabled = ["app", "cli", "desktop"].includes(flags.client) || flags.enableQuestionTool
 
         const tool = yield* Effect.all({
           invalid: Tool.init(invalid),
           shell: Tool.init(shell),
+          process: Tool.init(processTool),
           read: Tool.init(read),
           glob: Tool.init(globtool),
+          securityScan: Tool.init(securityScan),
           grep: Tool.init(greptool),
           edit: Tool.init(edit),
           write: Tool.init(writetool),
           task: Tool.init(task),
           fetch: Tool.init(webfetch),
+          browser: Tool.init(browser),
+          computer: Tool.init(computer),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
           skill: Tool.init(skilltool),
+          resources: Tool.init(resourceSearch),
           patch: Tool.init(patchtool),
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
           plan: Tool.init(plan),
+          external: Tool.init(externalAgent),
           ...(codeModeTool ? { execute: Tool.init(codeModeTool) } : {}),
         })
 
@@ -232,18 +261,33 @@ const layer = Layer.effect(
             tool.invalid,
             ...(questionEnabled ? [tool.question] : []),
             tool.shell,
+            // XCOD-288: manages what the shell tool started with `background: true`.
+            tool.process,
             tool.read,
             tool.glob,
             tool.grep,
             tool.edit,
             tool.write,
             tool.task,
-            tool.fetch,
+            // Offline mode (XCOD-121) doesn't offer the tools that reach the internet.
+            ...(Offline.enabled() ? [] : [tool.fetch]),
+            // XCOD-327: offered only while browser control is on in the live config (tools() below).
+            ...(Offline.enabled() ? [] : [tool.browser]),
+            // XCOD-339: offered only while computer control is on in the live config (tools() below).
+            tool.computer,
             tool.todo,
-            tool.search,
+            ...(Offline.enabled() ? [] : [tool.search]),
             tool.skill,
+            // XCOD-300: offered only while the project has searchable resources (tools() below).
+            tool.resources,
             tool.patch,
+            // XCOD-334: /security-review's re-review after fixes; read-only.
+            tool.securityScan,
             ...(tool.execute ? [tool.execute] : []),
+            // XCOD-204: opt-in, and never offline (it sends the task to the tool's vendor).
+            ...(cfg.external?.delegate === true && cfg.external.enabled !== false && !Offline.enabled()
+              ? [tool.external]
+              : []),
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
             ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
           ],
@@ -263,7 +307,7 @@ const layer = Layer.effect(
     })
 
     const describeTask = Effect.fn("ToolRegistry.describeTask")(function* (agent: Agent.Info) {
-      const items = (yield* agents.list()).filter((item) => item.mode !== "primary")
+      const items = (yield* agents.list()).filter((item) => Agent.dispatchable(item))
       const filtered = items.filter(
         (item) => Permission.evaluate("task", item.name, agent.permission).action !== "deny",
       )
@@ -289,7 +333,18 @@ const layer = Layer.effect(
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
+      const searchable = yield* resources.searchable(input.sessionID ?? "").pipe(Effect.orElseSucceed(() => false))
+      // XCOD-327: off by default, and absent while the organisation's policy (a locked
+      // `browser.enabled`) or the user's setting has it off.
+      const live = yield* config.get()
+      const browsing = ConfigBrowser.enabled(live.browser)
+      // XCOD-339: the same for computer control (`computer.enabled`).
+      const computing = ConfigComputer.enabled(live.computer)
       const filtered = (yield* all()).filter((tool) => {
+        if (tool.id === ProjectResourcesSearchTool.id) return searchable
+        if (tool.id === BrowserTool.id) return browsing
+        if (tool.id === ComputerTool.id) return computing
+
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
         }
@@ -301,6 +356,11 @@ const layer = Layer.effect(
 
         return true
       })
+
+      // XCOD-82: allowed per-task models, minus any the residency policy would deny.
+      const cfg = yield* config.get()
+      const subagentModels = SubagentModel.allowed(cfg, Residency.resolve(cfg.residency))
+      const background = backgroundEnabled(flags.experimentalBackgroundSubagents, cfg)
 
       const codeModeDescription = filtered.some((tool) => tool.id === "execute")
         ? yield* describeCodeMode(input)
@@ -316,14 +376,27 @@ const layer = Layer.effect(
             jsonSchema: tool.jsonSchema,
           }
           yield* plugin.trigger("tool.definition", { toolID: tool.id }, output)
-          const jsonSchema =
+          const pluginSchema =
             output.parameters === tool.parameters || output.jsonSchema !== tool.jsonSchema
               ? output.jsonSchema
               : undefined
+          const modelSchema =
+            tool.id === TaskTool.id && subagentModels.length
+              ? withModelParameter(pluginSchema ?? ToolJsonSchema.fromTool(tool), subagentModels)
+              : pluginSchema
+          // XCOD-287: no background parameter when background subagents are off in the live config.
+          const task =
+            tool.id === TaskTool.id
+              ? withBackground(
+                  { description: output.description, schema: modelSchema ?? ToolJsonSchema.fromTool(tool) },
+                  background,
+                )
+              : undefined
+          const jsonSchema = task && !background ? task.schema : modelSchema
           return {
             id: tool.id,
             description: [
-              output.description,
+              task?.description ?? output.description,
               tool.id === TaskTool.id ? yield* describeTask(input.agent) : undefined,
               tool.id === "execute" ? codeModeDescription : undefined,
             ]
@@ -449,6 +522,8 @@ export const node = LayerNode.make({
     MCP.node,
     Database.node,
     Ripgrep.node,
+    Resource.node,
+    Permission.node,
   ],
 })
 

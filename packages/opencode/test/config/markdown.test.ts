@@ -226,3 +226,36 @@ describe("ConfigMarkdown: frontmatter has weird model id", async () => {
     expect(result.content.trim()).toBe("Strictly follow da rules")
   })
 })
+
+// XCOD-208: a project agent file whose front matter isn't YAML or JSON is refused by name.
+describe("ConfigMarkdown: non-YAML front matter in a project file", () => {
+  test("a ---js agent file fails with the file's path and is skipped", async () => {
+    const os = await import("node:os")
+    const fs = await import("node:fs/promises")
+    const path = await import("node:path")
+    const { ConfigAgent } = await import("@/config/agent")
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "xcod-208-"))
+    const probe = globalThis as { __xcod208?: string }
+    try {
+      const file = path.join(dir, "agents", "evil.md")
+      await fs.mkdir(path.dirname(file), { recursive: true })
+      await fs.writeFile(
+        file,
+        '---js\n{ name: (globalThis.__xcod208 = "ran", "evil"), description: "d" }\n---\nprompt\n',
+      )
+      const error = await ConfigMarkdown.parse(file).then(
+        () => undefined,
+        (err: { data?: { path?: string; message?: string } }) => err,
+      )
+      expect(error?.data?.path).toBe(file)
+      expect(error?.data?.message).toContain("YAML or JSON")
+      // The agent loader skips the file instead of evaluating it.
+      expect(await ConfigAgent.load(dir)).toEqual({})
+      expect(await ConfigAgent.loadClaude(dir, () => {})).toEqual({})
+      expect(probe.__xcod208).toBeUndefined()
+    } finally {
+      delete probe.__xcod208
+      await fs.rm(dir, { recursive: true, force: true })
+    }
+  })
+})

@@ -19,7 +19,8 @@ import {
   upsertTheme,
   type ThemeJson,
 } from "../theme"
-import { createEffect, createMemo, onCleanup, onMount } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import * as ProjectTheme from "../util/project-theme"
 import { createStore, produce } from "solid-js/store"
 import { createSimpleContext } from "./helper"
 import { useKV } from "./kv"
@@ -62,6 +63,7 @@ export async function discoverThemes(directories: string[]) {
 
 export {
   DEFAULT_THEMES,
+  EXTERNAL_ACCENTS,
   addTheme,
   allThemes,
   generateSubtleSyntax,
@@ -93,7 +95,7 @@ const [store, setStore] = createStore<State>({
   themes: allThemes(),
   mode: "dark",
   lock: undefined,
-  active: "opencode",
+  active: "catppuccin",
   ready: false,
 })
 
@@ -118,8 +120,8 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         if (!lock && pick(kv.get("theme_mode")) !== undefined) kv.set("theme_mode", undefined)
         draft.mode = mode
         draft.lock = lock
-        const active = config.theme ?? kv.get("theme", "opencode")
-        draft.active = typeof active === "string" ? active : "opencode"
+        const active = config.theme ?? kv.get("theme", "catppuccin")
+        draft.active = typeof active === "string" ? active : "catppuccin"
         draft.ready = false
       }),
     )
@@ -140,11 +142,17 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
             }, {}),
           )
         })
-        .catch(() => setStore("active", "opencode"))
+        .catch(() => setStore("active", "catppuccin"))
     }
 
     onMount(() => {
-      void Promise.allSettled([resolveSystemTheme(store.mode), syncCustomThemes()]).finally(() => {
+      const system = resolveSystemTheme(store.mode)
+      const custom = syncCustomThemes()
+      // XCOD-276: the first frame waits only for what the active theme is made of: the terminal's
+      // palette for "system" (a terminal that doesn't answer costs its whole timeout), the theme files
+      // for a custom theme. Otherwise both arrive behind it.
+      const wait = [store.active === "system" ? system : undefined, hasTheme(store.active) ? undefined : custom]
+      void Promise.allSettled(wait).finally(() => {
         setStore("ready", true)
       })
     })
@@ -159,7 +167,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
           if (!colors.palette[0]) {
             if (hasResolvedSystemTheme) return
             setSystemTheme(undefined)
-            if (store.active === "system") setStore("active", "opencode")
+            if (store.active === "system") setStore("active", "catppuccin")
             return
           }
           const next = store.lock ?? terminalMode(colors) ?? mode
@@ -174,7 +182,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         .catch(() => {
           if (hasResolvedSystemTheme) return
           setSystemTheme(undefined)
-          if (store.active === "system") setStore("active", "opencode")
+          if (store.active === "system") setStore("active", "catppuccin")
         })
     }
 
@@ -253,8 +261,28 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       themeRefreshTimeouts.length = 0
     })
 
+    // XCOD-306: the project the active session counts in, and its theme. Never saved here: the
+    // global choice (`active`, kv `theme`, tui.json) stays what /settings and /theme show for all
+    // projects, and the project's own theme sits on top of it while one of its sessions is open.
+    const [project, setProject] = createSignal<{ ref: ProjectTheme.ProjectRef; shared?: string; locked?: boolean }>()
+    // A theme shown while it's picked (/theme moving through the list), over everything else.
+    const [preview, setPreview] = createSignal<string>()
+    const projectTheme = createMemo(() => {
+      const current = project()
+      if (!current) return undefined
+      const personal = kv.get(ProjectTheme.personalKey(current.ref.key))
+      return ProjectTheme.resolveProjectTheme({
+        personal: typeof personal === "string" ? personal : undefined,
+        shared: current.shared,
+        global: store.active,
+        locked: current.locked,
+        has: (name) => !!store.themes[name],
+      })
+    })
+    const shown = createMemo(() => preview() ?? projectTheme()?.theme ?? store.active)
+
     const values = createMemo(() => {
-      const active = store.themes[store.active]
+      const active = store.themes[shown()]
       if (active) return resolveTheme(active, store.mode)
 
       const saved = kv.get("theme")
@@ -263,7 +291,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         if (theme) return resolveTheme(theme, store.mode)
       }
 
-      return resolveTheme(store.themes.opencode, store.mode)
+      return resolveTheme(store.themes.catppuccin, store.mode)
     })
 
     createEffect(() => renderer.setBackgroundColor(values().background))
@@ -295,6 +323,29 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         setStore("active", theme)
         kv.set("theme", theme)
         return true
+      },
+      /** XCOD-306: shows a theme without choosing it (undefined: back to the chosen one). */
+      preview(theme: string | undefined) {
+        setPreview(theme && hasTheme(theme) ? theme : undefined)
+      },
+      /** The theme on screen: a preview, the project's, or the global one. */
+      get shown() {
+        return shown()
+      },
+      /** XCOD-306: the active session's project; undefined outside a project's session. */
+      project: () => project()?.ref,
+      setProject(input: { ref: ProjectTheme.ProjectRef; shared?: string; locked?: boolean } | undefined) {
+        setProject(input)
+      },
+      /** Which theme the project uses and why, while one is active. */
+      projectTheme: () => projectTheme(),
+      /** "Just me": this project's theme on this computer (undefined clears it). */
+      setPersonal(projectKey: string, theme: string | undefined) {
+        kv.set(ProjectTheme.personalKey(projectKey), theme)
+      },
+      personal(projectKey: string) {
+        const value = kv.get(ProjectTheme.personalKey(projectKey))
+        return typeof value === "string" ? value : undefined
       },
       get ready() {
         return store.ready

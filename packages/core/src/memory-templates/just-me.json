@@ -1,0 +1,8 @@
+{
+  "name": "just-me",
+  "title": "Just me, on this computer",
+  "description": "Memory on this computer, with the fact ledger encrypted by a key in your OS keychain.",
+  "leaves": "the fact text, to your model, to pull out names and relationships",
+  "requires": [],
+  "memory": { "backend": { "type": "embedded" }, "encryption": "os-keychain" }
+}

@@ -49,8 +49,11 @@ const GlobalEventSchema = Schema.Struct({
 }).annotate({ identifier: "GlobalEvent" })
 
 export const GlobalUpgradeInput = Schema.Struct({
-  target: Schema.String.check(
-    Schema.makeFilter((value) => (semver.valid(value) === null ? "Expected a semantic version" : undefined)),
+  // Omitted means "the latest published Lunos release", which is what the TUI's /upgrade asks for.
+  target: Schema.optional(
+    Schema.String.check(
+      Schema.makeFilter((value) => (semver.valid(value) === null ? "Expected a semantic version" : undefined)),
+    ),
   ),
 })
 
@@ -65,12 +68,43 @@ const GlobalUpgradeResult = Schema.Union([
   }),
 ])
 
+// XCOD-312: what this machine was last told about the Lunos account being disabled (CloudDisabled):
+// the reason category and the end, never the free-text reason. No `disabled` when it isn't, or where
+// this start needs no Lunos account.
+const GlobalAccount = Schema.Struct({
+  disabled: Schema.optional(
+    Schema.Struct({
+      category: Schema.optional(Schema.Literals(["abuse", "security", "terms", "payment", "offboarding", "other"])),
+      until: Schema.optional(Schema.String),
+    }),
+  ),
+}).annotate({ identifier: "GlobalAccount" })
+
+// XCOD-318: the desktop and web app's Feedback button. Sent on to Lunos Cloud with this machine's
+// sign-in (CloudBeta.feedback): the text, an optional screenshot, the version and OS, and the session
+// id only with `consent: true`. Never a transcript: there is no field for one.
+export const GlobalFeedbackInput = Schema.Struct({
+  text: Schema.String,
+  source: Schema.Literals(["app", "desktop"]),
+  consent: Schema.Boolean,
+  sessionId: Schema.optional(Schema.String),
+  os: Schema.optional(Schema.String),
+  screenshot: Schema.optional(Schema.Struct({ type: Schema.String, data: Schema.String })),
+}).annotate({ identifier: "GlobalFeedbackInput" })
+
+const GlobalFeedbackResult = Schema.Union([
+  Schema.Struct({ success: Schema.Literal(true), sessionShared: Schema.Boolean }),
+  Schema.Struct({ success: Schema.Literal(false), error: Schema.String }),
+]).annotate({ identifier: "GlobalFeedbackResult" })
+
 export const GlobalPaths = {
   health: "/global/health",
   event: "/global/event",
   config: "/global/config",
   dispose: "/global/dispose",
   upgrade: "/global/upgrade",
+  account: "/global/account",
+  feedback: "/global/feedback",
 } as const
 
 export const GlobalApi = HttpApi.make("global").add(
@@ -123,6 +157,28 @@ export const GlobalApi = HttpApi.make("global").add(
           description: "Clean up and dispose all OpenCode instances, releasing all resources.",
         }),
       ),
+      HttpApiEndpoint.get("account", GlobalPaths.account, {
+        success: described(GlobalAccount, "The Lunos account's state on this machine"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.account.get",
+          summary: "Get the Lunos account's state",
+          description:
+            "Whether this machine was told the Lunos account is disabled, with the reason category and the end date. Reads this machine's record only.",
+        }),
+      ),
+      HttpApiEndpoint.post("feedback", GlobalPaths.feedback, {
+        payload: GlobalFeedbackInput,
+        success: described(GlobalFeedbackResult, "Whether Lunos Cloud took the feedback"),
+        error: HttpApiError.BadRequest,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "global.feedback",
+          summary: "Send feedback to the Lunos team",
+          description:
+            "Sends feedback to Lunos Cloud with this machine's sign-in: the text, an optional screenshot, the Lunos version and OS, and the session id only when consent is true. Never a transcript.",
+        }),
+      ),
       HttpApiEndpoint.post("upgrade", GlobalPaths.upgrade, {
         payload: GlobalUpgradeInput,
         success: described(GlobalUpgradeResult, "Upgrade result"),
@@ -130,8 +186,8 @@ export const GlobalApi = HttpApi.make("global").add(
       }).annotateMerge(
         OpenApi.annotations({
           identifier: "global.upgrade",
-          summary: "Upgrade opencode",
-          description: "Upgrade opencode to the specified version.",
+          summary: "Upgrade Lunos",
+          description: "Upgrade Lunos to the specified version, or to the latest release when no target is given.",
         }),
       ),
     )

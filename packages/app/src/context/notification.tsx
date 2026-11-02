@@ -12,6 +12,7 @@ import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
 import { Persist, persisted } from "@/utils/persist"
 import { playSoundById } from "@/utils/sound"
+import { doneSound, soundChoices } from "@/utils/sound-events"
 import { useGlobal } from "./global"
 import { ServerConnection, useServer } from "./server"
 import { type DraftTab, useTabs } from "./tabs"
@@ -340,11 +341,10 @@ function createServerNotificationState(input: {
     void lookup(directory, sessionID).then((session) => {
       if (meta.disposed) return
       if (!session) return
+      // XCOD-311: a subagent finishing plays "Subagent finished" (off by default) and nothing else.
+      const sound = doneSound(!!session.parentID, soundChoices(settings.sounds))
+      if (sound) void playSoundById(sound, settings.sounds.volume())
       if (session.parentID) return
-
-      if (settings.sounds.agentEnabled()) {
-        void playSoundById(settings.sounds.agent())
-      }
 
       append({
         directory,
@@ -374,7 +374,7 @@ function createServerNotificationState(input: {
       if (session?.parentID) return
 
       if (settings.sounds.errorsEnabled()) {
-        void playSoundById(settings.sounds.errors())
+        void playSoundById(settings.sounds.errors(), settings.sounds.volume())
       }
 
       const error = "error" in event.properties ? event.properties.error : undefined

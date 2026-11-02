@@ -24,39 +24,37 @@ async function setup() {
     timeout: session("timeout", "Timeout session"),
   }
 
-  await Notifications.tui(
-    createTuiPluginApi({
-      attention: {
-        async notify(input) {
-          notifications.push(input)
-          return { ok: true, notification: true, sound: true }
-        },
+  const api = createTuiPluginApi({
+    attention: {
+      async notify(input) {
+        notifications.push(input)
+        return { ok: true, notification: true, sound: true }
       },
-      event: {
-        on: <Type extends Event["type"]>(type: Type, handler: (event: Extract<Event, { type: Type }>) => void) => {
-          const list = handlers.get(type) ?? []
-          const wrapped = handler as (event: Event) => void
-          list.push(wrapped)
-          handlers.set(type, list)
-          return () => {
-            handlers.set(
-              type,
-              (handlers.get(type) ?? []).filter((item) => item !== wrapped),
-            )
-          }
-        },
+    },
+    event: {
+      on: <Type extends Event["type"]>(type: Type, handler: (event: Extract<Event, { type: Type }>) => void) => {
+        const list = handlers.get(type) ?? []
+        const wrapped = handler as (event: Event) => void
+        list.push(wrapped)
+        handlers.set(type, list)
+        return () => {
+          handlers.set(
+            type,
+            (handlers.get(type) ?? []).filter((item) => item !== wrapped),
+          )
+        }
       },
-      state: {
-        session: {
-          get: (sessionID: string) => sessions[sessionID],
-        },
+    },
+    state: {
+      session: {
+        get: (sessionID: string) => sessions[sessionID],
       },
-    }),
-    undefined,
-    {} as never,
-  )
+    },
+  })
+  await Notifications.tui(api, undefined, {} as never)
 
   return {
+    api,
     notifications,
     emit(event: Event) {
       for (const handler of handlers.get(event.type) ?? []) handler(event)
@@ -165,7 +163,7 @@ describe("internal notifications TUI plugin", () => {
     ])
   })
 
-  test("uses sound-only notifications and subagent_done sound for subagent sessions", async () => {
+  test("uses sound-only notifications, the waiting sound for asks and subagent_done for subagent sessions", async () => {
     const harness = await setup()
 
     harness.emit({ id: "event-1", type: "question.asked", properties: question("question-1", "subagent") })
@@ -185,7 +183,8 @@ describe("internal notifications TUI plugin", () => {
         title: "Subagent session",
         message: "Question needs input",
         notification: false,
-        sound: { name: "question", when: "always" },
+        // XCOD-311: a subagent blocked on you is "Waiting for action", one sound per ask.
+        sound: { name: "waiting", when: "always" },
       },
       {
         title: "Subagent session",
@@ -261,6 +260,69 @@ describe("internal notifications TUI plugin", () => {
         message: "Model stopped responding",
         notification: { when: "blurred" },
         sound: { name: "error", when: "always" },
+      },
+    ])
+  })
+
+  // XCOD-311: the Notifications sub-tab's options, read on every alert.
+  test("notifies always, and for a finishing subagent, when the settings say so", async () => {
+    const harness = await setup()
+    // The plugin API's view is read-only; /settings updates the same object in the running app.
+    Object.assign(harness.api.tuiConfig.attention, { notify_when: "always", notify_subagents: true })
+
+    harness.emit({ id: "event-1", type: "permission.asked", properties: permission("permission-1", "subagent") })
+    harness.emit({
+      id: "event-2",
+      type: "session.status",
+      properties: { sessionID: "subagent", status: { type: "busy" } },
+    })
+    harness.emit({
+      id: "event-3",
+      type: "session.status",
+      properties: { sessionID: "subagent", status: { type: "idle" } },
+    })
+    harness.emit({ id: "event-4", type: "question.asked", properties: question("question-1") })
+
+    expect(harness.notifications).toEqual([
+      // A subagent's ask still doesn't notify: the option is about it finishing.
+      {
+        title: "Subagent session",
+        message: "Permission needs input",
+        notification: false,
+        sound: { name: "waiting", when: "always" },
+      },
+      {
+        title: "Subagent session",
+        message: "Session done",
+        notification: { when: "always" },
+        sound: { name: "subagent_done", when: "always" },
+      },
+      { ...questionNotification, notification: { when: "always" } },
+    ])
+  })
+
+  test("plays the budget warning sound for the server's budget warnings, not its refusals", async () => {
+    const harness = await setup()
+    const toast = (variant: "warning" | "error", message: string): Event => ({
+      id: `toast-${message}`,
+      type: "tui.toast.show",
+      properties: { title: "Budget", message, variant, duration: 10000 },
+    })
+
+    harness.emit(toast("warning", "Demo has used 80% of its October budget"))
+    harness.emit(toast("error", "Demo is over its budget"))
+    harness.emit({
+      id: "toast-other",
+      type: "tui.toast.show",
+      properties: { title: "Other", message: "Unrelated", variant: "warning" },
+    })
+
+    expect(harness.notifications).toEqual([
+      {
+        title: "Budget",
+        message: "Demo has used 80% of its October budget",
+        notification: { when: "blurred" },
+        sound: { name: "budget_warning", when: "always" },
       },
     ])
   })

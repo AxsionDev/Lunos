@@ -1,0 +1,3 @@
+# XCOD-185: the old realm bundle, written and deleted by lunos-idp.test.ts. Not *-realm.json: Keycloak
+# requires such a file to be named after its realm.
+.old-lunos.json

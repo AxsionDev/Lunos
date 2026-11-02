@@ -179,7 +179,7 @@ function extractTextFromHTML(html: string) {
   return text.trim()
 }
 
-function convertHTMLToMarkdown(html: string): string {
+export function convertHTMLToMarkdown(html: string): string {
   const turndownService = new TurndownService({
     headingStyle: "atx",
     hr: "---",

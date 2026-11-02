@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Lunos organisation policy for macOS, delivered by MDM (Jamf, Intune, Kandji, …).
+     Same content as managed.json. Replace the two PayloadUUIDs with your own (uuidgen). -->
+<plist version="1.0">
+  <dict>
+    <key>PayloadContent</key>
+    <array>
+      <dict>
+        <key>PayloadType</key>
+        <string>tech.lunos.managed</string>
+        <key>PayloadIdentifier</key>
+        <string>tech.lunos.managed.policy</string>
+        <key>PayloadUUID</key>
+        <string>6F1B8E0A-3C2D-4B7E-9A51-0D2E4C8B7F10</string>
+        <key>PayloadVersion</key>
+        <integer>1</integer>
+        <key>PayloadDisplayName</key>
+        <string>Lunos policy</string>
+        <key>$locked</key>
+        <array>
+          <string>residency</string>
+          <string>share</string>
+          <string>enabled_providers</string>
+          <string>marketplace_default</string>
+          <string>marketplace_allow</string>
+          <string>autoupdate</string>
+        </array>
+        <key>residency</key>
+        <dict>
+        <key>allow</key>
+          <array>
+            <string>eu</string>
+          </array>
+        <key>audit</key>
+          <true/>
+        </dict>
+        <key>share</key>
+        <string>disabled</string>
+        <key>enabled_providers</key>
+        <array>
+          <string>mistral</string>
+        </array>
+        <key>marketplace_default</key>
+        <true/>
+        <key>marketplace_allow</key>
+        <array>
+          <string>https://lunos.tech/marketplace.json</string>
+        </array>
+        <key>autoupdate</key>
+        <string>notify</string>
+      </dict>
+    </array>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadIdentifier</key>
+    <string>tech.lunos.managed.profile</string>
+    <key>PayloadUUID</key>
+    <string>A3C9D5E1-7B24-4F68-8E0D-5C1A9B2E6F34</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+    <key>PayloadDisplayName</key>
+    <string>Lunos organisation policy</string>
+    <key>PayloadScope</key>
+    <string>System</string>
+  </dict>
+</plist>

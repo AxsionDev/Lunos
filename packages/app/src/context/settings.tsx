@@ -3,6 +3,7 @@ import { batch, createEffect, createMemo, createSignal, onCleanup } from "solid-
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { persisted } from "@/utils/persist"
 import { usePlatform } from "@/context/platform"
+import { DEFAULT_SOUNDS, stepVolume } from "@opencode-ai/ui/sounds"
 
 export interface NotificationSettings {
   agent: boolean
@@ -17,6 +18,15 @@ export interface SoundSettings {
   permissions: string
   errorsEnabled: boolean
   errors: string
+  // XCOD-311: the events the TUI also has, and volume. Off by default: the app played nothing for
+  // them before, and played at full volume.
+  subagentEnabled: boolean
+  subagent: string
+  questionEnabled: boolean
+  question: string
+  waitingEnabled: boolean
+  waiting: string
+  volume: number
 }
 
 export interface Settings {
@@ -218,6 +228,13 @@ const defaultSettings: Settings = {
     permissions: "staplebops-02",
     errorsEnabled: true,
     errors: "nope-03",
+    subagentEnabled: false,
+    subagent: DEFAULT_SOUNDS.subagent_done,
+    questionEnabled: false,
+    question: DEFAULT_SOUNDS.question,
+    waitingEnabled: false,
+    waiting: DEFAULT_SOUNDS.waiting,
+    volume: 1,
   },
 }
 
@@ -540,6 +557,34 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         errors: withFallback(() => store.sounds?.errors, defaultSettings.sounds.errors),
         setErrors(value: string) {
           setStore("sounds", "errors", value)
+        },
+        subagentEnabled: withFallback(() => store.sounds?.subagentEnabled, defaultSettings.sounds.subagentEnabled),
+        setSubagentEnabled(value: boolean) {
+          setStore("sounds", "subagentEnabled", value)
+        },
+        subagent: withFallback(() => store.sounds?.subagent, defaultSettings.sounds.subagent),
+        setSubagent(value: string) {
+          setStore("sounds", "subagent", value)
+        },
+        questionEnabled: withFallback(() => store.sounds?.questionEnabled, defaultSettings.sounds.questionEnabled),
+        setQuestionEnabled(value: boolean) {
+          setStore("sounds", "questionEnabled", value)
+        },
+        question: withFallback(() => store.sounds?.question, defaultSettings.sounds.question),
+        setQuestion(value: string) {
+          setStore("sounds", "question", value)
+        },
+        waitingEnabled: withFallback(() => store.sounds?.waitingEnabled, defaultSettings.sounds.waitingEnabled),
+        setWaitingEnabled(value: boolean) {
+          setStore("sounds", "waitingEnabled", value)
+        },
+        waiting: withFallback(() => store.sounds?.waiting, defaultSettings.sounds.waiting),
+        setWaiting(value: string) {
+          setStore("sounds", "waiting", value)
+        },
+        volume: withFallback(() => store.sounds?.volume, defaultSettings.sounds.volume),
+        setVolume(value: number) {
+          setStore("sounds", "volume", stepVolume(value))
         },
       },
     }

@@ -1,0 +1,6 @@
+{
+  "bun": "1.4.4",
+  "source": "oven-sh/bun at tag bun-v1.4.4: scripts/build/deps/webkit.ts (WEBKIT_VERSION) and scripts/build/deps/tinycc.ts (TINYCC_COMMIT)",
+  "webkit": "d6375c72affe0f70222cdcb45012b10f0bf3a9d5",
+  "tinycc": "05f0fafaa3be31e31d7b4b5c17dc60f62c991171"
+}

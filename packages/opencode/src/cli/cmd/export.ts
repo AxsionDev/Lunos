@@ -160,7 +160,7 @@ function part(part: SessionV1.Part): SessionV1.Part {
 
 const partFn = part
 
-function sanitize(data: { info: Session.Info; messages: SessionV1.WithParts[] }) {
+export function sanitize(data: { info: Session.Info; messages: SessionV1.WithParts[] }) {
   return {
     info: {
       ...data.info,

@@ -1,5 +1,7 @@
 import { NamedError } from "@opencode-ai/core/util/error"
 import { ConfigErrorV1 } from "@opencode-ai/core/v1/config/error"
+import { Provider } from "@/provider/provider"
+import { ConfigPolicy } from "@/config/policy"
 import { Cause, Effect } from "effect"
 import { HttpRouter, HttpServerError, HttpServerRespondable, HttpServerResponse } from "effect/unstable/http"
 
@@ -24,6 +26,45 @@ export const errorLayer = HttpRouter.middleware<{ handles: unknown }>()((effect)
         ConfigErrorV1.RemoteAuthError.isInstance(error)
       ) {
         return Effect.succeed(HttpServerResponse.jsonUnsafe(error.toObject(), { status: 400 }))
+      }
+
+      // XCOD-166: an unknown model is the caller's mistake, not a server error. As { name, data }, the
+      // shape the CLI and TUI already format ("Model not found: …", suggestions, what to try).
+      if (Provider.ModelNotFoundError.isInstance(error)) {
+        return Effect.succeed(
+          HttpServerResponse.jsonUnsafe(
+            {
+              name: "ProviderModelNotFoundError",
+              data: {
+                providerID: error.providerID,
+                modelID: error.modelID,
+                suggestions: error.suggestions ?? [],
+                message: error.message,
+              },
+            },
+            { status: 400 },
+          ),
+        )
+      }
+
+      // XCOD-221: no provider set up is something the user fixes, so say how instead of a 500.
+      if (Provider.NoProvidersError.isInstance(error)) {
+        return Effect.succeed(
+          HttpServerResponse.jsonUnsafe(
+            { name: "ProviderNoProvidersError", data: { message: error.message } },
+            { status: 400 },
+          ),
+        )
+      }
+
+      // XCOD-219: a model the organisation's lock rules out, refused with the policy message.
+      if (error instanceof ConfigPolicy.LockedError) {
+        return Effect.succeed(
+          HttpServerResponse.jsonUnsafe(
+            { name: "PolicyLockedError", data: { key: error.key, message: error.message } },
+            { status: 403 },
+          ),
+        )
       }
 
       const ref = `err_${crypto.randomUUID().slice(0, 8)}`

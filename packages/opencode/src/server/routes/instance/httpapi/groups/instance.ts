@@ -52,6 +52,9 @@ export const InstancePaths = {
   agent: "/agent",
   skill: "/skill",
   lsp: "/lsp",
+  lspServers: "/lsp/servers",
+  lspStop: "/lsp/:serverID/stop",
+  lspLog: "/lsp/:serverID/log",
   formatter: "/formatter",
 } as const
 
@@ -174,6 +177,41 @@ export const InstanceApi = HttpApi.make("instance")
             identifier: "lsp.status",
             summary: "Get LSP status",
             description: "Get LSP server status",
+          }),
+        ),
+        HttpApiEndpoint.get("lspServers", InstancePaths.lspServers, {
+          query: WorkspaceRoutingQuery,
+          success: described(LSP.Overview, "Every LSP server Lunos knows and its state"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "lsp.servers",
+            summary: "List LSP servers",
+            description:
+              "XCOD-257: every built-in and custom language server with its state (running, starting, failed with the reason, not started, off), source, PID and diagnostics count, and whether LSP and downloads are on.",
+          }),
+        ),
+        HttpApiEndpoint.post("lspStop", InstancePaths.lspStop, {
+          params: { serverID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          payload: Schema.Struct({ restart: Schema.optional(Schema.Boolean) }),
+          success: described(Schema.Boolean, "Stopped"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "lsp.stop",
+            summary: "Stop or restart an LSP server",
+            description:
+              "Stops the server's running clients. With restart, a recorded failure is forgotten too, so the next matching file starts it again.",
+          }),
+        ),
+        HttpApiEndpoint.get("lspLog", InstancePaths.lspLog, {
+          params: { serverID: Schema.String },
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.mutable(Schema.Array(Schema.String)), "The last lines of the server's stderr"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "lsp.log",
+            summary: "LSP server log",
+            description: "The last 200 lines the server wrote to stderr in this session.",
           }),
         ),
         HttpApiEndpoint.get("formatter", InstancePaths.formatter, {

@@ -1,6 +1,7 @@
 import * as Tool from "./tool"
 import DESCRIPTION from "./task.txt"
 import { ToolJsonSchema } from "./json-schema"
+import type { JSONSchema7, JSONSchema7Definition } from "@ai-sdk/provider"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { BackgroundJob } from "@/background/job"
 import { Session } from "@/session/session"
@@ -10,10 +11,27 @@ import { Agent } from "../agent/agent"
 import { deriveSubagentSessionPermission } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
 import { Config } from "@/config/config"
-import { Effect, Exit, Schema, Scope } from "effect"
+import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { backgroundEnabled } from "@/background/enabled"
 import { Database } from "@opencode-ai/core/database/database"
+import { Residency } from "@opencode-ai/core/residency"
+import { AuditLog } from "@/audit/log"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
+import { SubagentModel } from "../agent/subagent-model"
+import { ConfigPolicy } from "@/config/policy"
+import { DynamicWorkflows } from "@/session/workflows"
+import { Budget } from "@/budget"
+import { Question } from "@/question"
+import path from "path"
+import { realpathSync } from "fs"
+import { Global } from "@opencode-ai/core/global"
+import { InstanceState } from "@/effect/instance-state"
+import { Permission } from "@/permission"
+import { SubagentIsolation } from "@/session/isolation"
+import { disposeInstance } from "@/effect/instance-registry"
 
 export interface TaskPromptOps {
   cancel(sessionID: SessionID): Effect.Effect<void>
@@ -22,6 +40,9 @@ export interface TaskPromptOps {
 }
 
 const id = "task"
+
+/** XCOD-287: subagents that run at once per session unless `subagent.max_parallel` says otherwise. */
+export const DEFAULT_MAX_PARALLEL = 3
 const BACKGROUND_DESCRIPTION = [
   "Background mode: background=true launches the subagent asynchronously and returns immediately.",
   "Foreground is the default; use it when you need the result before continuing.",
@@ -49,6 +70,9 @@ const BaseParameterFields = {
       "This should only be set if you mean to resume a previous task (you can pass a prior task_id and the task will continue the same subagent session as before instead of creating a fresh one)",
   }),
   command: Schema.optional(Schema.String).annotate({ description: "The command that triggered this task" }),
+  model: Schema.optional(Schema.String).annotate({
+    description: "Model for this task, from the allowed list. Only offered when subagent.dynamic is enabled.",
+  }),
 }
 
 const BaseParameters = Schema.Struct(BaseParameterFields)
@@ -60,6 +84,48 @@ export const Parameters = Schema.Struct({
       "Run the agent in the background. You will be notified when it completes. DO NOT sleep, poll, or proactively check on its progress",
   }),
 })
+
+/**
+ * The task tool's JSON schema with the `model` parameter constrained to `allowed`, or removed when
+ * nothing is allowed (XCOD-82). An enum, so the main agent can't invent a model id; the resolver
+ * still refuses anything off the list.
+ */
+export function withModelParameter(schema: JSONSchema7, allowed: readonly string[]): JSONSchema7 {
+  const properties = { ...(schema.properties ?? {}) } as Record<string, JSONSchema7Definition>
+  delete properties.model
+  if (allowed.length)
+    properties.model = {
+      type: "string",
+      enum: [...allowed],
+      description:
+        "Model for this task. Pick by the nature of the work: a cheap, fast model for broad search or simple lookups; a strong model for design, review or subtle debugging. Omit to use the configured default.",
+    }
+  return { ...schema, properties }
+}
+
+/**
+ * XCOD-287: the task tool's description and JSON schema as the model sees them for one request:
+ * without the `background` parameter and its explanation when background subagents are off in the
+ * live config. Tool init can't always read config, so it can't decide this on its own.
+ */
+export function withBackground(input: { description: string; schema: JSONSchema7 }, enabled: boolean) {
+  if (enabled) return input
+  const properties = { ...(input.schema.properties ?? {}) } as Record<string, JSONSchema7Definition>
+  delete properties.background
+  return {
+    description: input.description.replace(`\n\n${BACKGROUND_DESCRIPTION}`, ""),
+    schema: { ...input.schema, properties },
+  }
+}
+
+/** XCOD-332: a conflict nobody resolved; the patch is already saved. */
+class MergeStopped extends Error {}
+
+/** A file version for a conflict prompt or question: long ones are cut. */
+function clip(text: string, max = 4000) {
+  if (!text) return "(no file)"
+  return text.length > max ? `${text.slice(0, max)}\n… (${text.length - max} more characters)` : text
+}
 
 function renderOutput(input: {
   sessionID: SessionID
@@ -88,6 +154,52 @@ export const TaskTool = Tool.define(
     const scope = yield* Scope.Scope
     const flags = yield* RuntimeFlags.Service
     const database = yield* Database.Service
+    // Optional so test layers without a question service still build the tool; the registry has one.
+    const question = yield* Effect.serviceOption(Question.Service)
+
+    // XCOD-287: at most `subagent.max_parallel` subagents of one session run at once; the rest wait
+    // for a slot, marked `subagent.queued` on their session so the TUI can say so.
+    const slots = new Map<string, Semaphore.Semaphore>()
+    const slot = Effect.fn("TaskTool.slot")(function* (parentID: string, max: number) {
+      const hit = slots.get(parentID)
+      if (hit) {
+        // A changed setting applies to the next subagent; running ones keep their slot.
+        yield* hit.resize(max)
+        return hit
+      }
+      const next = Semaphore.makeUnsafe(max)
+      slots.set(parentID, next)
+      return next
+    })
+    const markQueued = Effect.fn("TaskTool.markQueued")(function* (sessionID: SessionID, queued: boolean) {
+      const latest = yield* sessions.get(sessionID)
+      const { subagent: _, ...rest } = (latest.metadata ?? {}) as Record<string, unknown>
+      yield* sessions.setMetadata({ sessionID, metadata: queued ? { ...rest, subagent: { queued: true } } : rest })
+    })
+
+    // XCOD-332: one merge into a working tree at a time, so each lands on the result of the last.
+    const merging = new Map<string, Semaphore.Semaphore>()
+    const mergeLock = (root: string) => {
+      const hit = merging.get(root)
+      if (hit) return hit
+      const next = Semaphore.makeUnsafe(1)
+      merging.set(root, next)
+      return next
+    }
+    /** XCOD-332: the subagent's worktree, diff size and merge state, for the sidebar. */
+    const setIsolation = Effect.fn("TaskTool.setIsolation")(function* (
+      sessionID: SessionID,
+      value: Record<string, unknown>,
+    ) {
+      const latest = yield* sessions.get(sessionID)
+      yield* sessions.setMetadata({ sessionID, metadata: { ...(latest.metadata ?? {}), isolation: value } })
+    })
+
+    const lastAssistant = Effect.fn("TaskTool.lastAssistant")(function* (sessionID: SessionID) {
+      const messages = yield* sessions.messages({ sessionID }).pipe(Effect.orElseSucceed(() => []))
+      const info = messages.findLast((item) => item.info.role === "assistant")?.info
+      return info?.role === "assistant" ? info : undefined
+    })
 
     const run = Effect.fn("TaskTool.execute")(function* (
       params: Schema.Schema.Type<typeof Parameters>,
@@ -95,9 +207,11 @@ export const TaskTool = Tool.define(
     ) {
       const cfg = yield* config.get()
       const runInBackground = params.background === true
-      if (runInBackground && !flags.experimentalBackgroundSubagents) {
+      if (runInBackground && !backgroundEnabled(flags.experimentalBackgroundSubagents, cfg)) {
         return yield* Effect.fail(
-          new Error("Background subagents require OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS=true"),
+          new Error(
+            'Background subagents are off. Enable them with "subagent": { "background": true } in your Lunos config.',
+          ),
         )
       }
 
@@ -114,6 +228,68 @@ export const TaskTool = Tool.define(
             `Subagent depth limit reached (${cfg.subagent_depth ?? 1}). Increase "subagent_depth" to allow nested subagents.`,
           ),
         )
+      }
+
+      // XCOD-303: in a Dynamic workflow, no new subagent starts once a budget with `on_limit: stop` is
+      // used up (steps already running finish), and a step re-dispatched MAX_REDISPATCH times goes
+      // to the user rather than round again.
+      const parentAgent = yield* agent.get(ctx.agent)
+      const dynamic =
+        !!parentAgent &&
+        DynamicWorkflows.decide({
+          config: cfg,
+          agent: parentAgent,
+          session: parent,
+          subagents: (yield* agent.list()).filter((item) => Agent.dispatchable(item)),
+        }).on
+      if (dynamic) {
+        const stop = yield* Budget.dispatchStop(
+          {
+            directory: parent.directory,
+            session: { id: parent.id, ...(parent.parentID ? { parentID: parent.parentID } : {}) },
+          },
+          cfg as Budget.Config,
+        ).pipe(
+          Effect.provideService(Database.Service, database),
+          // A budget that can't be read never stops work, as in the session loop.
+          Effect.orElseSucceed(() => undefined),
+        )
+        if (stop) return yield* Effect.fail(new Error(`${stop} No new subagent is dispatched.`))
+        const before = DynamicWorkflows.dispatches(ctx.messages, params)
+        if (before > DynamicWorkflows.MAX_REDISPATCH) {
+          const AGAIN = "Try again"
+          // Nobody to ask (`lunos run`, CI): refused, never left waiting.
+          const asker = Budget.unattended(current.permission) ? undefined : Option.getOrUndefined(question)
+          const answers = !asker
+            ? []
+            : yield* asker
+                .ask({
+                  sessionID: ctx.sessionID,
+                  questions: [
+                    {
+                      header: "Workflow step",
+                      question: `"${params.description}" has been re-dispatched ${before - 1} times without finishing. Dispatch it again?`,
+                      custom: true,
+                      options: [
+                        { label: AGAIN, description: `Dispatch ${params.subagent_type} once more` },
+                        { label: "Stop", description: "Leave this step; the main agent reports where it stands" },
+                      ],
+                    },
+                  ],
+                })
+                .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<ReadonlyArray<string>>))
+          const answer = answers[0]?.[0]
+          if (answer !== AGAIN)
+            return yield* Effect.fail(
+              new Error(
+                `"${params.description}" was re-dispatched ${DynamicWorkflows.MAX_REDISPATCH} times; ${
+                  answer
+                    ? `the user answered: ${answer}. Don't dispatch it again; follow the user's answer.`
+                    : "don't dispatch it again. Report where it stands and ask the user how to go on."
+                }`,
+              ),
+            )
+        }
       }
 
       if (!ctx.extra?.bypassAgentCheck) {
@@ -177,15 +353,58 @@ export const TaskTool = Tool.define(
       )
       if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
       const variant = msg.info.variant
+      const parentModel = { providerID: msg.info.providerID, modelID: msg.info.modelID }
 
-      const model = next.model ?? {
-        modelID: msg.info.modelID,
-        providerID: msg.info.providerID,
+      // XCOD-82: per-call → per-type → global → inherit. Resuming a task keeps the model of its
+      // original run unless this call explicitly (and allowably) overrides it.
+      const previous = session ? yield* lastAssistant(nextSession.id) : undefined
+      // XCOD-219: a locked subagent model also outranks a resumed task's earlier model.
+      const lock = ConfigPolicy.lockedSubagentModel(cfg, next.name)
+      const resolved = yield* Effect.try({
+        try: () => {
+          const out = (() => {
+            try {
+              return SubagentModel.resolve({
+                subagentType: next.name,
+                parent: { ...parentModel, variant },
+                perCall: params.model,
+                typeModel: next.modelSpec,
+                typeVariant: next.modelSpec ? next.variant : undefined,
+                lock,
+                config: cfg,
+              })
+            } catch (error) {
+              if (error instanceof SubagentModel.RefusedError && error.lockedKey)
+                ConfigPolicy.notifyRefused(error.lockedKey, `task model ${params.model}`)
+              throw error
+            }
+          })()
+          const final =
+            previous && params.model === undefined && !lock
+              ? {
+                  ...out,
+                  model: { providerID: previous.providerID, modelID: previous.modelID },
+                  variant: previous.variant,
+                  source: "resumed task",
+                }
+              : out
+          SubagentModel.checkResidency(final, AuditLog.residency(cfg))
+          return final
+        },
+        catch: (error) => (error instanceof Error ? error : new Error(String(error))),
+      })
+      const model = {
+        providerID: ProviderV2.ID.make(resolved.model.providerID),
+        modelID: ModelV2.ID.make(resolved.model.modelID),
       }
       const metadata = {
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
         model,
+        agent: next.name,
+        modelRule: resolved.rule,
+        modelSource: resolved.source,
+
         ...(runInBackground ? { background: true } : {}),
       }
 
@@ -197,8 +416,299 @@ export const TaskTool = Tool.define(
       const ops = ctx.extra?.promptOps as TaskPromptOps
       if (!ops) return yield* Effect.fail(new Error("TaskTool requires promptOps in ctx.extra"))
 
-      const runTask = Effect.fn("TaskTool.runTask")(function* () {
-        const parts = yield* ops.resolvePromptParts(params.prompt)
+      const gate = yield* slot(ctx.sessionID, cfg.subagent?.max_parallel ?? DEFAULT_MAX_PARALLEL)
+      const runTask = () =>
+        Effect.gen(function* () {
+          const now = yield* gate.withPermitsIfAvailable(1)(prompt())
+          if (Option.isSome(now)) return now.value
+          yield* markQueued(nextSession.id, true).pipe(Effect.ignore)
+          return yield* gate
+            .withPermits(1)(markQueued(nextSession.id, false).pipe(Effect.ignore, Effect.andThen(prompt())))
+            .pipe(Effect.onInterrupt(() => markQueued(nextSession.id, false).pipe(Effect.ignore)))
+        })
+
+      // XCOD-332: a writing subagent in a git repository works in its own worktree, merged into the
+      // user's tree when it finishes and removed whatever happens (a failed one leaves no edits).
+      const prompt = Effect.fn("TaskTool.runTask")(function* () {
+        const binding = yield* isolate()
+        if (!binding) return yield* work()
+        return yield* Effect.acquireUseRelease(
+          Effect.succeed(binding),
+          () =>
+            Effect.gen(function* () {
+              // The worktree is gone after the merge: the report names the user's paths instead.
+              const text = SubagentIsolation.remap(yield* work(binding), binding.to.root, binding.from.root)
+              return [text, yield* land(binding)].filter(Boolean).join("\n\n")
+            }),
+          (_, exit) =>
+            Effect.gen(function* () {
+              SubagentIsolation.unbind(nextSession.id)
+              // LSP, formatter and other per-directory state the tools started in the worktree.
+              yield* Effect.promise(() => disposeInstance(binding.to.directory).catch(() => undefined))
+              yield* Effect.promise(() => SubagentIsolation.discard(binding.handle).catch(() => undefined))
+              if (exit._tag === "Failure")
+                yield* setIsolation(nextSession.id, {
+                  state: "discarded",
+                  branch: binding.handle.branch,
+                  directory: binding.handle.directory,
+                }).pipe(Effect.ignore)
+            }),
+        )
+      })
+
+      const isolate = Effect.fn("TaskTool.isolate")(function* () {
+        const instance = yield* InstanceState.context
+        const sandbox = (cfg as { sandbox?: { enabled?: boolean; required?: boolean } }).sandbox
+        const decision = yield* Effect.promise(() =>
+          SubagentIsolation.decide({
+            configured: cfg.subagent?.isolation,
+            vcs: instance.project.vcs,
+            writes: !Permission.disabled(["edit"], next.permission).has("edit"),
+            sandboxed: !!(sandbox?.enabled || sandbox?.required),
+            directory: instance.directory,
+          }),
+        )
+        if (decision.mode === "shared") return undefined
+        const created = yield* Effect.tryPromise(async () => {
+          const root = await SubagentIsolation.toplevel(instance.directory)
+          const real = realpathSync(instance.directory)
+          const created = await SubagentIsolation.create({
+            root,
+            dataDir: Global.Path.data,
+            session: ctx.sessionID,
+            step: params.description,
+          })
+          return {
+            handle: created.handle,
+            from: { root: path.resolve(instance.directory, path.relative(real, root)), directory: instance.directory },
+            to: {
+              root: created.handle.directory,
+              directory: path.join(created.handle.directory, path.relative(root, real)),
+            },
+          } satisfies SubagentIsolation.Binding
+        }).pipe(
+          // A worktree that can't be made (disk full, a broken repository) never stops the work:
+          // the subagent shares the tree, as before, and its session says why.
+          Effect.catchCause((cause) =>
+            Effect.logWarning("subagent worktree failed; sharing the working tree", { cause }).pipe(
+              Effect.andThen(
+                setIsolation(nextSession.id, { state: "shared", reason: "the worktree could not be created" }),
+              ),
+              Effect.ignore,
+              Effect.as(undefined),
+            ),
+          ),
+        )
+        if (!created) return undefined
+        SubagentIsolation.bind(nextSession.id, created)
+        yield* setIsolation(nextSession.id, {
+          state: "running",
+          branch: created.handle.branch,
+          directory: created.handle.directory,
+        }).pipe(Effect.ignore)
+        return created
+      })
+
+      const regenerate = (root: string) =>
+        SubagentIsolation.regenerate(root).catch(
+          (error) => `lockfile regeneration failed (${error instanceof Error ? error.message : String(error)})`,
+        )
+
+      /** Commits the worktree and merges it into the user's tree, through `merge` and the user on a conflict. */
+      /** The subagent's changes as a patch beside its worktrees, for when they can't be merged. */
+      const savePatch = (handle: SubagentIsolation.Handle) =>
+        Effect.promise(async () => {
+          const target = path.join(
+            SubagentIsolation.home(Global.Path.data, handle.root),
+            "patches",
+            `${handle.branch.replaceAll("/", "-")}.patch`,
+          )
+          await Bun.write(target, await SubagentIsolation.diff(handle))
+          return target
+        })
+
+      const land = Effect.fn("TaskTool.land")(function* (binding: SubagentIsolation.Binding) {
+        return yield* landing(binding).pipe(
+          // A merge that breaks (the user edited a file mid-apply, a git error) must not lose the work.
+          Effect.catchCause((cause) =>
+            Effect.gen(function* () {
+              const failure = Cause.squash(cause)
+              if (failure instanceof MergeStopped) return yield* Effect.fail(failure)
+              const saved = yield* savePatch(binding.handle).pipe(Effect.option)
+              return yield* Effect.fail(
+                new Error(
+                  `Merging "${params.description}" into your working tree failed (${failure instanceof Error ? failure.message : String(failure)}).${
+                    Option.isSome(saved) ? ` Its changes are saved in ${saved.value}.` : ""
+                  }`,
+                ),
+              )
+            }),
+          ),
+        )
+      })
+
+      const landing = Effect.fn("TaskTool.landing")(function* (binding: SubagentIsolation.Binding) {
+        const handle = binding.handle
+        yield* Effect.promise(() => SubagentIsolation.finalize(handle, `lunos: ${params.description}`))
+        return yield* mergeLock(handle.root).withPermits(1)(
+          Effect.gen(function* () {
+            const first = yield* Effect.promise(() => SubagentIsolation.merge(handle, { regenerate }))
+            const result = first.state === "conflict" ? yield* resolveConflict(binding, first) : first
+            yield* setIsolation(nextSession.id, {
+              state: result.state === "empty" ? "unchanged" : "merged",
+              branch: handle.branch,
+              directory: handle.directory,
+              files: result.files.length,
+              additions: result.additions,
+              deletions: result.deletions,
+            }).pipe(Effect.ignore)
+            if (result.state === "empty") return "<isolation>The subagent changed no files.</isolation>"
+            if (result.state === "conflict") return ""
+            return [
+              `<isolation branch="${handle.branch}">`,
+              `Merged ${result.files.length} file(s) (+${result.additions} -${result.deletions}) into the working tree: ${result.files.join(", ")}.`,
+              ...(result.resolved.length ? [`Combined automatically: ${result.resolved.join(", ")}.`] : []),
+              ...(result.regenerated ? [`Lockfile: ${result.regenerated}.`] : []),
+              "Run the qa checks on the combined result before reporting this step done.",
+              "</isolation>",
+            ].join("\n")
+          }),
+        )
+      })
+
+      const resolveConflict = Effect.fn("TaskTool.resolveConflict")(function* (
+        binding: SubagentIsolation.Binding,
+        conflict: Extract<SubagentIsolation.MergeResult, { state: "conflict" }>,
+      ) {
+        const handle = binding.handle
+        yield* setIsolation(nextSession.id, {
+          state: "conflict",
+          branch: handle.branch,
+          directory: handle.directory,
+          conflicts: conflict.conflicts.map((item) => item.path),
+        }).pipe(Effect.ignore)
+        if (yield* mergeAgent(binding, conflict)) {
+          const again = yield* Effect.promise(() => SubagentIsolation.merge(handle, { regenerate }))
+          if (again.state !== "conflict") return again
+        }
+        // XCOD-324: a conflict neither side could resolve is one of the reasons a person is needed.
+        const files = conflict.conflicts.map((item) => item.path)
+        const asker = Budget.unattended(current.permission) ? undefined : Option.getOrUndefined(question)
+        const THEIRS = "Use the subagent's version"
+        const OURS = "Keep my version"
+        const answers = !asker
+          ? []
+          : yield* asker
+              .ask({
+                sessionID: ctx.sessionID,
+                questions: [
+                  {
+                    header: "Merge conflict",
+                    question: [
+                      `"${params.description}" (${handle.branch}) conflicts with your working tree in ${files.join(", ")}, and the merge subagent couldn't resolve it.`,
+                      ...conflict.conflicts.flatMap((item) => [
+                        "",
+                        `${item.path}, your version:`,
+                        clip(item.ours),
+                        `${item.path}, the subagent's version:`,
+                        clip(item.theirs),
+                      ]),
+                    ].join("\n"),
+                    options: [
+                      { label: THEIRS, description: `Take the subagent's ${files.join(", ")}; merge the rest` },
+                      { label: OURS, description: `Keep your ${files.join(", ")}; merge the rest` },
+                      { label: "Stop", description: "Merge nothing; the subagent's changes are saved as a patch" },
+                    ],
+                  },
+                ],
+              })
+              .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<ReadonlyArray<string>>))
+        const answer = answers[0]?.[0]
+        if (answer === THEIRS || answer === OURS)
+          return yield* Effect.promise(() =>
+            SubagentIsolation.settle(handle, answer === THEIRS ? "theirs" : "ours", { regenerate }),
+          )
+        const saved = yield* savePatch(handle)
+        yield* setIsolation(nextSession.id, {
+          state: "conflict",
+          branch: handle.branch,
+          conflicts: files,
+          patch: saved,
+        }).pipe(Effect.ignore)
+        return yield* Effect.fail(
+          new MergeStopped(
+            `Merge conflict in ${files.join(", ")}: nothing from "${params.description}" was merged into your working tree. Its changes are saved in ${saved}.`,
+          ),
+        )
+      })
+
+      /** The `merge` subagent, in the conflicted worktree. True when it left no conflict behind. */
+      const mergeAgent = Effect.fn("TaskTool.mergeAgent")(function* (
+        binding: SubagentIsolation.Binding,
+        conflict: Extract<SubagentIsolation.MergeResult, { state: "conflict" }>,
+      ) {
+        const info = yield* agent.get("merge")
+        if (!info) return false
+        const handle = binding.handle
+        yield* Effect.promise(() => SubagentIsolation.prepareConflict(handle, conflict.ours))
+        const child = yield* sessions.create({
+          parentID: ctx.sessionID,
+          title: `Merge ${params.description} (@merge subagent)`,
+          agent: info.name,
+          permission: deriveSubagentSessionPermission({
+            parentSessionPermission: parent.permission ?? [],
+            subagent: info,
+          }),
+        })
+        SubagentIsolation.bind(child.id, binding)
+        const ok = yield* ops
+          .prompt({
+            messageID: MessageID.ascending(),
+            sessionID: child.id,
+            model: { modelID: model.modelID, providerID: model.providerID },
+            agent: info.name,
+            parts: [
+              {
+                type: "text",
+                text: [
+                  `Resolve the merge conflicts in ${binding.to.root} (an isolated worktree; edit files only there).`,
+                  `Conflicted files: ${conflict.conflicts.map((item) => item.path).join(", ")}.`,
+                  ...conflict.conflicts.flatMap((item) => [
+                    "",
+                    `## ${item.path}`,
+                    "Base (where both started):",
+                    clip(item.base),
+                    "Ours (the user's working tree now):",
+                    clip(item.ours),
+                    `Theirs (the subagent's change for "${params.description}"):`,
+                    clip(item.theirs),
+                  ]),
+                ].join("\n"),
+              },
+            ],
+          })
+          .pipe(
+            Effect.map((result) => !(result.info.role === "assistant" && result.info.error)),
+            Effect.catchCause(() => Effect.succeed(false)),
+            Effect.ensuring(Effect.sync(() => SubagentIsolation.unbind(child.id))),
+          )
+        const done = ok && (yield* Effect.promise(() => SubagentIsolation.conclude(handle, conflict.ours)))
+        if (!done) yield* Effect.promise(() => SubagentIsolation.abortConflict(handle))
+        return done
+      })
+
+      const work = Effect.fn("TaskTool.work")(function* (binding?: SubagentIsolation.Binding) {
+        const resolvedParts = yield* ops.resolvePromptParts(params.prompt)
+        const parts = binding
+          ? [
+              ...resolvedParts,
+              {
+                type: "text" as const,
+                synthetic: true,
+                text: `You are working in an isolated git worktree at ${binding.to.directory}, a copy of ${binding.from.directory} with its uncommitted changes. Your file and shell tools run there, and paths under ${binding.from.root} are mapped to it. When you finish, your changes are merged into the user's working tree; if you fail, they are discarded. Don't commit, switch branches, stash or touch other worktrees.`,
+              },
+            ]
+          : resolvedParts
         const result = yield* ops.prompt({
           messageID: MessageID.ascending(),
           sessionID: nextSession.id,
@@ -206,7 +716,7 @@ export const TaskTool = Tool.define(
             modelID: model.modelID,
             providerID: model.providerID,
           },
-          variant: next.model ? undefined : variant,
+          variant: resolved.variant,
           agent: next.name,
           parts,
         })
@@ -358,12 +868,17 @@ export const TaskTool = Tool.define(
       )
     })
 
+    // Tool init can run outside an instance (tests, tool listings), where config isn't
+    // reachable; fall back to the default there. Execution re-checks with live config, and the
+    // registry drops the background parameter per request when it's off (withBackground).
+    const initialConfig = yield* config.get().pipe(Effect.catchCause(() => Effect.succeed({})))
+    const backgroundOn = backgroundEnabled(flags.experimentalBackgroundSubagents, initialConfig)
     return {
-      description: flags.experimentalBackgroundSubagents
-        ? [DESCRIPTION, BACKGROUND_DESCRIPTION].join("\n\n")
-        : DESCRIPTION,
+      description: backgroundOn ? [DESCRIPTION, BACKGROUND_DESCRIPTION].join("\n\n") : DESCRIPTION,
       parameters: Parameters,
-      jsonSchema: flags.experimentalBackgroundSubagents ? undefined : ToolJsonSchema.fromSchema(BaseParameters),
+      // `model` is never offered by default; the registry adds it, as an enum of the allowed models,
+      // only when subagent.dynamic is enabled (withModelParameter).
+      jsonSchema: withModelParameter(ToolJsonSchema.fromSchema(backgroundOn ? Parameters : BaseParameters), []),
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context) =>
         run(params, ctx).pipe(Effect.orDie),
     }

@@ -162,6 +162,7 @@ export function SortableTerminalTabV2(props: {
                   aria-label={language.t("terminal.close")}
                 />
               }
+              onMiddleClick={close}
             >
               <span onDblClick={edit} classList={{ invisible: store.editing }}>
                 {label()}

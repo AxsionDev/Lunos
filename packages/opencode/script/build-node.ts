@@ -23,6 +23,10 @@ await Bun.build({
     OPENCODE_MODELS_DEV: generated.modelsData,
     OPENCODE_VERSION: `'${Script.version}'`,
     OPENCODE_CHANNEL: `'${Script.channel}'`,
+    // XCOD-312: the desktop app's server is this bundle. As in script/build.ts (XCOD-273), only the
+    // release pipeline sets it, so a disabled Lunos account is shown and refused in the official
+    // desktop app too; a build from source leaves it off.
+    LUNOS_OFFICIAL_BUILD: JSON.stringify(process.env.LUNOS_OFFICIAL_BUILD === "1"),
   },
   files: {
     "opencode-web-ui.gen.ts": "",

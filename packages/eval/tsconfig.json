@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@tsconfig/bun/tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": false
+  },
+  // tasks/ run inside their own containers, graded by Harbor, not by this package
+  "exclude": ["tasks", "runs"]
+}

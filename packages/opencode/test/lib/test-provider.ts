@@ -10,6 +10,10 @@ export function testProviderConfig(llmUrl: string) {
   return {
     formatter: false,
     lsp: false,
+    // XCOD-303: these tests script the main agent calling bash, write and other tools itself, so
+    // they run with Dynamic workflows off (the main agent working directly). Its default (on) is
+    // covered by test/session/dynamic-workflows-loop.test.ts and test/cli/run/dynamic-workflows.test.ts.
+    workflows: { dynamic: false },
     provider: {
       test: {
         name: "Test",

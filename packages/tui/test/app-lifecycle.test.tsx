@@ -65,19 +65,19 @@ test("app.exit prints the session epilogue after scoped cleanup", async () => {
   const core = await import("@opentui/core")
   mock.module("@opentui/core", () => ({ ...core, createCliRenderer: async () => setup.renderer }))
   const events = createEventSource()
+  const session = {
+    id: "dummy",
+    title: "Demo session",
+    slug: "dummy",
+    projectID: "project",
+    directory,
+    version: "0.0.0-test",
+    time: { created: 0, updated: 0 },
+  }
   const calls = createFetch((url) => {
-    if (url.pathname === "/session")
-      return json([
-        {
-          id: "dummy",
-          title: "Demo session",
-          slug: "dummy",
-          projectID: "project",
-          directory,
-          version: "0.0.0-test",
-          time: { created: 0, updated: 0 },
-        },
-      ])
+    if (url.pathname === "/session") return json([session])
+    // XCOD-276: the session screen opens once the data is in, so it asks for its session.
+    if (url.pathname === "/session/dummy") return json(session)
   })
   const originalWrite = process.stdout.write.bind(process.stdout)
   let stdout = ""
@@ -113,13 +113,15 @@ test("app.exit prints the session epilogue after scoped cleanup", async () => {
     )
 
     await ready
+    // XCOD-276: plugins start before the session data is in; the session screen waits for it.
+    for (let i = 0; i < 100 && !api?.state.ready; i++) await Bun.sleep(10)
     await setup.renderOnce()
     await setup.renderOnce()
     api?.keymap.dispatchCommand("app.exit")
     await task
 
     expect(stdout).toContain("Demo session")
-    expect(stdout).toContain("opencode -s dummy")
+    expect(stdout).toContain("lunos -s dummy")
   } finally {
     process.stdout.write = originalWrite
     if (!setup.renderer.isDestroyed) setup.renderer.destroy()
@@ -176,7 +178,7 @@ test("fatal startup errors set a nonzero exit after scoped cleanup", async () =>
     )
 
     await task
-    expect(stderr).toContain("Run `opencode auth login https://example.com` to re-authenticate.")
+    expect(stderr).toContain("Run `lunos auth login https://example.com` to re-authenticate.")
     expect(stderr).not.toContain("Unexpected server error")
     expect(process.exitCode).toBe(1)
     expect(setup.renderer.isDestroyed).toBe(true)

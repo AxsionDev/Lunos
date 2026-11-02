@@ -1,4 +1,6 @@
 import type { BoxRenderable, TextareaRenderable, ScrollBoxRenderable } from "@opentui/core"
+import { EXTERNAL_BADGE, EXTERNAL_LABEL, externalOf, wantExternalTools } from "../../util/external"
+import { lunosName, UNAVAILABLE } from "../../util/external-commands"
 import { pathToFileURL } from "bun"
 import fuzzysort from "fuzzysort"
 import path from "path"
@@ -15,6 +17,7 @@ import { useTuiPaths } from "../../context/runtime"
 import { useTuiConfig } from "../../config"
 import { useLocation } from "../../context/location"
 import { useTheme, selectedForeground } from "../../context/theme"
+import { useToast } from "../../ui/toast"
 import { SplitBorder } from "../../ui/border"
 import { useTerminalDimensions } from "@opentui/solid"
 import { Locale } from "../../util/locale"
@@ -65,16 +68,23 @@ export type AutocompleteOption = {
   display: string
   value?: string
   aliases?: string[]
+  aliasHints?: Record<string, string>
   disabled?: boolean
+  /** Shown greyed out (XCOD-250), still selectable. */
+  muted?: boolean
   description?: string
   isDirectory?: boolean
   onSelect?: () => void
   path?: string
+  /** XCOD-262: plain text that replaces the typed `@query` (a session tag such as `@2`). */
+  insert?: string
 }
 
 export function Autocomplete(props: {
   value: string
   sessionID?: string
+  /** XCOD-262: extra `@` completions, before agents and files. */
+  mentions?: () => AutocompleteOption[]
   setPrompt: (input: (prompt: PromptInfo) => void) => void
   setExtmark: (partIndex: number, extmarkId: number) => void
   anchor: () => BoxRenderable
@@ -87,6 +97,7 @@ export function Autocomplete(props: {
   const editor = useEditorContext()
   const sdk = useSDK()
   const sync = useSync()
+  const toast = useToast()
   const data = useData()
   const project = useProject()
   const slashes = useCommandSlashes()
@@ -399,6 +410,30 @@ export function Autocomplete(props: {
     return options
   })
 
+  function insertText(text: string) {
+    const input = props.input()
+    const currentCursorOffset = input.cursorOffset
+    const needsSpace = displayCharAt(props.value, currentCursorOffset) !== " "
+    input.cursorOffset = store.index
+    const startCursor = input.logicalCursor
+    input.cursorOffset = currentCursorOffset
+    const endCursor = input.logicalCursor
+    input.deleteRange(startCursor.row, startCursor.col, endCursor.row, endCursor.col)
+    input.insertText(text + (needsSpace ? " " : ""))
+  }
+
+  const mentions = createMemo(() =>
+    (props.mentions?.() ?? []).map(
+      (option): AutocompleteOption => ({
+        ...option,
+        onSelect: () => {
+          if (option.insert) insertText(option.insert)
+          option.onSelect?.()
+        },
+      }),
+    ),
+  )
+
   const agents = createMemo(() => {
     return sync.data.agent
       .filter((agent) => !agent.hidden && agent.mode !== "primary")
@@ -444,17 +479,98 @@ export function Autocomplete(props: {
       ),
   )
 
-  const commands = createMemo((): AutocompleteOption[] => {
-    const results: AutocompleteOption[] = [...slashes()]
+  // XCOD-300: project resources by @name, inserted as plain text: the server adds the resource to the turn.
+  const [projectResources] = createResource(
+    () => (store.visible === "@" ? true : undefined),
+    async () => (await sdk.client.resource.list({}).catch(() => undefined))?.data ?? [],
+  )
+  const resourceAliases = createMemo(() =>
+    (projectResources() ?? [])
+      .filter((item) => item.kind !== "reference" && !item.problem)
+      .map(
+        (item): AutocompleteOption => ({
+          display: "@" + item.name,
+          description: ` resource · ${item.mode === "on_demand" ? "@name" : item.mode}${item.description ? ` · ${item.description}` : ""}`,
+          onSelect: () => {
+            const input = props.input()
+            const end = input.cursorOffset
+            input.cursorOffset = store.index
+            const start = input.logicalCursor
+            input.cursorOffset = end
+            const stop = input.logicalCursor
+            input.deleteRange(start.row, start.col, stop.row, stop.col)
+            input.insertText(`@${item.name}${displayCharAt(props.value, end) === " " ? "" : " "}`)
+          },
+        }),
+      ),
+  )
 
-    for (const serverCommand of sync.data.command) {
-      if (serverCommand.source === "skill") continue
-      const label = serverCommand.source === "mcp" ? ":mcp" : ""
-      results.push({
-        display: "/" + serverCommand.name + label,
-        description: serverCommand.description,
+  const commands = createMemo((): AutocompleteOption[] => {
+    // XCOD-218: in an external session, the tool's own /commands replace Lunos's prompt commands
+    // (they're sent to Claude Code / Codex as typed); Lunos's app commands stay unless a name clashes.
+    const external = props.sessionID ? externalOf(sync.session.get(props.sessionID)) : undefined
+    const own = external?.commands ?? []
+    const tool = external ? EXTERNAL_LABEL[external.tool] : ""
+    const results: AutocompleteOption[] = external
+      ? slashes()
+          .filter((item) => !own.includes(item.display.slice(1).trim()))
+          .map((item) => {
+            // XCOD-254: app commands for a Lunos agent, mode or model mean nothing here.
+            const name = item.display.slice(1).trim()
+            // XCOD-254: these act on the tool's session, so say whose.
+            if (name === "models") return { ...item, description: `Switch ${EXTERNAL_BADGE[external.tool]}'s model` }
+            if (!UNAVAILABLE.has(name)) return item
+            return {
+              ...item,
+              muted: true,
+              description: `Not available in a ${tool} session`,
+              onSelect: () => toast.show({ variant: "info", message: `/${name} isn't available in a ${tool} session` }),
+            }
+          })
+      : [...slashes()]
+    // XCOD-285: the tool's own commands come first, with what the tool says about them.
+    const info = new Map((external?.commandInfo ?? []).map((item) => [item.name, item]))
+    const first: AutocompleteOption[] = []
+    for (const name of own)
+      first.push({
+        display: "/" + name,
+        description: [
+          tool,
+          info.get(name)?.description ? `· ${info.get(name)!.description}` : "command",
+          info.get(name)?.hint ? `· ${info.get(name)!.hint}` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         onSelect: () => {
-          const newText = "/" + serverCommand.name + " "
+          const newText = "/" + name + " "
+          const cursor = props.input().logicalCursor
+          props.input().deleteRange(0, 0, cursor.row, cursor.col)
+          props.input().insertText(newText)
+          props.input().cursorOffset = Bun.stringWidth(newText)
+        },
+      })
+
+    // XCOD-254: `external.share.commands: false` (lockable) keeps Lunos's commands out of these sessions.
+    const shareCommands = !external || sync.data.config.external?.share?.commands !== false
+    for (const serverCommand of shareCommands ? sync.data.command : []) {
+      if (serverCommand.source === "skill") continue
+      // XCOD-254: in an external session Lunos's commands are listed too, labelled, and renamed
+      // `name:lunos` where the tool has one of the same name.
+      const name = external ? lunosName(serverCommand.name, own) : serverCommand.name
+      const label = serverCommand.source === "mcp" && !external ? ":mcp" : ""
+      results.push({
+        display: "/" + name + label,
+        description: external
+          ? [
+              "Lunos",
+              serverCommand.source === "mcp" ? "MCP prompt" : "command",
+              serverCommand.description ? `· ${serverCommand.description}` : "",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : serverCommand.description,
+        onSelect: () => {
+          const newText = "/" + name + " "
           const cursor = props.input().logicalCursor
           props.input().deleteRange(0, 0, cursor.row, cursor.col)
           props.input().insertText(newText)
@@ -464,10 +580,12 @@ export function Autocomplete(props: {
     }
 
     results.sort((a, b) => a.display.localeCompare(b.display))
+    first.sort((a, b) => a.display.localeCompare(b.display))
+    const listed = [...first, ...results]
 
-    const max = firstBy(results, [(x) => x.display.length, "desc"])?.display.length
-    if (!max) return results
-    return results.map((item) => ({
+    const max = firstBy(listed, [(x) => x.display.length, "desc"])?.display.length
+    if (!max) return listed
+    return listed.map((item) => ({
       ...item,
       display: item.display.padEnd(max + 2),
     }))
@@ -489,7 +607,9 @@ export function Autocomplete(props: {
     // it shouldn't be additionally sorted by fuzzysort as it will loose the results
     const fileOptions: AutocompleteOption[] = store.visible === "@" ? filesValue || [] : []
     const nonFileOptions: AutocompleteOption[] =
-      store.visible === "@" ? [...referenceAliasesValue, ...agentsValue, ...mcpResources()] : [...commandsValue]
+      store.visible === "@"
+        ? [...mentions(), ...referenceAliasesValue, ...resourceAliases(), ...agentsValue, ...mcpResources()]
+        : [...commandsValue]
 
     if (!searchValue) {
       return [...nonFileOptions, ...fileOptions]
@@ -553,8 +673,10 @@ export function Autocomplete(props: {
   function select() {
     const selected = options()[store.selected]
     if (!selected) return
+    const hint = store.visible === "/" ? selected.aliasHints?.["/" + search().trim()] : undefined
     hide()
     selected.onSelect?.()
+    if (hint) toast.show({ variant: "info", message: hint, duration: 5000 })
   }
 
   function expandDirectory() {
@@ -641,6 +763,8 @@ export function Autocomplete(props: {
   }))
 
   function show(mode: "@" | "/") {
+    // XCOD-250: /claude and /codex find out now whether their tools are usable.
+    if (mode === "/") wantExternalTools()
     setStore({
       visible: mode,
       index: props.input().cursorOffset,
@@ -764,7 +888,12 @@ export function Autocomplete(props: {
               }}
               onMouseUp={() => select()}
             >
-              <text fg={index === store.selected ? selectedForeground(theme) : theme.text} flexShrink={0}>
+              <text
+                fg={
+                  index === store.selected ? selectedForeground(theme) : option().muted ? theme.textMuted : theme.text
+                }
+                flexShrink={0}
+              >
                 {option().display}
               </text>
               <Show when={option().description}>

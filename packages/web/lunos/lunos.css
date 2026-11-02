@@ -1,0 +1,6 @@
+/* XCOD-124: upstream reserves room for its "OpenCode v2" banner below the header. Lunos doesn't
+   show that banner (starlight.mjs uses Starlight's own PageFrame), so the space goes too. */
+:root,
+:root[data-has-hero] {
+  --v2-banner-height: 0rem;
+}

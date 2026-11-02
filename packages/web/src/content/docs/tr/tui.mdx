@@ -163,6 +163,18 @@ Yardım penceresini gösterir.
 
 ---
 
+### marketplace
+
+Pazar yerlerinizden eklentilere, becerilere, hook'lara ve MCP sunucularına göz atın ve bunları yükleyin. O sekmeyi açmak için bir sekme adı (`plugins`, `skills`, `hooks`, `mcp`), yüklü olanları mevcut güncellemeler işaretli olarak görmek için `installed`, aramak için başka sözcükler ekleyin. _Takma ad_: `/discover`
+
+```bash frame="none"
+/marketplace
+/marketplace mcp
+/marketplace playwright
+```
+
+---
+
 ### models
 
 Kullanılabilir modelleri listeler.
@@ -187,6 +199,16 @@ Yeni bir oturum başlatır. _Takma ad_: `/clear`
 
 ---
 
+### plugins
+
+Yüklü eklentileri listeler ve bunları açıp kapatır.
+
+```bash frame="none"
+/plugins
+```
+
+---
+
 ### redo
 
 Geri alınan bir mesajı tekrar uygular. Yalnızca `/undo` kullanıldıktan sonra kullanılabilir.
@@ -207,10 +229,20 @@ Dahili olarak bu işlem dosya değişikliklerini yönetmek için Git kullanır. 
 
 ### sessions
 
-Oturumları listeler ve aralarında geçiş yapar. _Takma adlar_: `/resume`, `/continue`
+Bu makinedeki tüm projelerdeki tüm oturumlar: durum, proje, model, son etkinlik ve maliyet, kendi gruplarınızda.
 
 ```bash frame="none"
 /sessions
+```
+
+---
+
+### resume
+
+Bu projenin oturumlarını listeler ve aralarında geçiş yapar. _Takma adlar_: `/continue`
+
+```bash frame="none"
+/resume
 ```
 
 **Kısayol:** `ctrl+x l`

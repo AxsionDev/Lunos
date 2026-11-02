@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- XCOD-333: the Visual Studio plugin's logic without Visual Studio: the IDE protocol client, hunks,
+       prompt context, session state. netstandard2.0 so the VSIX (.NET Framework 4.7.2) can use it, and
+       it builds and is tested on any OS with `dotnet test`. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Lunos.Core</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The version Microsoft.VisualStudio.SDK 17.14 references: Visual Studio provides it at run time. -->
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+  </ItemGroup>
+</Project>

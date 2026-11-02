@@ -4,6 +4,8 @@ import { ModelsDev } from "@opencode-ai/core/models-dev"
 import { effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+import { Jurisdiction } from "@opencode-ai/core/jurisdiction"
+import { Config } from "@/config/config"
 
 export const ModelsCommand = effectCmd({
   command: "models [provider]",
@@ -22,6 +24,15 @@ export const ModelsCommand = effectCmd({
       .option("refresh", {
         describe: "refresh the models cache from models.dev",
         type: "boolean",
+      })
+      .option("recommended", {
+        describe:
+          "only the Recommended models, each with why (curated; under an EU-only policy, from published eval results)",
+        type: "boolean",
+      })
+      .option("size", {
+        describe: "only models of this size (see the size rules in docs/models.md)",
+        choices: ["large", "medium", "small"] as const,
       }),
   handler: Effect.fn("Cli.models")(function* (args) {
     const { Provider } = yield* Effect.promise(() => import("@/provider/provider"))
@@ -35,9 +46,21 @@ export const ModelsCommand = effectCmd({
 
     const print = (providerID: ProviderV2.ID, verbose?: boolean) => {
       const p = providers[providerID]
-      const sorted = Object.entries(p.models).sort(([a], [b]) => a.localeCompare(b))
+      const sorted = Object.entries(p.models)
+        .filter(([, model]) => (args.recommended ? model.recommended !== undefined : true))
+        .filter(([, model]) => (args.size ? model.size === args.size : true))
+        .sort(([a], [b]) => a.localeCompare(b))
       for (const [modelID, model] of sorted) {
         process.stdout.write(`${providerID}/${modelID}`)
+        // XCOD-213: extra columns only when asked for, for the same reason.
+        if (args.size) process.stdout.write(`\t${model.size}`)
+        if (args.recommended) process.stdout.write(`\t${model.recommended}`)
+        // XCOD-212: only blocked rows get a second column, so scripts reading names are unaffected.
+        if (model.blocked?.policy === "residency")
+          process.stdout.write(`\tblocked by policy (${model.blocked.policy}: ${model.blocked.region})`)
+        // XCOD-219
+        if (model.blocked?.policy === "locked")
+          process.stdout.write(`\tlocked by your organisation (${model.blocked.key})`)
         process.stdout.write(EOL)
         if (verbose) {
           process.stdout.write(JSON.stringify(model, null, 2))
@@ -53,7 +76,10 @@ export const ModelsCommand = effectCmd({
       return
     }
 
+    // Residency decides per provider (and endpoint), so providers with blocked models are listed last.
+    const blocked = (id: string) => Object.values(providers[id as ProviderV2.ID].models).some((model) => model.blocked)
     const ids = Object.keys(providers).sort((a, b) => {
+      if (blocked(a) !== blocked(b)) return blocked(a) ? 1 : -1
       const aIsOpencode = a.startsWith("opencode")
       const bIsOpencode = b.startsWith("opencode")
       if (aIsOpencode && !bIsOpencode) return -1
@@ -62,5 +88,12 @@ export const ModelsCommand = effectCmd({
     })
 
     for (const providerID of ids) print(ProviderV2.ID.make(providerID), args.verbose)
+
+    // XCOD-320: an EU-only policy recommends only an EU model with a published eval result.
+    const none = !Object.values(providers).some((p) => Object.values(p.models).some((model) => model.recommended))
+    if (args.recommended && none) {
+      const config = yield* Config.Service.use((cfg) => cfg.get())
+      if (Jurisdiction.euOnly(config.residency)) UI.println(Jurisdiction.NO_EU_RECOMMENDATION)
+    }
   }),
 })

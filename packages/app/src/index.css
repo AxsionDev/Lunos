@@ -25,6 +25,13 @@
 }
 
 @layer components {
+  /* XCOD-235: the light theme's warning text (yellow-800) is about 2.2:1 on white, below WCAG AA's
+     4.5:1, and "Waiting for approval" is the Sessions window's most important state. */
+  [data-color-scheme="light"] [data-page="sessions"] {
+    /* The Tailwind colour, not --v2-state-fg-warning: it is resolved once, at :root. */
+    --color-v2-state-fg-warning: var(--v2-yellow-1100);
+  }
+
   [data-component="getting-started"] {
     container-type: inline-size;
     container-name: getting-started;

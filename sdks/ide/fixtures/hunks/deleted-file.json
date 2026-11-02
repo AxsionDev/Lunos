@@ -1,0 +1,22 @@
+{
+  "name": "deleted-file",
+  "file": "src/deleted-file.txt",
+  "before": "gone 1\ngone 2\n",
+  "after": "",
+  "patch": "Index: src/deleted-file.txt\n===================================================================\n--- src/deleted-file.txt\t\n+++ src/deleted-file.txt\t\n@@ -1,2 +0,0 @@\n-gone 1\n-gone 2\n",
+  "hunks": 1,
+  "cases": [
+    {
+      "accept": [
+        false
+      ],
+      "expected": "gone 1\ngone 2\n"
+    },
+    {
+      "accept": [
+        true
+      ],
+      "expected": ""
+    }
+  ]
+}

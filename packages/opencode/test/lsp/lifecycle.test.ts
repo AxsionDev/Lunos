@@ -42,13 +42,26 @@ describe("LSP service lifecycle", () => {
     ),
   )
 
-  it.instance("hasClients() returns false for .ts files in instance when LSP is unset", () =>
+  // XCOD-246: LSP is on unless the config sets it to false.
+  it.instance("hasClients() returns true for .ts files in instance when LSP is unset", () =>
     LSP.Service.use((lsp) =>
       Effect.gen(function* () {
         const result = yield* lsp.hasClients(path.join((yield* TestInstance).directory, "test.ts"))
-        expect(result).toBe(false)
+        expect(result).toBe(true)
       }),
     ),
+  )
+
+  it.instance(
+    "hasClients() returns false for .ts files in instance when lsp is false",
+    () =>
+      LSP.Service.use((lsp) =>
+        Effect.gen(function* () {
+          const result = yield* lsp.hasClients(path.join((yield* TestInstance).directory, "test.ts"))
+          expect(result).toBe(false)
+        }),
+      ),
+    { config: { lsp: false } },
   )
 
   it.instance(

@@ -259,12 +259,18 @@ export function BasicTool(props: BasicToolProps) {
       <Show
         when={props.triggerAsLink || props.triggerHref}
         fallback={
-          <Collapsible.Trigger
-            data-hide-details={props.hideDetails ? "true" : undefined}
-            onClick={props.onTriggerClick}
+          <Show
+            when={!props.hideDetails}
+            fallback={
+              // Nothing to expand: a plain row, not a button, so links inside it (webfetch URL)
+              // are not nested inside another interactive control (XCOD-141).
+              <div data-slot="collapsible-trigger" data-hide-details="true">
+                {trigger()}
+              </div>
+            }
           >
-            {trigger()}
-          </Collapsible.Trigger>
+            <Collapsible.Trigger onClick={props.onTriggerClick}>{trigger()}</Collapsible.Trigger>
+          </Show>
         }
       >
         <Collapsible.Trigger

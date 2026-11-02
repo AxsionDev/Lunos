@@ -2,7 +2,17 @@
 
 ## Status
 
-This document describes the agreed target design for the V2 plugin system. It is an implementation plan, not documentation for the current API.
+> **Superseded (2026-09-24, XCOD-74). This is not a description of the API that exists.**
+> For the current API, read [`effect/README.md`](./README.md) (Effect) and
+> [`../promise/README.md`](../promise/README.md) (Promise). Both describe what is actually built.
+
+This was the original target design for the v2 plugin system. It is kept for its design rationale, but large parts of it were never built. It misled four Phase 2 tickets into building on things that don't exist:
+
+- **The `tool` domain exists, but not in the form sketched below (XCOD-75).** It is `ctx.tool["execute.before"]` / `ctx.tool["execute.after"]`, not `ctx.tool.hook(...)`, and live sessions reach it through a bridge from the v1 tool dispatch. See the READMEs.
+- **There is no event API reachable by plugins.** See [Event API](#event-api) below and XCOD-76. Migration step 8 is unstarted.
+- **The v2 runtime hooks (`aisdk.sdk`, `aisdk.language`) run in v2's `AISDK.language()`, which live sessions don't use.** Sessions resolve models through the v1 provider (`packages/opencode/src/provider/provider.ts`). XCOD-93 found the residency policy unenforced for exactly this reason.
+
+Treat everything below as history and rationale, not as a reference.
 
 ## Goals
 
@@ -182,6 +192,8 @@ ctx.tool.hook(...)      // invoked at a live tool operation boundary
 The shared low-level machinery owns registration order, scope cleanup, disposal, and snapshots. Each domain owns when its transforms or runtime hooks execute.
 
 ## Event API
+
+> **Not implemented, and the draft was deleted (XCOD-76, 2026-09-24).** An unreachable `effect/event.ts` shim sat unused: it wasn't exported, wasn't in `PluginContext`, and wasn't constructed by `plugin/host.ts`. It was removed rather than wired up, because no plugin needed it. If a real plugin needs to react to catalog, config or session changes, reintroduce this together with that consumer. The design below is kept as a sketch only. Core's own `EventV2` is a separate thing and is unaffected.
 
 The Effect API exposes the existing event system as typed streams using generated SDK event discriminants.
 
@@ -481,6 +493,8 @@ The Effect implementation remains the canonical runtime. Promise and embedding w
 - Make add/remove/replacement rely on scoped registration and domain rebuilds.
 
 ### 8. Add Event Adapter
+
+> **Not done; deferred until a consumer exists (XCOD-76).**
 
 - Build the SDK event discriminant map.
 - Resolve public type strings to internal EventV2 definitions.
