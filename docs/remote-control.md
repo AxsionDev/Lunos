@@ -4,7 +4,7 @@ Follow and steer a session that runs on your computer from app.lunos.tech, on yo
 
 ## Turning it on and off
 
-In the TUI, run `/remote` in the session. Lunos asks you to confirm, then shows the link (`https://app.lunos.tech/remote/<link>`) and copies it. Open it signed in to the same Lunos account. Run `/remote` again to turn it off; it ends at once.
+In the TUI, run `/remote on` in the session (or pick **Remote control** in the command palette; `/remote` alone toggles). Lunos asks you to confirm, then shows the link (`https://app.lunos.tech/remote/<link>`) and copies it. Open it signed in to the same Lunos account. `/remote off` ends it at once.
 
 It is **off by default**, per session. It also ends:
 
@@ -40,7 +40,7 @@ Lunos Cloud keeps this in memory only, for as long as the link lives, and drops 
 - **signed-out**: not signed in with `lunos login`, or signed in at your organisation's identity provider without `cloud.endpoint` (as for sync);
 - **not-registered**: this computer isn't registered (`lunos sync on` or `lunos login`);
 - **device**: this device's sync is off in app.lunos.tech;
-- **residency**: your residency policy doesn't allow Lunos Cloud (`sync:lunos-cloud`).
+- **residency**: your residency policy doesn't allow Lunos Cloud (`sync:lunos-cloud`); the residency decision is also recorded as `sync.denied` with `gate: "residency"`.
 
 ## Audit
 
@@ -53,3 +53,4 @@ On Lunos Cloud: `remote.opened`, `remote.command` (kind only) and `remote.ended`
 - Web push notifications when the session waits for you (optional in XCOD-338).
 - A sidebar button: `/remote` and the command palette (**Remote control**) only.
 - The desktop app and `lunos run` have no `/remote` yet; the HTTP route (`POST /experimental/session/:id/remote`) is there for them.
+- Sessions on the V2 session core: their approvals aren't forwarded yet (the TUI's own approvals are V1).

@@ -27,7 +27,9 @@ import { CloudSyncRedact } from "./sync-redact"
  * What leaves the machine follows the session sync rules (XCOD-185): never-upload files and
  * `sync.exclude` through the path rule, then every string through the credential scanner, on
  * whole parts (streamed text is accumulated here and sent as snapshots, so a secret split across
- * two deltas is still caught). Permission requests go with their kind and patterns only.
+ * two deltas is still caught). Permission requests go with their kind and patterns only. Only the
+ * V1 asks this process's TUI answers (`/permission`, `/question`) are forwarded; the V2 session
+ * core's asks have no answering route here yet.
  *
  * Every command from the web is checked again here before it runs: the link must still be on (a
  * poll in flight can outlive `/remote off`), a permission or question must be pending for this
@@ -259,7 +261,6 @@ export function bridge(input: BridgeInput) {
           },
         ]
       case "permission.asked":
-      case "permission.v2.asked":
         if (!own(p.sessionID)) return []
         return [
           {
@@ -276,7 +277,6 @@ export function bridge(input: BridgeInput) {
           },
         ]
       case "question.asked":
-      case "question.v2.asked":
         if (!own(p.sessionID)) return []
         return [
           {
@@ -286,11 +286,8 @@ export function bridge(input: BridgeInput) {
           },
         ]
       case "permission.replied":
-      case "permission.v2.replied":
       case "question.replied":
-      case "question.v2.replied":
       case "question.rejected":
-      case "question.v2.rejected":
         if (!own(p.sessionID)) return []
         return [
           {
@@ -539,7 +536,7 @@ export async function enable(input: EnableInput): Promise<Status> {
   if (refused) throw deny(input.sessionID, refused)
   const endpoint = input.opts?.endpoint ?? state!.endpoint
   if (!CloudSync.residency(input.config, endpoint, { audit: true, session: input.sessionID }).allowed)
-    throw deny(input.sessionID, "residency", false)
+    throw deny(input.sessionID, "residency")
   const opts: CloudRemoteLink.Options = input.opts ?? {
     endpoint,
     token: async () => (await CloudAuth.session("Remote control")).tokens.access_token,
