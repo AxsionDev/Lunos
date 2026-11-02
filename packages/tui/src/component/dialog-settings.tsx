@@ -1,6 +1,17 @@
 import { TextAttributes } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
-import { For, Match, Show, Switch, createMemo, createResource, createSignal, onMount, useContext } from "solid-js"
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createMemo,
+  createResource,
+  createSignal,
+  onMount,
+  useContext,
+  type JSX,
+} from "solid-js"
 import type { SettingRow, SettingsSnapshot } from "@opencode-ai/sdk/v2"
 import { versionDetail } from "@opencode-ai/core/installation/version"
 import { useTheme } from "../context/theme"
@@ -47,6 +58,8 @@ import { AccountContext } from "../context/account"
 import { useTuiConfig } from "../config"
 import { applySaved, packName, packSound, useSoundSettingsEditor } from "./dialog-sound-settings"
 import * as SoundSettings from "../util/sound-settings"
+import { setStatuslineConfig, StatuslineView, useStatusline, useStatuslineConfig } from "./statusline"
+import { PRESET_LABEL, PRESETS, parse, type Config as StatuslineConfig, type Preset } from "../util/statusline"
 import {
   AGENT_NAME,
   TABS,
@@ -73,6 +86,31 @@ import {
 type Scope = "user" | "project"
 
 /** Paths under the home directory as `~/…`, so they fit an 80-column dialog. */
+const STATUSLINE_ROW = "+statusline."
+
+/** XCOD-335: the line as the prompt would draw it, for the session /settings was opened from. */
+function StatuslinePreview(props: { config: () => StatuslineConfig | undefined }) {
+  const { theme } = useTheme()
+  const route = useRoute()
+  const preview = useStatusline({
+    sessionID: () => (route.data.type === "session" ? route.data.sessionID : undefined),
+    config: props.config,
+  })
+  return (
+    <box paddingLeft={2} height={1} overflow="hidden">
+      <Show when={preview.segments().length} fallback={<text fg={theme.textMuted}>(nothing to show yet)</text>}>
+        <StatuslineView segments={preview.segments()} />
+      </Show>
+    </box>
+  )
+}
+
+/** XCOD-335: the status line config after saving (or clearing) one of its keys. */
+function savedStatusline(config: StatuslineConfig | undefined, key: string, value: unknown): StatuslineConfig {
+  if (key === "tui.statusline") return value && typeof value === "object" ? (value as StatuslineConfig) : {}
+  return { ...config, [key.slice("tui.statusline.".length)]: value }
+}
+
 function home(file: string) {
   const dir = process.env.HOME
   return dir && file.startsWith(dir + "/") ? "~" + file.slice(dir.length) : file
@@ -543,6 +581,13 @@ export function DialogSettings(props: {
   const backTo = (key: string) => ({ back: () => reopen(key), generation })
   // XCOD-311: Notifications & sounds' volume, pack and per-event sound pickers.
   const tuiConfig = useTuiConfig()
+  // XCOD-335: Appearance › Status line previews the line as the prompt draws it, for the session
+  // this was opened from; highlighting a preset previews that preset.
+  const statuslineConfig = useStatuslineConfig()
+  const previewPreset = () => {
+    const value = highlighted()
+    return value?.startsWith(STATUSLINE_ROW) ? (value.slice(STATUSLINE_ROW.length) as Preset) : undefined
+  }
   const soundEditor = useSoundSettingsEditor({ save: (...args) => save(...args), reopen, backTo })
 
   /** XCOD-306: the project's theme, for just you (this computer) or shared (the project's tui.json). */
@@ -674,6 +719,9 @@ export function DialogSettings(props: {
     // XCOD-311: alerts read their config on every alert; this makes the change heard at once.
     if (row.key.startsWith(SoundSettings.PREFIX))
       applySaved(tuiConfig.attention, row.key, options.unset ? undefined : data.value)
+    // XCOD-335: the prompt redraws its status line from this, no restart.
+    if (row.key === "tui.statusline" || row.key.startsWith("tui.statusline."))
+      setStatuslineConfig(savedStatusline(statuslineConfig(), row.key, options.unset ? undefined : data.value))
     // XCOD-297: turned off. Saved on this computer (by the host when this is a sandbox), and the
     // restart starts without it; it isn't asked about, since the toast says it happens.
     if (row.key === "sandbox.enabled" && data.value === false && !options.unset && data.changed) {
@@ -1189,6 +1237,18 @@ export function DialogSettings(props: {
       ]
     // XCOD-307: Appearance › Layout starts with the right pane, per view. It's kept on this computer
     // (kv.json, as the pane keybind keeps it), not in config, so it isn't a setting row.
+    // XCOD-335: Appearance › Status line starts with the presets; each previews as it's highlighted.
+    if (props.area === APPEARANCE && sub() === "Status line" && !query()) {
+      const chosen = statuslineConfig()?.preset ?? "default"
+      return [
+        ...PRESETS.map((preset) => ({
+          title: PRESET_LABEL[preset],
+          value: `${STATUSLINE_ROW}${preset}`,
+          footer: preset === chosen ? "✓ chosen" : "",
+        })),
+        ...list,
+      ]
+    }
     if (props.area === APPEARANCE && sub() === "Layout" && !query())
       return [
         ...PANE_VIEWS.map((view) => ({
@@ -1233,7 +1293,45 @@ export function DialogSettings(props: {
     ]
   })
 
+  const statuslineFooter = (row?: JSX.Element) => {
+    const config = statuslineConfig()
+    const wins = config?.command?.trim()
+      ? "Your command wins over the presets and the template."
+      : config?.template?.trim()
+        ? "Your template wins over the presets."
+        : undefined
+    const unknown = config?.template ? parse(config.template).unknown : []
+    return (
+      <box flexDirection="column">
+        <text fg={theme.textMuted}>Preview{previewPreset() ? ` (${PRESET_LABEL[previewPreset()!]})` : ""}:</text>
+        <StatuslinePreview
+          config={() => {
+            const preset = previewPreset()
+            return preset ? { ...statuslineConfig(), preset } : statuslineConfig()
+          }}
+        />
+        <Show when={unknown.length}>
+          <text fg={theme.warning} wrapMode="word">
+            Unknown in your template: {unknown.map((name) => `{${name}}`).join(", ")}
+          </text>
+        </Show>
+        {row ?? (
+          <text fg={theme.textMuted} wrapMode="word">
+            {wins ??
+              "Enter picks a preset. A template ({model}, {context_pct}, {cost_session}, {budget_left}, {branch}, {subagents_running}…) or a command of your own wins over it."}
+          </text>
+        )}
+      </box>
+    )
+  }
+
   const footer = () => {
+    if (props.area === APPEARANCE && sub() === "Status line" && !query())
+      return statuslineFooter(previewPreset() || !current() ? undefined : rowFooter())
+    return rowFooter()
+  }
+
+  const rowFooter = () => {
     const synthetic = highlighted()
     if (atHome() && !query())
       return (
@@ -1511,6 +1609,11 @@ export function DialogSettings(props: {
                   )
                 if (option.value.startsWith("+pane."))
                   return pickPane(option.value.slice("+pane.".length) as RightPane.PaneView)
+                if (option.value.startsWith(STATUSLINE_ROW)) {
+                  const row = rows().find((item) => item.key === "tui.statusline.preset")
+                  if (row) return void save(row, option.value.slice(STATUSLINE_ROW.length))
+                  return
+                }
                 if (option.value.startsWith("+sandbox.")) return sandboxAction(option.value.slice("+sandbox.".length))
                 if (option.value.startsWith("+external.config.")) {
                   const tool = option.value.slice("+external.config.".length) as "claude" | "codex"

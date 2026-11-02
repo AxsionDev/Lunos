@@ -39,7 +39,7 @@ import { useRoute } from "../../context/route"
 import { useProject } from "../../context/project"
 import { useSync } from "../../context/sync"
 import { useEvent } from "../../context/event"
-import { useBudget } from "../budget-meter"
+import { StatuslineView, useStatusline } from "../statusline"
 import { workflowsLabel } from "../../util/workflows"
 import { editorSelectionKey, useEditorContext, type EditorSelection } from "../../context/editor"
 import { normalizePromptContent, openEditor } from "../../editor"
@@ -343,8 +343,6 @@ export function Prompt(props: PromptProps) {
     return messages.findLast((m): m is UserMessage => m.role === "user")
   })
 
-  // XCOD-298: the next turn's estimate against what's left of the project's budget.
-  const budget = useBudget(() => props.sessionID)
   // XCOD-303: whether the main agent dispatches subagents to do the work (/workflows on|off).
   const workflows = createMemo(() => {
     if (external()) return
@@ -355,9 +353,15 @@ export function Prompt(props: PromptProps) {
       config: sync.data.config as Parameters<typeof workflowsLabel>[0]["config"],
       metadata: session?.metadata as Record<string, unknown> | undefined,
       child: !!session?.parentID,
+      // XCOD-330: what the server checks before it runs a Dynamic workflow, so an "on" that can't run says off.
+      permission: local.mode.current()?.permission,
+      session: session?.permission,
+      subagents: sync.data.agent.filter((item) => item.mode !== "primary"),
       narrow: dimensions().width < 120,
     })
   })
+  // XCOD-335: the line under the prompt, from tui.statusline (a preset, a template or a script).
+  const statusline = useStatusline({ sessionID: () => props.sessionID, external: () => !!external() })
   const usage = createMemo(() => {
     if (!props.sessionID) return
     const session = sync.session.get(props.sessionID)
@@ -2412,7 +2416,7 @@ export function Prompt(props: PromptProps) {
               <Switch>
                 <Match when={store.mode === "normal"}>
                   {/* XCOD-303: before the first turn there's no usage line to carry it. */}
-                  <Show when={!usage() && workflows()}>
+                  <Show when={statusline.isDefault() && !usage() && workflows()}>
                     {(label) => (
                       <text fg={theme.textMuted} wrapMode="none">
                         {label()}
@@ -2420,12 +2424,17 @@ export function Prompt(props: PromptProps) {
                     )}
                   </Show>
                   <Switch>
-                    <Match when={usage()}>
-                      {(item) => (
-                        <text fg={theme.textMuted} wrapMode="none">
-                          {[item().context, item().cost, budget()?.line, workflows()].filter(Boolean).join(" · ")}
-                        </text>
-                      )}
+                    {/* XCOD-335: Default shows once there's usage, as it always has; any other line as
+                        soon as it has something to show. It replaces the keys, as the usage line did. */}
+                    <Match when={statusline.isDefault() ? usage() : statusline.segments().length}>
+                      <box
+                        flexShrink={1}
+                        minWidth={0}
+                        maxWidth={statusline.isDefault() ? undefined : Math.max(20, dimensions().width - 30)}
+                        overflow="hidden"
+                      >
+                        <StatuslineView segments={statusline.segments()} accent={accent()} />
+                      </box>
                     </Match>
                     {/* XCOD-260: Lunos's agent modes don't apply to a Claude Code / Codex session. */}
                     <Match when={!external()}>

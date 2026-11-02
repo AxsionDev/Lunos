@@ -8,6 +8,7 @@ import {
   glyph,
   halfCell,
   halfRows,
+  isolationText,
   PIXEL_COLOR,
   plainName,
   subagentsOf,
@@ -282,6 +283,13 @@ function View(props: { api: TuiPluginApi; session_id: string }) {
             <text fg={theme().error} wrapMode="none">
               {row.item.error}
             </text>
+          </Show>
+          <Show when={isolationText(api.state.session.get(row.item.id)?.metadata)}>
+            {(line) => (
+              <text fg={line().startsWith("conflict") ? theme().warning : theme().textMuted} wrapMode="none">
+                {line()}
+              </text>
+            )}
           </Show>
           <Show when={usage(row.item)}>
             <text fg={theme().textMuted} wrapMode="none">

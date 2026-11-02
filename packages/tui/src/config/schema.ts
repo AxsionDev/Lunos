@@ -107,6 +107,23 @@ export const Prompt = Schema.Struct({
   }),
 }).annotate({ description: "Prompt size settings" })
 
+/** XCOD-335: the line under the prompt. A command wins over a template, a template over a preset. */
+export const StatuslinePreset = Schema.Literals(["default", "minimal", "cost", "git", "agents"]).annotate({
+  description:
+    "A built-in line: default (context, cost, budget, workflows), minimal (model, context %), cost (cost, budget left, context %), git (branch, changed files, ahead/behind) or agents (subagents working, waiting, done)",
+})
+export const Statusline = Schema.Struct({
+  preset: Schema.optional(StatuslinePreset),
+  template: Schema.optional(Schema.String).annotate({
+    description:
+      'Your own line, e.g. "{workflow} · {approval} · {model} · {branch} · ctx {context_pct}% · {cost_session} · {budget_left} · {subagents_running}". A part whose fields are all empty is left out. Wins over preset',
+  }),
+  command: Schema.optional(Schema.String).annotate({
+    description:
+      "A command that gets the session state as JSON on stdin and prints one line. Runs at most once a second, is stopped after 300 ms, and the last good line stays if it fails. Wins over template and preset. Only read from your own tui.json",
+  }),
+}).annotate({ description: "What the line under the prompt shows" })
+
 export const Info = Schema.Struct({
   $schema: Schema.optional(Schema.String),
   theme: Schema.optional(Schema.String).annotate({ description: "Colour theme, by name (see /themes)" }),
@@ -149,5 +166,6 @@ export const Info = Schema.Struct({
     description:
       "false turns off the tips on the home screen and under the working indicator. /tips still lists them (default: true)",
   }),
+  statusline: Schema.optional(Statusline),
 })
 export type Info = Schema.Schema.Type<typeof Info>

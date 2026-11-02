@@ -358,6 +358,35 @@ export type SubagentEntry = {
   error?: string
 }
 
+/**
+ * XCOD-332: a subagent's worktree line for the sidebar, from `metadata.isolation` on its session:
+ * its branch while it runs, then its diff size and whether it merged or conflicted.
+ */
+export function isolationText(metadata: Record<string, unknown> | undefined) {
+  const value = metadata?.isolation
+  if (!value || typeof value !== "object") return undefined
+  const info = value as {
+    state?: unknown
+    branch?: unknown
+    files?: unknown
+    additions?: unknown
+    deletions?: unknown
+    conflicts?: unknown
+  }
+  const branch = typeof info.branch === "string" ? info.branch : undefined
+  const size =
+    typeof info.files === "number"
+      ? `${info.files} file${info.files === 1 ? "" : "s"} +${Number(info.additions) || 0} -${Number(info.deletions) || 0}`
+      : undefined
+  const conflicts = Array.isArray(info.conflicts) ? info.conflicts.filter((item) => typeof item === "string") : []
+  if (info.state === "running") return branch ? `worktree ${branch}` : "worktree"
+  if (info.state === "merged") return ["merged", size].filter(Boolean).join(" · ")
+  if (info.state === "unchanged") return "worktree · no changes"
+  if (info.state === "conflict") return `conflict${conflicts.length ? `: ${conflicts.join(", ")}` : ""}`
+  if (info.state === "discarded") return "worktree discarded"
+  return undefined
+}
+
 /** What the TUI knows about a subagent's own session. */
 export type ChildInfo = {
   /** Its session status type: "busy", "retry", "idle". */
