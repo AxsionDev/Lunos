@@ -35,8 +35,37 @@ import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/l
 import { Reference } from "@opencode-ai/core/reference"
 import { Location } from "@opencode-ai/core/location"
 import { PluginV2 } from "@opencode-ai/core/plugin"
+import { SandboxConfig } from "@/sandbox/config"
+import { SandboxDocker } from "@/sandbox/docker"
 
 /** XCOD-164: shell commands the default agent asks before running. Matched as command prefixes. */
+
+/**
+ * XCOD-343: external_directory rules for the sandbox's own volume, when this server runs inside one.
+ * Later rules win, so each "ask" comes after the "/sandbox/*" allow. What stays asked: Lunos's own
+ * folders under the sandbox's home (config, which sets the agent's permissions; data, with sessions
+ * and run logs; state; cache, whose bin folder holds binaries Lunos runs) and the audit log, so no
+ * agent can change its own rules, history or record without a prompt.
+ */
+export function sandboxExternalDirectory(
+  inside: boolean,
+  protect: readonly string[] = [Global.Path.config, Global.Path.data, Global.Path.state, Global.Path.cache],
+  audit = SandboxDocker.AUDIT_FILE,
+): Record<string, "allow" | "ask"> {
+  if (!inside) return {}
+  return {
+    [SandboxDocker.ROOT]: "allow",
+    [path.join(SandboxDocker.ROOT, "*")]: "allow",
+    ...Object.fromEntries(
+      protect.flatMap((dir) => [
+        [dir, "ask"],
+        [path.join(dir, "*"), "ask"],
+      ]),
+    ),
+    [audit]: "ask",
+  }
+}
+
 export const OUTWARD_COMMANDS = [
   "git push",
   "git remote add",
@@ -146,9 +175,14 @@ const layer = Layer.effect(
           ...skillDirs.map((dir) => path.join(dir, "*")),
           ...referenceDirs.map((dir) => path.join(dir, "*")),
         ]
+        // XCOD-343: inside a sandbox, /sandbox (the workspace's parent, and HOME) is the container's own
+        // space, not something outside your project: listing it or reading the home folder mustn't ask.
+        // Lunos's own config there still asks, so an agent can't loosen its own permissions.
+        const sandboxDirs = sandboxExternalDirectory(SandboxConfig.inside())
         const readonlyExternalDirectory = {
           "*": "ask",
           ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
+          ...sandboxDirs,
         } satisfies Record<string, "allow" | "ask" | "deny">
 
         const defaults = Permission.fromConfig({
@@ -165,6 +199,7 @@ const layer = Layer.effect(
           external_directory: {
             "*": "ask",
             ...Object.fromEntries(whitelistedDirs.map((dir) => [dir, "allow"])),
+            ...sandboxDirs,
           },
           // XCOD-164: commands that publish, reach a remote, or change state outside the project
           // ask first. A recording run once committed, rewrote the global git config, added a
