@@ -254,6 +254,7 @@ By default a sandbox can reach only what it needs. `sandbox.network` sets how mu
 **The allow list** is worked out on your machine when the sandbox is created, and shown at start:
 
 - **Model endpoints.** Each provider in your config at its `baseURL`, and the API host of each provider you have credentials for (`lunos auth`, or a `*_API_KEY` variable). Under a [residency policy](data-residency.md), only providers the policy allows.
+  A sign-in adds the hosts it calls: OpenAI's ChatGPT login adds `chatgpt.com` and `auth.openai.com`, and GitHub Copilot on GitHub Enterprise adds `copilot-api.<your domain>`. If the proxy refuses a host, the error names it and the `sandbox.allow` entry that lets it through.
 - **Remote MCP servers** in your config.
 - **The npm registry** (`registry.npmjs.org`), for LSP servers and packages the agent installs.
 - **`sandbox.allow`**, from your global or managed config: extra hosts, as `"host"` (port 443) or `"host:port"`. A leading dot allows subdomains: `".internal.example.eu"`.

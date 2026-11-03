@@ -416,7 +416,7 @@ async function launch(
     await pruneExpired(log)
     log("starting")
     const stored = await credentials()
-    const info = await Sandbox.create({ directory, config, providers: Object.keys(stored), log })
+    const info = await Sandbox.create({ directory, config, providers: Object.keys(stored), auth: stored, log })
     return { info, stored }
   })
   options.created?.(info)

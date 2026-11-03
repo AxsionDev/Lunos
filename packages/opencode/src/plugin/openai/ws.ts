@@ -69,6 +69,23 @@ export function isAbortError(error: unknown): error is DOMException {
   return error instanceof DOMException && error.name === "AbortError"
 }
 
+/**
+ * XCOD-340: inside a sandbox, the egress proxy refuses a host that isn't on its allow list, and the
+ * WebSocket client reports only "Proxy refused to open a tunnel: 403 Forbidden". Name the host and the fix.
+ */
+export function proxyRefusal(error: Error, url: string, sandbox = !!process.env.LUNOS_SANDBOX) {
+  if (!sandbox || !/refused to open a tunnel:\s*403/i.test(error.message)) return error
+  let host = url
+  try {
+    host = new URL(url).hostname
+  } catch {}
+  return new Error(
+    `${host} isn't allowed by the sandbox network policy. Add it to sandbox.allow in your global config ` +
+      `("sandbox": { "allow": ["${host}"] }) and start the sandbox again. (${error.message})`,
+    { cause: error },
+  )
+}
+
 export function connectResponsesWebSocket(options: ConnectResponsesWebSocketOptions) {
   return new Promise<WebSocket>((resolve, reject) => {
     if (options.signal?.aborted) {
@@ -114,7 +131,9 @@ export function connectResponsesWebSocket(options: ConnectResponsesWebSocketOpti
     function onError(error: unknown) {
       socket.on("error", () => {})
       cleanup()
-      reject(error instanceof Error ? error : new Error(errorMessage(error), { cause: error }))
+      reject(
+        proxyRefusal(error instanceof Error ? error : new Error(errorMessage(error), { cause: error }), options.url),
+      )
     }
 
     function onClose(code: number, reason: Buffer) {

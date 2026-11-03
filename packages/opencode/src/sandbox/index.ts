@@ -259,6 +259,8 @@ type CreateInput = {
   config: SandboxConfig.Resolved
   /** Provider ids the host holds credentials for: their API hosts go on the egress allow list. */
   providers?: readonly string[]
+  /** XCOD-340: the stored credentials by provider, so a sign-in's own hosts (chatgpt.com) are allowed too. */
+  auth?: Record<string, unknown>
   log?: (line: string) => void
   /** XCOD-282: how big a folder may be (tests); SandboxGit.LIMITS otherwise. */
   limits?: SandboxGit.Limits
@@ -296,6 +298,7 @@ async function build(input: CreateInput): Promise<Meta> {
   const computed = SandboxAllow.compute({
     doc: SandboxConfig.effectiveDoc(input.directory, managed),
     providers: [...(input.providers ?? []), ...SandboxAllow.providersFromEnv(Object.keys(providerEnv()))],
+    auth: input.auth,
     network,
     extra: input.config.allow,
   })
