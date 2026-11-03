@@ -18,6 +18,10 @@ It is **off by default**, per session. It also ends:
 
 A command sent from the web waits at most 60 seconds to be picked up; an approval you tap while the computer is asleep is dropped, never run hours later.
 
+## Notifications on your phone
+
+On app.lunos.tech › Remote, **Notify me on this device** turns on a notification for when a remote session waits for an approval or a question. Tap the notification to open that session. The notification says only that a session is waiting, and which one. It is delivered encrypted through your browser's push service (Google, Apple, Mozilla or Microsoft), so that service can't read it. On an iPhone or iPad, add app.lunos.tech to the Home Screen first. Turn it off on the same page.
+
 ## Who can control it
 
 Only the signed-in Lunos account that turned it on. Another account (another person, or your other account) gets "not found" for everything about it. Your computer proves it is the computer with a secret only it holds, so the web page can't pretend to be the computer either.
@@ -52,6 +56,5 @@ On Lunos Cloud: `remote.opened`, `remote.command` (kind only) and `remote.ended`
 
 ## Not yet
 
-- Web push notifications when the session waits for you (optional in XCOD-338).
 - The desktop app and `lunos run` have no `/remote` yet; the HTTP route (`POST /experimental/session/:id/remote`) is there for them.
 - Sessions on the V2 session core: their approvals aren't forwarded yet (the TUI's own approvals are V1).
