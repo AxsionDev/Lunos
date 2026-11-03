@@ -329,6 +329,8 @@ describe("XCOD-334 security review internals", () => {
     // With no one to answer (lunos run in CI), nothing is fixed and the model doesn't choose.
     expect(template).toContain("If the question tool is unavailable or the question is refused")
     expect(template).toContain("Never choose for the user.")
+    // The 3 Nov run rated the scan's Critical AWS key Low; the scan's severity stands.
+    expect(template).toContain("Never lower the severity the scan gave a finding you keep")
   })
 
   test("parses targets as typed after the command", () => {

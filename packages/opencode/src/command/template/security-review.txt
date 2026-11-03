@@ -12,7 +12,7 @@ Lunos has already scanned the change with pattern, entropy and anti-forgery chec
 
 $SECURITY_SCAN
 
-Treat these as leads, not verdicts. Open each file and confirm or reject every finding in context. Drop a finding only if it is clearly a false positive, and say why. Never add a `lunos-ignore-security` comment yourself; suppressions are the user's call and are audited.
+Treat these as leads, not verdicts. Open each file and confirm or reject every finding in context. Drop a finding only if it is clearly a false positive, and say why. Never lower the severity the scan gave a finding you keep: if you think it is lower, keep the scan's severity and add "(disputed: <reason>)". A leaked credential stays Critical even when you think it alone can't be used. Never add a `lunos-ignore-security` comment yourself; suppressions are the user's call and are audited.
 
 ## 2. Project rules
 
