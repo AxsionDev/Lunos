@@ -6,6 +6,8 @@ Follow and steer a session that runs on your computer from app.lunos.tech, on yo
 
 In the TUI, run `/remote on` in the session (or pick **Remote control** in the command palette; `/remote` alone toggles). Lunos asks you to confirm, then shows the link (`https://app.lunos.tech/remote/<link>`) and copies it. Open it signed in to the same Lunos account. `/remote off` ends it at once.
 
+The session sidebar shows **Remote** too. While it's off, clicking "turn on" does the same as `/remote`, so it asks first. While it's on, it shows the link and the time left, and clicking it turns remote control off. The row updates within a few seconds when the session is ended from app.lunos.tech, or when its 12 hours run out.
+
 It is **off by default**, per session. It also ends:
 
 - when you tap **End remote** on the web page (one tap revokes the link);
@@ -51,6 +53,5 @@ On Lunos Cloud: `remote.opened`, `remote.command` (kind only) and `remote.ended`
 ## Not yet
 
 - Web push notifications when the session waits for you (optional in XCOD-338).
-- A sidebar button: `/remote` and the command palette (**Remote control**) only.
 - The desktop app and `lunos run` have no `/remote` yet; the HTTP route (`POST /experimental/session/:id/remote`) is there for them.
 - Sessions on the V2 session core: their approvals aren't forwarded yet (the TUI's own approvals are V1).
