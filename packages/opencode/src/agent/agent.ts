@@ -42,18 +42,27 @@ import { SandboxDocker } from "@/sandbox/docker"
 
 /**
  * XCOD-343: external_directory rules for the sandbox's own volume, when this server runs inside one.
- * Later rules win, so the config folder's "ask" comes after the "/sandbox/*" allow.
+ * Later rules win, so each "ask" comes after the "/sandbox/*" allow. What stays asked: Lunos's own
+ * folders under the sandbox's home (config, which sets the agent's permissions; data, with sessions
+ * and run logs; state; cache, whose bin folder holds binaries Lunos runs) and the audit log, so no
+ * agent can change its own rules, history or record without a prompt.
  */
 export function sandboxExternalDirectory(
   inside: boolean,
-  configDir = Global.Path.config,
+  protect: readonly string[] = [Global.Path.config, Global.Path.data, Global.Path.state, Global.Path.cache],
+  audit = SandboxDocker.AUDIT_FILE,
 ): Record<string, "allow" | "ask"> {
   if (!inside) return {}
   return {
     [SandboxDocker.ROOT]: "allow",
     [path.join(SandboxDocker.ROOT, "*")]: "allow",
-    [configDir]: "ask",
-    [path.join(configDir, "*")]: "ask",
+    ...Object.fromEntries(
+      protect.flatMap((dir) => [
+        [dir, "ask"],
+        [path.join(dir, "*"), "ask"],
+      ]),
+    ),
+    [audit]: "ask",
   }
 }
 
