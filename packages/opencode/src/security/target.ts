@@ -26,6 +26,11 @@ export type Change = {
   file: string
   added: Line[]
   deleted: boolean
+  /**
+   * XCOD-334: lines of the new file next to which lines were removed. Removing `[ValidateAntiForgeryToken]`
+   * adds nothing, but it is the change that matters: file rules treat these lines as touched.
+   */
+  removed?: number[]
 }
 
 export type Resolved = {
@@ -154,12 +159,20 @@ export function parseDiff(diff: string): Change[] {
       changes.push(current)
       continue
     }
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw)
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(raw)
     if (hunk) {
-      next = Number(hunk[1])
+      // "+N,0": nothing added, and the removed lines sat after line N of the new file.
+      next = hunk[2] === "0" ? Number(hunk[1]) + 1 : Number(hunk[1])
       continue
     }
     if (!current) continue
+    if (raw.startsWith("-")) {
+      // Between new-file lines next - 1 and next. A file deleted outright has no new-file lines.
+      if (current.deleted) continue
+      const removed = (current.removed ??= [])
+      for (const line of [next - 1, next]) if (line > 0 && !removed.includes(line)) removed.push(line)
+      continue
+    }
     if (raw.startsWith("+")) {
       current.added.push({ line: next, text: raw.slice(1) })
       next++
@@ -167,7 +180,7 @@ export function parseDiff(diff: string): Change[] {
     }
     if (raw.startsWith(" ")) next++
   }
-  return changes.filter((change) => change.added.length || change.deleted)
+  return changes.filter((change) => change.added.length || change.deleted || change.removed?.length)
 }
 
 function unquote(value: string) {

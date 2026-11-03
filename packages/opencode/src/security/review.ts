@@ -48,7 +48,11 @@ export async function run(options: Options): Promise<Report> {
         content,
         findings: [
           ...SecurityRules.scanLines(change.file, change.added),
-          ...SecurityRules.scanFile(change.file, change.added, content),
+          ...SecurityRules.scanFile(
+            change.file,
+            [...change.added, ...(change.removed ?? []).map((line) => ({ line }))],
+            content,
+          ),
         ],
       }
     }),

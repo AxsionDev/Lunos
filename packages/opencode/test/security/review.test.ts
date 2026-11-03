@@ -245,6 +245,25 @@ describe("XCOD-334 security review", () => {
     expect(report.rules).toBe("- All controllers need [Authorize].")
   })
 
+  test("a branch that only removes [ValidateAntiForgeryToken] is flagged (nothing added)", async () => {
+    await using dir = await repo()
+    await write(dir.path, { "Controllers/TransfersController.cs": FIXED["Controllers/TransfersController.cs"] })
+    await $`git add -A && git commit -qm protected`.cwd(dir.path).quiet()
+    const base = (await $`git rev-parse --abbrev-ref HEAD`.cwd(dir.path).text()).trim()
+    await $`git checkout -qb feature`.cwd(dir.path).quiet()
+    await write(dir.path, { "Controllers/TransfersController.cs": PLANTED["Controllers/TransfersController.cs"] })
+    await $`git add -A && git commit -qm unprotected`.cwd(dir.path).quiet()
+    const report = await SecurityReview.run({
+      cwd: dir.path,
+      spec: SecurityTarget.parse(`--branch feature --base ${base}`),
+      osv: false,
+    })
+    expect(report.files).toBe(1)
+    expect(report.findings.map((item) => [item.id, item.severity, item.file])).toEqual([
+      ["csrf/missing-antiforgery", "high", "Controllers/TransfersController.cs"],
+    ])
+  })
+
   test("offline mode turns the OSV lookup off but still lists the dependency changes", async () => {
     await using dir = await repo()
     await write(dir.path, { "package.json": PLANTED["package.json"] })
@@ -313,6 +332,7 @@ describe("XCOD-334 security review internals", () => {
           { line: 11, text: "eleven" },
         ],
         deleted: false,
+        removed: [10, 11],
       },
       { file: "gone.ts", added: [], deleted: true },
     ])
@@ -352,6 +372,24 @@ describe("XCOD-334 security review internals", () => {
     "const sha = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3a94a8fe5ccb19ba61c4c0873'",
   ])("does not flag %s", (text) => {
     expect(SecurityRules.scanLines("a.ts", [{ line: 1, text }])).toEqual([])
+  })
+
+  test("a pure deletion marks the new-file lines on each side of it", () => {
+    const [change] = SecurityTarget.parseDiff(
+      [
+        "diff --git a/C.cs b/C.cs",
+        "--- a/C.cs",
+        "+++ b/C.cs",
+        "@@ -11 +10,0 @@ public class C",
+        "-    [ValidateAntiForgeryToken]",
+        "@@ -20,2 +19,1 @@",
+        "--- a removed SQL comment",
+        "-x",
+        "+y",
+      ].join("\n"),
+    )
+    expect(change!.added).toEqual([{ line: 19, text: "y" }])
+    expect(change!.removed).toEqual([10, 11, 18, 19])
   })
 
   test("anti-forgery: a class-level or global attribute and API controllers are covered", () => {
