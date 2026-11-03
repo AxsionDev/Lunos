@@ -640,6 +640,57 @@ describe("sandbox network", () => {
     ])
   })
 
+  test("XCOD-340: a stored sign-in allows the hosts it calls, not only the provider's API host", async () => {
+    const { SandboxAllow } = await import("../../src/sandbox/allow")
+    const chatgpt = SandboxAllow.compute({
+      doc: {},
+      providers: [],
+      auth: { openai: { type: "oauth", refresh: "r", access: "a", expires: 0 } },
+      network: "policy",
+      extra: [],
+    })
+    expect(chatgpt.allow).toContain("chatgpt.com:443")
+    expect(chatgpt.allow).toContain("auth.openai.com:443")
+    expect(chatgpt.allow).toContain("api.openai.com:443")
+    // An OpenAI API key calls api.openai.com only.
+    const key = SandboxAllow.compute({
+      doc: {},
+      providers: [],
+      auth: { openai: { type: "api", key: "sk-x" } },
+      network: "policy",
+      extra: [],
+    })
+    expect(key.allow).toContain("api.openai.com:443")
+    expect(key.allow).not.toContain("chatgpt.com:443")
+    // Copilot on GitHub Enterprise calls copilot-api.<domain>.
+    const ghe = SandboxAllow.compute({
+      doc: {},
+      providers: [],
+      auth: {
+        "github-copilot": {
+          type: "oauth",
+          refresh: "r",
+          access: "a",
+          expires: 0,
+          enterpriseUrl: "https://Corp.ghe.com/",
+        },
+      },
+      network: "policy",
+      extra: [],
+    })
+    expect(ghe.allow).toContain("copilot-api.corp.ghe.com:443")
+    // A residency policy that refuses the provider refuses its sign-in hosts too.
+    const eu = SandboxAllow.compute({
+      doc: { residency: { allow: ["eu"] } },
+      providers: [],
+      auth: { openai: { type: "oauth", refresh: "r", access: "a", expires: 0 } },
+      network: "policy",
+      extra: [],
+    })
+    expect(eu.allow).not.toContain("chatgpt.com:443")
+    expect(eu.denied.map((item) => item.provider)).toContain("openai")
+  })
+
   test("a repository can make the network stricter, never looser, and can't add hosts", async () => {
     expect(SandboxConfig.strictest("open", "policy")).toBe("policy")
     expect(SandboxConfig.strictest("none", "open")).toBe("none")

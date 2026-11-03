@@ -907,3 +907,17 @@ async function waitFor(predicate: () => boolean, message: string) {
     await new Promise((resolve) => setTimeout(resolve, 1))
   }
 }
+
+test("XCOD-340: a sandbox proxy refusal names the host and sandbox.allow", async () => {
+  const { proxyRefusal } = await import("../../src/plugin/openai/ws")
+  const refused = new Error("Proxy refused to open a tunnel: 403 Forbidden")
+  const url = "wss://chatgpt.com/backend-api/codex/responses"
+  const named = proxyRefusal(refused, url, true)
+  expect(named.message).toContain("chatgpt.com isn't allowed by the sandbox network policy")
+  expect(named.message).toContain('"allow": ["chatgpt.com"]')
+  expect(named.cause).toBe(refused)
+  // Outside a sandbox, or for another error, nothing changes.
+  expect(proxyRefusal(refused, url, false)).toBe(refused)
+  const other = new Error("socket hang up")
+  expect(proxyRefusal(other, url, true)).toBe(other)
+})

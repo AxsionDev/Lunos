@@ -40,6 +40,29 @@ const ENV_PROVIDERS: Record<string, string> = {
 
 export const NPM_REGISTRY = "registry.npmjs.org:443"
 
+/**
+ * XCOD-340: hosts a stored sign-in (not an API key) calls, which aren't the provider's API host.
+ * The sandbox gets the stored credentials (OPENCODE_AUTH_CONTENT), so it also refreshes them there.
+ * - OpenAI's ChatGPT login (plugin/openai/codex.ts): the Codex endpoint on chatgpt.com, and
+ *   auth.openai.com for the token refresh.
+ * - GitHub Copilot on GitHub Enterprise (plugin/github-copilot/copilot.ts): copilot-api.<domain>.
+ * Anthropic has no sign-in plugin in Lunos: a Claude key calls api.anthropic.com, already listed.
+ */
+export function authHosts(provider: string, info: unknown): string[] {
+  const auth = record(info)
+  if (auth.type !== "oauth") return []
+  if (provider === "openai") return ["chatgpt.com", "auth.openai.com"]
+  if (provider === "github-copilot" && typeof auth.enterpriseUrl === "string" && auth.enterpriseUrl.trim()) {
+    const domain = auth.enterpriseUrl
+      .trim()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/.*$/, "")
+      .toLowerCase()
+    return domain ? [`copilot-api.${domain}`] : []
+  }
+  return []
+}
+
 /** The provider ids implied by *_API_KEY variable names. */
 export function providersFromEnv(names: readonly string[]) {
   return names.map(
@@ -84,6 +107,8 @@ export function compute(input: {
   doc: Doc
   /** Provider ids you hold credentials for. */
   providers: readonly string[]
+  /** XCOD-340: the stored credentials by provider (`lunos auth`), so a sign-in's own hosts are allowed. */
+  auth?: Record<string, unknown>
   network: SandboxConfig.Network
   /** sandbox.allow. */
   extra: readonly string[]
@@ -95,12 +120,16 @@ export function compute(input: {
   const allow = new Set<string>()
   const denied: Computed["denied"] = []
 
-  for (const provider of new Set([...Object.keys(configured), ...input.providers])) {
+  const auth = input.auth ?? {}
+  for (const provider of new Set([...Object.keys(configured), ...input.providers, ...Object.keys(auth)])) {
     const baseURL = record(record(configured[provider]).options).baseURL
     const url = typeof baseURL === "string" ? baseURL : undefined
-    const hosts = url
-      ? [fromURL(url)]
-      : (DEFAULT_HOSTS[provider] ?? Jurisdiction.lookup(provider).hosts ?? []).map((host) => `${host}:443`)
+    const hosts = [
+      ...(url
+        ? [fromURL(url)]
+        : (DEFAULT_HOSTS[provider] ?? Jurisdiction.lookup(provider).hosts ?? []).map((host) => `${host}:443`)),
+      ...authHosts(provider, auth[provider]).map((host) => `${host}:443`),
+    ]
     if (hosts.length === 0) continue
     if (policy) {
       const decision = Residency.evaluate(provider, policy, url)

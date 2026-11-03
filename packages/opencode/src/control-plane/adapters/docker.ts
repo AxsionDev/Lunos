@@ -38,12 +38,13 @@ export const DockerAdapter: WorkspaceAdapter = {
     // stored with `lunos auth` (in OPENCODE_AUTH_CONTENT) go on the egress allow list, or under the
     // default network policy the session would lose its model once warped in.
     await Sandbox.prune().catch(() => [])
-    const stored = secrets.OPENCODE_AUTH_CONTENT ? Object.keys(JSON.parse(secrets.OPENCODE_AUTH_CONTENT)) : []
+    const auth: Record<string, unknown> = secrets.OPENCODE_AUTH_CONTENT ? JSON.parse(secrets.OPENCODE_AUTH_CONTENT) : {}
     const sandbox = await Sandbox.create({
       id: decodeExtra(info.extra).sandbox,
       directory,
       config: SandboxConfig.load(directory),
-      providers: stored,
+      providers: Object.keys(auth),
+      auth,
     })
     await Sandbox.start(sandbox, { secrets })
   },
