@@ -1,9 +1,12 @@
+import path from "node:path"
+import { existsSync } from "node:fs"
 import { SandboxConfig } from "./config"
 import { SandboxDocker } from "./docker"
 import { SandboxExec } from "./exec"
 import { SandboxGit } from "./git"
 import { SandboxMount } from "./mount"
 import { SandboxError, SandboxFailure } from "./error"
+import { SandboxToolchain } from "./toolchain"
 
 // XCOD-279: the checks a sandbox needs to start, run before anything is saved or started. Turning
 // the sandbox on in /settings runs the quick form (no download), and is refused when one fails;
@@ -11,7 +14,8 @@ import { SandboxError, SandboxFailure } from "./error"
 
 export type Check = {
   name: string
-  status: "pass" | "fail" | "skip"
+  /** XCOD-344: "warn" doesn't stop the sandbox; it says what won't work in it. */
+  status: "pass" | "fail" | "skip" | "warn"
   detail: string
   fix?: string
   error?: SandboxError
@@ -188,7 +192,24 @@ export async function run(input: {
   for (const ref of images) checks.push(await imageCheck(ref, input.full))
   if (await present(config.egressImage)) checks.push(await smoke(config.egressImage))
   else checks.push(skip("test container", "the image isn't here yet"))
+  checks.push(await toolchainCheck(located?.root, config.image))
   return checks
+}
+
+/** XCOD-344: whether the image has what the project's build and tests need. Never fails the sandbox. */
+async function toolchainCheck(root: string | undefined, ref: string): Promise<Check> {
+  const name = "project toolchain"
+  if (!root) return skip(name, "needs the workspace check to pass")
+  const needs = SandboxToolchain.needed(root)
+  if (needs.length === 0) return pass(name, "nothing this check knows to look for")
+  if (existsSync(path.join(root, ".devcontainer"))) return pass(name, "the project's .devcontainer chooses the image")
+  if (!(await present(ref))) return skip(name, "the image isn't here yet")
+  const absent = await SandboxToolchain.missing(ref, needs)
+  if (!absent) return skip(name, "couldn't run the image to check")
+  const tools = [...new Set(needs.map((need) => need.tool))].join(", ")
+  const text = SandboxToolchain.message(absent)
+  if (!text) return pass(name, `${tools} in the image`)
+  return { name, status: "warn", detail: text, fix: "Add a .devcontainer, or set sandbox.image." }
 }
 
 /**

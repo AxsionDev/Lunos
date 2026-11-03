@@ -8,6 +8,7 @@ import { Global } from "@opencode-ai/core/global"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import { parse } from "jsonc-parser"
 import { AuditLog } from "@/audit/log"
+import { SandboxToolchain } from "./toolchain"
 import { SandboxConfig } from "./config"
 import { SandboxDocker } from "./docker"
 import { SandboxError, SandboxFailure } from "./error"
@@ -65,6 +66,8 @@ export type Meta = {
   engine?: SandboxDocker.Runtime["engine"]
   /** XCOD-157: absent on sandboxes made before network policy existed, which were "open". */
   network?: SandboxConfig.Network
+  /** XCOD-344: what the project needs that the image lacks, as told at start; unset when nothing is. */
+  toolchain?: string
   /** The egress proxy's allow list ("host:port"), fixed when the sandbox was created. */
   allow?: string[]
   /** The newest egress decision already written to the audit trail. */
@@ -293,6 +296,13 @@ async function build(input: CreateInput): Promise<Meta> {
       (input.config.image === input.config.egressImage ? trusted : await SandboxDocker.image(input.config.image))
     return { trusted, chosen, image }
   })
+  // XCOD-344: what the project's build and tests need that the image lacks; checked alongside the
+  // rest of the set-up, never failing it. A devcontainer chose its image for the project, so it's trusted.
+  const toolchain = chosen.image
+    ? Promise.resolve(undefined)
+    : SandboxToolchain.missing(image.id, SandboxToolchain.needed(repo.root))
+        .then((absent) => (absent ? SandboxToolchain.message(absent) : undefined))
+        .catch(() => undefined)
   const managed = await SandboxConfig.managedDoc()
   const network = input.config.network
   const computed = SandboxAllow.compute({
@@ -372,6 +382,11 @@ async function build(input: CreateInput): Promise<Meta> {
       allow: computed.allow,
       password,
       created: new Date().toISOString(),
+    }
+    const missing = await toolchain
+    if (missing) {
+      result.toolchain = missing
+      log(`warning: ${missing}`)
     }
     await saveMeta(result)
 

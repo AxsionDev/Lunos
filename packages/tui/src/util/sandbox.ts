@@ -19,7 +19,8 @@ export type SandboxFailure = {
 export type SandboxState =
   /** Being created or started; `detail` is its latest step ("copying …", "image …"). */
   | { status: "starting"; detail?: string }
-  | { status: "ready"; id: string }
+  /** XCOD-344: `warning` says what the project needs that the image lacks, shown once at start. */
+  | { status: "ready"; id: string; warning?: string }
   /** sandbox.required and it failed: nothing runs until Retry works. */
   | { status: "blocked"; failure: SandboxFailure }
   /** It failed: Lunos restarts without it, handing over the unsent prompt. */
