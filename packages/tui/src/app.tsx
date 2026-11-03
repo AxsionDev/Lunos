@@ -7,7 +7,8 @@ import { useExternalExit } from "./component/external-exit"
 import { EXTERNAL_LABEL, externalOf, toolUnavailable, toolsWanted } from "./util/external"
 import type { ExternalToolStatus } from "@opencode-ai/sdk/v2"
 import { registerOpencodeSpinner } from "./component/register-spinner"
-import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
+import { createOpencodeKeymap } from "./keymap-host"
+import { routeWarnings } from "./util/warnings"
 import { Deferred, Effect } from "effect"
 import { Global } from "@opencode-ai/core/global"
 import { Flag } from "@opencode-ai/core/flag/flag"
@@ -276,7 +277,9 @@ export const run = Effect.fn("Tui.run")(function* (input: TuiInput) {
           }),
       )
       win32DisableProcessedInput()
-      const keymap = createDefaultOpenTuiKeymap(renderer)
+      // XCOD-341: process warnings go to the run log, not over the screen, until the TUI exits.
+      yield* Effect.acquireRelease(Effect.sync(routeWarnings), (restore) => Effect.sync(restore))
+      const keymap = createOpencodeKeymap(renderer)
       yield* Effect.acquireRelease(
         Effect.sync(() => registerOpencodeKeymap(keymap, renderer, input.config)),
         (unregister) => Effect.sync(unregister),
