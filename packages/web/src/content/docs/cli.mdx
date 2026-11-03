@@ -753,6 +753,8 @@ Review changes for security problems. It reports, ranked by severity:
 
 Each finding gives a CWE id, the file and line, why it matters and how to fix it. Use it in CI or a pre-commit hook. Inside a session, `/security-review` runs the same scan, has the model review the change in depth, and, if you ask, dispatches subagents to fix findings of High severity and above. It then re-runs the scan and has the code checked.
 
+`/security-review` asks before it fixes anything. Add `--fix high`, `--fix all` or `--fix none` to answer in advance, for example in `lunos run --command security-review -- --branch feature-x --fix high`. With no one to answer and no `--fix`, as in CI, it reports the findings and fixes nothing.
+
 ```bash
 lunos security-review                       # uncommitted changes, including untracked files
 lunos security-review --branch feature-x    # a branch against its merge base

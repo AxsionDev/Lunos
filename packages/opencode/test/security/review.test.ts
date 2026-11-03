@@ -245,6 +245,44 @@ describe("XCOD-334 security review", () => {
     expect(report.rules).toBe("- All controllers need [Authorize].")
   })
 
+  test("a branch that only removes [ValidateAntiForgeryToken] is flagged (nothing added)", async () => {
+    await using dir = await repo()
+    await write(dir.path, { "Controllers/TransfersController.cs": FIXED["Controllers/TransfersController.cs"] })
+    await $`git add -A && git commit -qm protected`.cwd(dir.path).quiet()
+    const base = (await $`git rev-parse --abbrev-ref HEAD`.cwd(dir.path).text()).trim()
+    await $`git checkout -qb feature`.cwd(dir.path).quiet()
+    await write(dir.path, { "Controllers/TransfersController.cs": PLANTED["Controllers/TransfersController.cs"] })
+    await $`git add -A && git commit -qm unprotected`.cwd(dir.path).quiet()
+    const report = await SecurityReview.run({
+      cwd: dir.path,
+      spec: SecurityTarget.parse(`--branch feature --base ${base}`),
+      osv: false,
+    })
+    expect(report.files).toBe(1)
+    expect(report.findings.map((item) => [item.id, item.severity, item.file])).toEqual([
+      ["csrf/missing-antiforgery", "high", "Controllers/TransfersController.cs"],
+    ])
+  })
+
+  test("on the checked-out branch, uncommitted fixes count: the re-review after Fix all is clean", async () => {
+    await using dir = await repo()
+    const base = (await $`git rev-parse --abbrev-ref HEAD`.cwd(dir.path).text()).trim()
+    await $`git checkout -qb feature`.cwd(dir.path).quiet()
+    await write(dir.path, { "src/users.ts": PLANTED["src/users.ts"], "src/storage.ts": PLANTED["src/storage.ts"] })
+    await $`git add -A && git commit -qm planted`.cwd(dir.path).quiet()
+    const spec = SecurityTarget.parse(`--branch feature --base ${base}`)
+    const before = await SecurityReview.run({ cwd: dir.path, spec, osv: false })
+    expect(before.findings.map((item) => item.id).sort()).toEqual(["injection/sql", "secrets/aws-access-key"])
+    // What the fix subagents leave: edits in the working tree, not committed.
+    await write(dir.path, { "src/users.ts": FIXED["src/users.ts"], "src/storage.ts": FIXED["src/storage.ts"] })
+    const after = await SecurityReview.run({ cwd: dir.path, spec, osv: false })
+    expect(after.findings).toEqual([])
+    // A branch that isn't checked out is still reviewed as committed.
+    await $`git stash -q -u && git checkout -q ${base}`.cwd(dir.path).quiet()
+    const committed = await SecurityReview.run({ cwd: dir.path, spec, osv: false })
+    expect(committed.findings.map((item) => item.id).sort()).toEqual(["injection/sql", "secrets/aws-access-key"])
+  })
+
   test("offline mode turns the OSV lookup off but still lists the dependency changes", async () => {
     await using dir = await repo()
     await write(dir.path, { "package.json": PLANTED["package.json"] })
@@ -279,6 +317,20 @@ describe("XCOD-334 security review", () => {
 })
 
 describe("XCOD-334 security review internals", () => {
+  test("--fix answers the fix question in advance and doesn't change the target", async () => {
+    expect(SecurityTarget.parse("--branch feature --base main --fix all")).toEqual({
+      kind: "branch",
+      name: "feature",
+      base: "main",
+    })
+    expect(SecurityTarget.parse("--fix high")).toEqual({ kind: "uncommitted" })
+    const template = await Bun.file(path.join(import.meta.dir, "../../src/command/template/security-review.txt")).text()
+    expect(template).toContain("`--fix high`, `--fix all` or `--fix none`")
+    // With no one to answer (lunos run in CI), nothing is fixed and the model doesn't choose.
+    expect(template).toContain("If the question tool is unavailable or the question is refused")
+    expect(template).toContain("Never choose for the user.")
+  })
+
   test("parses targets as typed after the command", () => {
     expect(SecurityTarget.parse("")).toEqual({ kind: "uncommitted" })
     expect(SecurityTarget.parse("--branch feat/x")).toEqual({ kind: "branch", name: "feat/x", base: undefined })
@@ -313,6 +365,7 @@ describe("XCOD-334 security review internals", () => {
           { line: 11, text: "eleven" },
         ],
         deleted: false,
+        removed: [10, 11],
       },
       { file: "gone.ts", added: [], deleted: true },
     ])
@@ -352,6 +405,33 @@ describe("XCOD-334 security review internals", () => {
     "const sha = 'a94a8fe5ccb19ba61c4c0873d391e987982fbbd3a94a8fe5ccb19ba61c4c0873'",
   ])("does not flag %s", (text) => {
     expect(SecurityRules.scanLines("a.ts", [{ line: 1, text }])).toEqual([])
+  })
+
+  test("a pure deletion marks the new-file lines on each side of it", () => {
+    const [change] = SecurityTarget.parseDiff(
+      [
+        "diff --git a/C.cs b/C.cs",
+        "--- a/C.cs",
+        "+++ b/C.cs",
+        "@@ -11 +10,0 @@ public class C",
+        "-    [ValidateAntiForgeryToken]",
+        "@@ -20,2 +19,1 @@",
+        "--- a removed SQL comment",
+        "-x",
+        "+y",
+      ].join("\n"),
+    )
+    expect(change!.added).toEqual([{ line: 19, text: "y" }])
+    expect(change!.removed).toEqual([10, 11, 18, 19])
+  })
+
+  test("lockfiles' integrity hashes aren't reported as secrets", () => {
+    const hash = '      "contentHash": "Xk9pW2mR7qLs4vT8nB3cY6hJ1dF5gA0eZuOiPtQwErTyUiOpAsDfGhJkLzXcVbNm==",'
+    expect(SecurityRules.scanLines("src/config.json", [{ line: 1, text: hash }]).map((item) => item.id)).toEqual([
+      "secrets/high-entropy",
+    ])
+    for (const file of ["tests/dotnet/packages.lock.json", "Pipfile.lock", "Gemfile.lock", "composer.lock", "uv.lock"])
+      expect(SecurityRules.scanLines(file, [{ line: 1, text: hash }])).toEqual([])
   })
 
   test("anti-forgery: a class-level or global attribute and API controllers are covered", () => {

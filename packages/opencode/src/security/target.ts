@@ -26,6 +26,11 @@ export type Change = {
   file: string
   added: Line[]
   deleted: boolean
+  /**
+   * XCOD-334: lines of the new file next to which lines were removed. Removing `[ValidateAntiForgeryToken]`
+   * adds nothing, but it is the change that matters: file rules treat these lines as touched.
+   */
+  removed?: number[]
 }
 
 export type Resolved = {
@@ -73,6 +78,19 @@ export async function resolve(cwd: string, spec: Spec): Promise<Resolved> {
     const into = spec.base ?? (await defaultBranch(root))
     const base = (await git(root, ["merge-base", into, spec.name])).trim()
     if (!base) throw new Error(`no merge base between ${into} and ${spec.name}`)
+    // XCOD-334: the branch that's checked out is reviewed as it is on disk, uncommitted edits
+    // included: after "Fix all" the fixes aren't committed, and a re-scan of the committed branch
+    // would report the same findings again however well they were fixed.
+    const current = (await git(root, ["symbolic-ref", "--quiet", "--short", "HEAD"])).trim()
+    if (current === spec.name) {
+      const disk = await workingTree(root, base)
+      return {
+        label: label(spec),
+        ...disk,
+        before: (file) => show(root, base, file),
+        rules: () => show(root, base, RULES_FILE),
+      }
+    }
     return {
       label: label(spec),
       changes: parseDiff(await git(root, ["diff", "--no-color", "--no-ext-diff", "--unified=0", base, spec.name])),
@@ -82,7 +100,16 @@ export async function resolve(cwd: string, spec: Spec): Promise<Resolved> {
     }
   }
   const head = (await git(root, ["rev-parse", "--verify", "--quiet", "HEAD"])).trim()
-  const base = head || EMPTY_TREE
+  return {
+    label: label(spec),
+    ...(await workingTree(root, head || EMPTY_TREE)),
+    before: (file) => (head ? show(root, head, file) : Promise.resolve(undefined)),
+    rules: () => (head ? show(root, head, RULES_FILE) : Promise.resolve(undefined)),
+  }
+}
+
+/** The working tree against `base`: tracked changes, and untracked files as wholly added. */
+async function workingTree(root: string, base: string) {
   const tracked = parseDiff(await git(root, ["diff", "--no-color", "--no-ext-diff", "--unified=0", base]))
   // `git diff` never shows untracked files: they are new, so every line is added.
   const untracked = (await git(root, ["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean)
@@ -92,13 +119,7 @@ export async function resolve(cwd: string, spec: Spec): Promise<Resolved> {
       return { file, added: text === undefined ? [] : lines(text), deleted: false }
     }),
   )
-  return {
-    label: label(spec),
-    changes: [...tracked, ...added],
-    after: (file) => readDisk(root, file),
-    before: (file) => (head ? show(root, head, file) : Promise.resolve(undefined)),
-    rules: () => (head ? show(root, head, RULES_FILE) : Promise.resolve(undefined)),
-  }
+  return { changes: [...tracked, ...added], after: (file: string) => readDisk(root, file) }
 }
 
 async function resolvePr(root: string, number: string): Promise<Resolved> {
@@ -154,12 +175,20 @@ export function parseDiff(diff: string): Change[] {
       changes.push(current)
       continue
     }
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw)
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(raw)
     if (hunk) {
-      next = Number(hunk[1])
+      // "+N,0": nothing added, and the removed lines sat after line N of the new file.
+      next = hunk[2] === "0" ? Number(hunk[1]) + 1 : Number(hunk[1])
       continue
     }
     if (!current) continue
+    if (raw.startsWith("-")) {
+      // Between new-file lines next - 1 and next. A file deleted outright has no new-file lines.
+      if (current.deleted) continue
+      const removed = (current.removed ??= [])
+      for (const line of [next - 1, next]) if (line > 0 && !removed.includes(line)) removed.push(line)
+      continue
+    }
     if (raw.startsWith("+")) {
       current.added.push({ line: next, text: raw.slice(1) })
       next++
@@ -167,7 +196,7 @@ export function parseDiff(diff: string): Change[] {
     }
     if (raw.startsWith(" ")) next++
   }
-  return changes.filter((change) => change.added.length || change.deleted)
+  return changes.filter((change) => change.added.length || change.deleted || change.removed?.length)
 }
 
 function unquote(value: string) {

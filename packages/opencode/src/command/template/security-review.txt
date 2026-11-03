@@ -2,7 +2,7 @@ You are running a security review of a code change. Find real vulnerabilities, r
 
 Input: $ARGUMENTS
 
-(No input reviews the uncommitted changes, including untracked files. `--branch <name> [--base <ref>]` reviews a branch against its merge base. `--pr <number>` reviews a pull request through `gh`.)
+(No input reviews the uncommitted changes, including untracked files. `--branch <name> [--base <ref>]` reviews a branch against its merge base. `--pr <number>` reviews a pull request through `gh`. `--fix high`, `--fix all` or `--fix none` answers the fix question in advance.)
 
 ---
 
@@ -56,7 +56,13 @@ End with a one-line count per severity and the suppressed findings, if any.
 
 ## 5. Fix
 
-If any finding is High or Critical, ask the user with the question tool: **"Fix all High and above"**, **"Fix all findings"**, or **"Don't fix"**. Then:
+If any finding is High or Critical, decide what to fix:
+
+- If the input says `--fix high`, `--fix all` or `--fix none`, that is the user's answer: fix High and above, fix every finding, or fix nothing. Don't ask.
+- Otherwise ask the user with the question tool: **"Fix all High and above"**, **"Fix all findings"**, or **"Don't fix"**.
+- If the question tool is unavailable or the question is refused (a run with no one to answer, such as `lunos run` in CI), fix nothing. Finish with the report, and end it with: "Nothing was fixed: run again with `--fix high` or `--fix all` to fix these." Never choose for the user.
+
+For "Don't fix" or `--fix none`, stop after the report. Otherwise:
 
 1. Group the chosen findings by file, so no two subagents edit the same file. Dispatch one fix subagent per group with the task tool, all in parallel. If the subagent tool offers worktree isolation, use it.
 2. Give each subagent:
