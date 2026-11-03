@@ -188,6 +188,8 @@ These are the defaults. `tmp` is the size of the in-memory `/tmp`.
 
 The default is `ghcr.io/axsiondev/lunos:<the CLI's version>`. Set `sandbox.image` to use another image; it must have `lunos` as its entry point, and `/bin/sh`, `cat` and `mv` (used to pass the sandbox its credentials at start). `git` in the image is recommended, so the agent has a working repository. The volumes are always filled from the Lunos image, never from one a repository chose.
 
+The default image has git, curl, ripgrep, Node.js, npm and Python, so the agent can build and test most JavaScript and Python projects with no setup. For another toolchain (Go, Rust, .NET, Java, Ruby, PHP, Bun), add a `.devcontainer` or set `sandbox.image`. When the project needs a command the image doesn't have, for example `go` because of `go.mod`, the sandbox says so when it starts. In the TUI that's a "Sandbox toolchain" message; `lunos sandbox doctor` shows it as a `WARN` on its "project toolchain" line. The sandbox still starts.
+
 Where `sandbox.image` is set matters:
 
 - **In your global or managed config**, it's the Lunos image to use, for example a mirror of it on a registry your machines can reach. The egress proxy runs from it, and a project's devcontainer gets Lunos from it.
