@@ -425,6 +425,15 @@ describe("XCOD-334 security review internals", () => {
     expect(change!.removed).toEqual([10, 11, 18, 19])
   })
 
+  test("lockfiles' integrity hashes aren't reported as secrets", () => {
+    const hash = '      "contentHash": "Xk9pW2mR7qLs4vT8nB3cY6hJ1dF5gA0eZuOiPtQwErTyUiOpAsDfGhJkLzXcVbNm==",'
+    expect(SecurityRules.scanLines("src/config.json", [{ line: 1, text: hash }]).map((item) => item.id)).toEqual([
+      "secrets/high-entropy",
+    ])
+    for (const file of ["tests/dotnet/packages.lock.json", "Pipfile.lock", "Gemfile.lock", "composer.lock", "uv.lock"])
+      expect(SecurityRules.scanLines(file, [{ line: 1, text: hash }])).toEqual([])
+  })
+
   test("anti-forgery: a class-level or global attribute and API controllers are covered", () => {
     const body = (prefix: string) =>
       `${prefix}public class C : Controller\n{\n    [HttpPost]\n    public IActionResult Save() => Ok();\n}\n`

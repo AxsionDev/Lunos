@@ -54,7 +54,8 @@ const CONFIG = [".json", ".yaml", ".yml", ".toml", ".ini", ".env", ".properties"
 
 /** Files with no source code worth pattern-matching (lockfiles are checked by the dependency step). */
 const SKIP = [
-  /(^|\/)(package-lock\.json|bun\.lockb?|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|go\.sum|poetry\.lock)$/,
+  // Lockfiles: their integrity hashes look like secrets. Their versions are checked by deps.ts.
+  /(^|\/)(package-lock\.json|npm-shrinkwrap\.json|bun\.lockb?|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|go\.sum|poetry\.lock|uv\.lock|Pipfile\.lock|Gemfile\.lock|composer\.lock|packages\.lock\.json|gradle\.lockfile)$/,
   /\.min\.js$/,
   /\.sarif(\.json)?$/,
   /\.(png|jpe?g|gif|svg|ico|pdf|woff2?|ttf|zip|gz)$/i,
