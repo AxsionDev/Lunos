@@ -1,5 +1,4 @@
-import { createContext, For, useContext, type ParentProps, Show } from "solid-js"
-import { createStore } from "solid-js/store"
+import { createContext, createSignal, For, useContext, type ParentProps, Show } from "solid-js"
 import { useTheme } from "../context/theme"
 import { useTerminalDimensions } from "@opentui/solid"
 import { SplitBorder } from "./border"
@@ -99,9 +98,10 @@ export function Toast() {
 }
 
 function init() {
-  const [store, setStore] = createStore({
-    currentToast: null as ToastOptions | null,
-  })
+  // XCOD-342: a signal, not a store. Setting a store path to an object merges into the object there,
+  // so a passing toast shown over the sticky one wrote its title and message into the sticky toast
+  // (and kept its buttons): the sticky one came back with the other's text. A signal replaces it.
+  const [current, setCurrent] = createSignal<ToastOptions | null>(null)
 
   let timeoutHandle: NodeJS.Timeout | null = null
   // XCOD-281: the sticky toast, shown again once a passing one has gone.
@@ -113,7 +113,7 @@ function init() {
       const toastOptions = { ...options, duration: options.duration ?? 5000 }
       if (timeoutHandle) clearTimeout(timeoutHandle)
       timeoutHandle = null
-      setStore("currentToast", toastOptions)
+      setCurrent(toastOptions)
       showingPinned = !!toastOptions.sticky
       if (toastOptions.sticky) {
         pinned = toastOptions
@@ -121,7 +121,7 @@ function init() {
       }
       timeoutHandle = setTimeout(() => {
         showingPinned = !!pinned
-        setStore("currentToast", pinned)
+        setCurrent(pinned)
       }, toastOptions.duration).unref()
     },
     error: (err: any) => {
@@ -141,10 +141,10 @@ function init() {
       timeoutHandle = null
       if (showingPinned) pinned = null
       showingPinned = !!pinned
-      setStore("currentToast", pinned)
+      setCurrent(pinned)
     },
     get currentToast(): ToastOptions | null {
-      return store.currentToast
+      return current()
     },
   }
   return toast
