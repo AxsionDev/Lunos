@@ -298,6 +298,20 @@ describe("XCOD-334 security review", () => {
 })
 
 describe("XCOD-334 security review internals", () => {
+  test("--fix answers the fix question in advance and doesn't change the target", async () => {
+    expect(SecurityTarget.parse("--branch feature --base main --fix all")).toEqual({
+      kind: "branch",
+      name: "feature",
+      base: "main",
+    })
+    expect(SecurityTarget.parse("--fix high")).toEqual({ kind: "uncommitted" })
+    const template = await Bun.file(path.join(import.meta.dir, "../../src/command/template/security-review.txt")).text()
+    expect(template).toContain("`--fix high`, `--fix all` or `--fix none`")
+    // With no one to answer (lunos run in CI), nothing is fixed and the model doesn't choose.
+    expect(template).toContain("If the question tool is unavailable or the question is refused")
+    expect(template).toContain("Never choose for the user.")
+  })
+
   test("parses targets as typed after the command", () => {
     expect(SecurityTarget.parse("")).toEqual({ kind: "uncommitted" })
     expect(SecurityTarget.parse("--branch feat/x")).toEqual({ kind: "branch", name: "feat/x", base: undefined })
