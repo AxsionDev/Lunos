@@ -264,6 +264,25 @@ describe("XCOD-334 security review", () => {
     ])
   })
 
+  test("on the checked-out branch, uncommitted fixes count: the re-review after Fix all is clean", async () => {
+    await using dir = await repo()
+    const base = (await $`git rev-parse --abbrev-ref HEAD`.cwd(dir.path).text()).trim()
+    await $`git checkout -qb feature`.cwd(dir.path).quiet()
+    await write(dir.path, { "src/users.ts": PLANTED["src/users.ts"], "src/storage.ts": PLANTED["src/storage.ts"] })
+    await $`git add -A && git commit -qm planted`.cwd(dir.path).quiet()
+    const spec = SecurityTarget.parse(`--branch feature --base ${base}`)
+    const before = await SecurityReview.run({ cwd: dir.path, spec, osv: false })
+    expect(before.findings.map((item) => item.id).sort()).toEqual(["injection/sql", "secrets/aws-access-key"])
+    // What the fix subagents leave: edits in the working tree, not committed.
+    await write(dir.path, { "src/users.ts": FIXED["src/users.ts"], "src/storage.ts": FIXED["src/storage.ts"] })
+    const after = await SecurityReview.run({ cwd: dir.path, spec, osv: false })
+    expect(after.findings).toEqual([])
+    // A branch that isn't checked out is still reviewed as committed.
+    await $`git stash -q -u && git checkout -q ${base}`.cwd(dir.path).quiet()
+    const committed = await SecurityReview.run({ cwd: dir.path, spec, osv: false })
+    expect(committed.findings.map((item) => item.id).sort()).toEqual(["injection/sql", "secrets/aws-access-key"])
+  })
+
   test("offline mode turns the OSV lookup off but still lists the dependency changes", async () => {
     await using dir = await repo()
     await write(dir.path, { "package.json": PLANTED["package.json"] })

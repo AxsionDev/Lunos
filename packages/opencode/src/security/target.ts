@@ -78,6 +78,19 @@ export async function resolve(cwd: string, spec: Spec): Promise<Resolved> {
     const into = spec.base ?? (await defaultBranch(root))
     const base = (await git(root, ["merge-base", into, spec.name])).trim()
     if (!base) throw new Error(`no merge base between ${into} and ${spec.name}`)
+    // XCOD-334: the branch that's checked out is reviewed as it is on disk, uncommitted edits
+    // included: after "Fix all" the fixes aren't committed, and a re-scan of the committed branch
+    // would report the same findings again however well they were fixed.
+    const current = (await git(root, ["symbolic-ref", "--quiet", "--short", "HEAD"])).trim()
+    if (current === spec.name) {
+      const disk = await workingTree(root, base)
+      return {
+        label: label(spec),
+        ...disk,
+        before: (file) => show(root, base, file),
+        rules: () => show(root, base, RULES_FILE),
+      }
+    }
     return {
       label: label(spec),
       changes: parseDiff(await git(root, ["diff", "--no-color", "--no-ext-diff", "--unified=0", base, spec.name])),
@@ -87,7 +100,16 @@ export async function resolve(cwd: string, spec: Spec): Promise<Resolved> {
     }
   }
   const head = (await git(root, ["rev-parse", "--verify", "--quiet", "HEAD"])).trim()
-  const base = head || EMPTY_TREE
+  return {
+    label: label(spec),
+    ...(await workingTree(root, head || EMPTY_TREE)),
+    before: (file) => (head ? show(root, head, file) : Promise.resolve(undefined)),
+    rules: () => (head ? show(root, head, RULES_FILE) : Promise.resolve(undefined)),
+  }
+}
+
+/** The working tree against `base`: tracked changes, and untracked files as wholly added. */
+async function workingTree(root: string, base: string) {
   const tracked = parseDiff(await git(root, ["diff", "--no-color", "--no-ext-diff", "--unified=0", base]))
   // `git diff` never shows untracked files: they are new, so every line is added.
   const untracked = (await git(root, ["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean)
@@ -97,13 +119,7 @@ export async function resolve(cwd: string, spec: Spec): Promise<Resolved> {
       return { file, added: text === undefined ? [] : lines(text), deleted: false }
     }),
   )
-  return {
-    label: label(spec),
-    changes: [...tracked, ...added],
-    after: (file) => readDisk(root, file),
-    before: (file) => (head ? show(root, head, file) : Promise.resolve(undefined)),
-    rules: () => (head ? show(root, head, RULES_FILE) : Promise.resolve(undefined)),
-  }
+  return { changes: [...tracked, ...added], after: (file: string) => readDisk(root, file) }
 }
 
 async function resolvePr(root: string, number: string): Promise<Resolved> {
