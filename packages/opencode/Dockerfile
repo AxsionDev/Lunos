@@ -7,7 +7,9 @@ ENV BUN_RUNTIME_TRANSPILER_CACHE_PATH=${BUN_RUNTIME_TRANSPILER_CACHE_PATH}
 # XCOD-144: git so agents in a sandbox (`lunos run --sandbox`) have a working repository, and a
 # uid-1000 user, which is what the sandbox runs as (it passes --user 1000:1000 regardless).
 # XCOD-157: curl, which agents reach for first; it honours the sandbox's egress proxy.
-RUN apk add libgcc libstdc++ ripgrep git curl && adduser -D -u 1000 -h /home/lunos lunos
+# XCOD-344: Node.js, npm and Python, so a sandboxed agent can build and test the most common projects
+# without a devcontainer (Build's and qa's checks run them). Other toolchains: a devcontainer or sandbox.image.
+RUN apk add libgcc libstdc++ ripgrep git curl nodejs npm python3 && adduser -D -u 1000 -h /home/lunos lunos
 
 # XCOD-49: the dist directories were renamed opencode-* -> lunos-* by the rebrand, but this
 # Dockerfile kept its own hardcoded copy of the old paths. It went unnoticed because the ghcr

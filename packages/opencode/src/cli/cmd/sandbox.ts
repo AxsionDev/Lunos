@@ -725,7 +725,7 @@ export async function sandboxTui(
     },
     ready() {
       SandboxDisabled.clear(directory)
-      return { status: "ready", id: info?.id ?? "" }
+      return { status: "ready", id: info?.id ?? "", ...(info?.toolchain ? { warning: info.toolchain } : {}) }
     },
     failed: (error) => failed(error, directory, restarted?.changes ?? [], args.strict),
     // The first frame goes first: nothing of the sandbox's start-up competes with it.
@@ -802,7 +802,7 @@ const attempt = <A>(run: () => Promise<A>) =>
 
 /** XCOD-279: one check as `lunos sandbox doctor` prints it, with the command and output when it failed. */
 export function checkLines(check: SandboxPreflight.Check) {
-  const mark = { pass: "pass", fail: "FAIL", skip: "skip" }[check.status]
+  const mark = { pass: "pass", fail: "FAIL", skip: "skip", warn: "WARN" }[check.status]
   return [
     `${mark}  ${check.name}: ${check.detail}`,
     ...(check.status === "fail" && check.error?.command ? [`        command: ${check.error.command}`] : []),

@@ -772,6 +772,20 @@ function App(props: {
     return false
   }
 
+  // XCOD-344: the sandbox is up, but its image lacks what the project builds and tests with (node for
+  // package.json …): said once, so the agent's failing checks aren't the first anyone hears of it.
+  createEffect(
+    on(
+      () => {
+        const state = sandbox.state()
+        return state?.status === "ready" ? state.warning : undefined
+      },
+      (warning) => {
+        if (warning) toast.show({ variant: "warning", title: "Sandbox toolchain", message: warning, duration: 15000 })
+      },
+    ),
+  )
+
   // XCOD-281: the sandbox failed behind the TUI: start again without it, handing over the prompt in
   // the box (and whether it was waiting to be sent). It's never sent to this computer from here.
   createEffect(
