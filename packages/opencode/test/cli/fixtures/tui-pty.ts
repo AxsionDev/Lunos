@@ -8,6 +8,7 @@ import net from "net"
 import os from "os"
 import path from "path"
 import { spawn } from "@opencode-ai/core/pty/pty.bun"
+import { noPodman } from "../../fixture/no-podman"
 
 export const COLS = 120
 export const ROWS = 45
@@ -222,6 +223,8 @@ export async function prepare(options: Options = {}) {
     await fs.writeFile(file, `#!/bin/sh\necho "$@" >> "${opened}"\n`)
     await fs.chmod(file, 0o755)
   }
+  // No container runtime unless a test puts one in bin: the PATH below keeps /usr/bin (a runner's podman).
+  await noPodman(dirs.bin)
   const env: Record<string, string> = {
     PATH: `${dirs.bin}:${path.dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`,
     ...(process.platform === "win32" ? windowsEnv(home, dirs.bin) : {}),
@@ -254,6 +257,10 @@ export async function prepare(options: Options = {}) {
       },
     }),
     NO_PROXY: "127.0.0.1,localhost,.invalid",
+    // The pty child inherits this process's environment underneath `env` (bun-pty spawns it without
+    // clearing it), so a CI runner's CI=true would exempt every start from the Welcome screen and
+    // change what the TUI asks. A test of the CI exemption sets it itself.
+    CI: "",
     ...options.env,
   }
   if (process.platform === "win32")

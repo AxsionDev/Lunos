@@ -56,6 +56,10 @@ const cacheDir = path.join(dir, "cache", "opencode")
 await fs.mkdir(cacheDir, { recursive: true })
 await fs.writeFile(path.join(cacheDir, "version"), "14")
 
+// The runner's CI=true changes behaviour under test: the Welcome screen's `ci` exemption, budgets
+// treating every turn as unattended (no "ask"), the failure screen. Tests of those set it themselves.
+delete process.env["CI"]
+
 // Clear provider and server auth env vars to ensure clean test state
 delete process.env["ANTHROPIC_API_KEY"]
 delete process.env["OPENAI_API_KEY"]

@@ -21,6 +21,7 @@ import { SandboxRollback } from "../../src/sandbox/rollback"
 import { checkLines, failed } from "../../src/cli/cmd/sandbox"
 import { SandboxDisabled } from "../../src/sandbox/disabled"
 import { tmpdir } from "../fixture/fixture"
+import { noPodman } from "../fixture/no-podman"
 
 const STOPPED =
   'error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.47/info": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.'
@@ -46,6 +47,7 @@ exit 2
 `
   await Bun.write(path.join(dir, "docker"), script)
   await fs.chmod(path.join(dir, "docker"), 0o755)
+  await noPodman(dir)
   return dir
 }
 
