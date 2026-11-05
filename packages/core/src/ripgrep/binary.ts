@@ -1,5 +1,5 @@
 import path from "path"
-import { Context, Effect, Layer, Stream } from "effect"
+import { Context, Effect, Layer, Schedule, Stream } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
@@ -145,6 +145,11 @@ export namespace RipgrepBinary {
             const archive = path.join(download, filename)
             const bytes = yield* HttpClientRequest.get(url).pipe(
               http.execute,
+              // GitHub's release CDN answers a 502/503/504 now and then (Windows CI): try again a few times.
+              Effect.retry({
+                while: (error) => error.reason._tag === "StatusCodeError" && error.reason.response.status >= 500,
+                schedule: Schedule.both(Schedule.exponential("500 millis"), Schedule.recurs(3)),
+              }),
               Effect.flatMap((response) => response.arrayBuffer),
               Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
             )
