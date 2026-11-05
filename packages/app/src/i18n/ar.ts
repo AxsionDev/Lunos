@@ -1429,4 +1429,21 @@ export const dict = {
   "feedback.sent": "شكرًا لك. وصلت ملاحظاتك إلى فريق Lunos.",
   "feedback.failed": "لم تُرسَل ملاحظاتك",
   "prompt.placeholder.accountDisabled": "تم تعطيل حسابك في Lunos: لا يمكن إرسال مطالبات جديدة",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "التحكم عن بُعد",
+  "command.session.remote.description": "تابِع هذه الجلسة ووجّهها من app.lunos.tech",
+  "session.remote.on.title": "تشغيل التحكم عن بُعد؟",
+  "session.remote.on.body":
+    "بعد تسجيل الدخول إلى حسابك في Lunos، يمكنك متابعة هذه الجلسة على app.lunos.tech، والرد على طلبات الموافقة والأسئلة الخاصة بها، وإرسال المطالبات وإيقافها، لمدة تصل إلى 12 ساعة. تظل الجلسة تعمل هنا وفق سياسة هذا الحاسوب. يحتفظ Lunos باتصال صادر واحد فقط بـ Lunos Cloud (EU)؛ ولا يُفتح أي منفذ. يُنهي الأمر /remote off التحكم عن بُعد.",
+  "session.remote.on.confirm": "تشغيل",
+  "session.remote.off.title": "التحكم عن بُعد مُفعّل",
+  "session.remote.off.body": "يمكن متابعة هذه الجلسة وتوجيهها على {{url}}. إيقاف التحكم عن بُعد؟ سينتهي فورًا.",
+  "session.remote.off.confirm": "إيقاف التشغيل",
+  "toast.session.remote.on.title": "التحكم عن بُعد مُفعّل",
+  "toast.session.remote.on.copied": "تم نسخ الرابط: {{url}}",
+  "toast.session.remote.already": "التحكم عن بُعد مُفعّل بالفعل: {{url}}",
+  "toast.session.remote.off.title": "التحكم عن بُعد متوقف",
+  "toast.session.remote.onFailed.title": "تعذّر تشغيل التحكم عن بُعد",
+  "toast.session.remote.offFailed.title": "تعذّر إيقاف التحكم عن بُعد",
+  "toast.session.remote.noSession": "ابدأ جلسة أولًا؛ يجعل الأمر /remote تلك الجلسة قابلة للتحكم عن بُعد.",
 }

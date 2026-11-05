@@ -1379,4 +1379,22 @@ export const dict: Record<string, string> = {
   "feedback.sent": "ধন্যবাদ। আপনার মতামত Lunos টিমের কাছে পৌঁছেছে।",
   "feedback.failed": "আপনার মতামত পাঠানো হয়নি",
   "prompt.placeholder.accountDisabled": "আপনার Lunos অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে: নতুন প্রম্পট পাঠানো যাবে না",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "রিমোট কন্ট্রোল",
+  "command.session.remote.description": "app.lunos.tech থেকে এই সেশন অনুসরণ ও পরিচালনা করুন",
+  "session.remote.on.title": "রিমোট কন্ট্রোল চালু করবেন?",
+  "session.remote.on.body":
+    "আপনার Lunos অ্যাকাউন্টে সাইন ইন থাকা অবস্থায় আপনি সর্বোচ্চ 12 ঘণ্টা app.lunos.tech-এ এই সেশন অনুসরণ করতে, এর অনুমোদন ও প্রশ্নের উত্তর দিতে, প্রম্পট পাঠাতে এবং এটি থামাতে পারবেন। এটি তখনও এখানেই, এই কম্পিউটারের নীতি অনুযায়ী চলে। Lunos, Lunos Cloud (EU)-এর সঙ্গে কেবল একটি বহির্গামী সংযোগ রাখে; কোনো পোর্ট খোলা হয় না। /remote off এটি বন্ধ করে।",
+  "session.remote.on.confirm": "চালু করুন",
+  "session.remote.off.title": "রিমোট কন্ট্রোল চালু আছে",
+  "session.remote.off.body":
+    "এই সেশনটি {{url}}-এ অনুসরণ ও পরিচালনা করা যায়। রিমোট কন্ট্রোল বন্ধ করবেন? এটি সঙ্গে সঙ্গে শেষ হবে।",
+  "session.remote.off.confirm": "বন্ধ করুন",
+  "toast.session.remote.on.title": "রিমোট কন্ট্রোল চালু আছে",
+  "toast.session.remote.on.copied": "লিংক কপি করা হয়েছে: {{url}}",
+  "toast.session.remote.already": "রিমোট কন্ট্রোল আগে থেকেই চালু আছে: {{url}}",
+  "toast.session.remote.off.title": "রিমোট কন্ট্রোল বন্ধ আছে",
+  "toast.session.remote.onFailed.title": "রিমোট কন্ট্রোল চালু করা যায়নি",
+  "toast.session.remote.offFailed.title": "রিমোট কন্ট্রোল বন্ধ করা যায়নি",
+  "toast.session.remote.noSession": "আগে একটি সেশন শুরু করুন; /remote সেই সেশনটিকে রিমোট করে।",
 }

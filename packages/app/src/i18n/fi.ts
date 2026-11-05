@@ -1398,4 +1398,22 @@ export const dict = {
   "feedback.sent": "Kiitos. Palautteesi meni Lunos-tiimille.",
   "feedback.failed": "Palautettasi ei lähetetty",
   "prompt.placeholder.accountDisabled": "Lunos-tilisi on poistettu käytöstä: uusia kehotteita ei voi lähettää",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Etäohjaus",
+  "command.session.remote.description": "Seuraa ja ohjaa tätä istuntoa osoitteesta app.lunos.tech",
+  "session.remote.on.title": "Otetaanko etäohjaus käyttöön?",
+  "session.remote.on.body":
+    "Voit sen jälkeen (Lunos-tilillesi kirjautuneena) seurata tätä istuntoa osoitteessa app.lunos.tech, vastata sen hyväksyntäpyyntöihin ja kysymyksiin, lähettää kehotteita ja pysäyttää sen, enintään 12 tunnin ajan. Istunto toimii edelleen täällä tämän tietokoneen käytännön mukaisesti. Lunos pitää yllä yhtä lähtevää yhteyttä Lunos Cloud -palveluun (EU); yhtään porttia ei avata. /remote off lopettaa sen.",
+  "session.remote.on.confirm": "Ota käyttöön",
+  "session.remote.off.title": "Etäohjaus on käytössä",
+  "session.remote.off.body":
+    "Tätä istuntoa voi seurata ja ohjata osoitteessa {{url}}. Poistetaanko etäohjaus käytöstä? Se päättyy heti.",
+  "session.remote.off.confirm": "Poista käytöstä",
+  "toast.session.remote.on.title": "Etäohjaus on käytössä",
+  "toast.session.remote.on.copied": "Linkki kopioitu: {{url}}",
+  "toast.session.remote.already": "Etäohjaus on jo käytössä: {{url}}",
+  "toast.session.remote.off.title": "Etäohjaus ei ole käytössä",
+  "toast.session.remote.onFailed.title": "Etäohjauksen käyttöönotto epäonnistui",
+  "toast.session.remote.offFailed.title": "Etäohjauksen poistaminen käytöstä epäonnistui",
+  "toast.session.remote.noSession": "Aloita ensin istunto; /remote tekee siitä istunnosta etäohjattavan.",
 }

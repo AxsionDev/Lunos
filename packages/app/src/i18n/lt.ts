@@ -1419,4 +1419,22 @@ export const dict = {
   "feedback.sent": "Ačiū. Jūsų atsiliepimas pasiekė Lunos komandą.",
   "feedback.failed": "Jūsų atsiliepimas neišsiųstas",
   "prompt.placeholder.accountDisabled": "Jūsų Lunos paskyra išjungta: naujų užklausų siųsti negalima",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Nuotolinis valdymas",
+  "command.session.remote.description": "Stebėkite ir valdykite šį seansą iš app.lunos.tech",
+  "session.remote.on.title": "Įjungti nuotolinį valdymą?",
+  "session.remote.on.body":
+    "Prisijungę prie savo Lunos paskyros, galėsite iki 12 valandų stebėti šį seansą svetainėje app.lunos.tech, atsakyti į jo patvirtinimo užklausas ir klausimus, siųsti raginimus ir jį sustabdyti. Jis ir toliau veikia čia, pagal šio kompiuterio politiką. Lunos palaiko vieną išeinantį ryšį su Lunos Cloud (EU); joks prievadas neatidaromas. /remote off jį išjungia.",
+  "session.remote.on.confirm": "Įjungti",
+  "session.remote.off.title": "Nuotolinis valdymas įjungtas",
+  "session.remote.off.body":
+    "Šį seansą galima stebėti ir valdyti adresu {{url}}. Išjungti nuotolinį valdymą? Jis baigiasi iš karto.",
+  "session.remote.off.confirm": "Išjungti",
+  "toast.session.remote.on.title": "Nuotolinis valdymas įjungtas",
+  "toast.session.remote.on.copied": "Nuoroda nukopijuota: {{url}}",
+  "toast.session.remote.already": "Nuotolinis valdymas jau įjungtas: {{url}}",
+  "toast.session.remote.off.title": "Nuotolinis valdymas išjungtas",
+  "toast.session.remote.onFailed.title": "Nepavyko įjungti nuotolinio valdymo",
+  "toast.session.remote.offFailed.title": "Nepavyko išjungti nuotolinio valdymo",
+  "toast.session.remote.noSession": "Pirmiausia pradėkite seansą; /remote įjungia to seanso nuotolinį valdymą.",
 }

@@ -18,6 +18,7 @@ import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-
 import { useAccount } from "@/context/account"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
 import { useSessionTakeover } from "@/components/prompt-input/takeover"
+import { useRemoteControl } from "@/pages/session/use-remote-control"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
 import { useComments } from "@/context/comments"
 import { formatKeybind, useCommand } from "@/context/command"
@@ -242,6 +243,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   }
 
   const takeover = useSessionTakeover()
+  const remote = useRemoteControl()
   const accepting = createMemo(() => {
     const id = props.controls.session.id
     if (!id) return permission.isAutoAcceptingDirectory(sdk().directory)
@@ -272,6 +274,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     onSubmit: props.onSubmit,
     model: props.controls.model.selection,
     takeover,
+    remote,
   })
 
   const referenceDescription = (reference: ReferenceInfo) =>

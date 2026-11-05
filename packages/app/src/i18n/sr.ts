@@ -1397,4 +1397,22 @@ export const dict = {
   "feedback.sent": "Хвала. Ваше повратне информације стигле су тиму Lunos-а.",
   "feedback.failed": "Ваше повратне информације нису послате",
   "prompt.placeholder.accountDisabled": "Ваш Lunos налог је онемогућен: нови упити не могу да се пошаљу",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Даљинско управљање",
+  "command.session.remote.description": "Пратите и усмеравајте ову сесију са app.lunos.tech",
+  "session.remote.on.title": "Укључити даљинско управљање?",
+  "session.remote.on.body":
+    "Када сте пријављени на свој Lunos налог, можете до 12 сати да пратите ову сесију на app.lunos.tech, одговарате на њена одобрења и питања, шаљете упите и зауставите је. И даље се извршава овде, према политици овог рачунара. Lunos одржава само једну одлазну везу ка Lunos Cloud (EU); ниједан порт се не отвара. /remote off га завршава.",
+  "session.remote.on.confirm": "Укључи",
+  "session.remote.off.title": "Даљинско управљање је укључено",
+  "session.remote.off.body":
+    "Ова сесија може да се прати и усмерава на {{url}}. Искључити даљинско управљање? Одмах престаје.",
+  "session.remote.off.confirm": "Искључи",
+  "toast.session.remote.on.title": "Даљинско управљање је укључено",
+  "toast.session.remote.on.copied": "Линк је копиран: {{url}}",
+  "toast.session.remote.already": "Даљинско управљање је већ укључено: {{url}}",
+  "toast.session.remote.off.title": "Даљинско управљање је искључено",
+  "toast.session.remote.onFailed.title": "Укључивање даљинског управљања није успело",
+  "toast.session.remote.offFailed.title": "Искључивање даљинског управљања није успело",
+  "toast.session.remote.noSession": "Прво покрените сесију; /remote омогућава даљинско управљање том сесијом.",
 }

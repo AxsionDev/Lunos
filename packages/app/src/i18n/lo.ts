@@ -1375,4 +1375,21 @@ export const dict = {
   "feedback.sent": "ຂອບໃຈ. ຄຳຕິຊົມຂອງທ່ານໄປຮອດທີມ Lunos ແລ້ວ.",
   "feedback.failed": "ຄຳຕິຊົມຂອງທ່ານບໍ່ໄດ້ຖືກສົ່ງ",
   "prompt.placeholder.accountDisabled": "ບັນຊີ Lunos ຂອງທ່ານຖືກປິດການນຳໃຊ້: ບໍ່ສາມາດສົ່ງຄຳຖາມໃໝ່ໄດ້",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "ການຄວບຄຸມທາງໄກ",
+  "command.session.remote.description": "ຕິດຕາມ ແລະ ຄວບຄຸມເຊດຊັນນີ້ຈາກ app.lunos.tech",
+  "session.remote.on.title": "ເປີດການຄວບຄຸມທາງໄກບໍ?",
+  "session.remote.on.body":
+    "ເມື່ອເຂົ້າສູ່ລະບົບບັນຊີ Lunos ຂອງທ່ານແລ້ວ ທ່ານສາມາດຕິດຕາມເຊດຊັນນີ້ທີ່ app.lunos.tech, ຕອບການອະນຸມັດ ແລະ ຄຳຖາມຂອງມັນ, ສົ່ງຄຳສັ່ງ ແລະ ຢຸດມັນໄດ້ ເຖິງ 12 ຊົ່ວໂມງ. ມັນຍັງຄົງແລ່ນຢູ່ບ່ອນນີ້ ພາຍໃຕ້ນະໂຍບາຍຂອງຄອມພິວເຕີນີ້. Lunos ຮັກສາການເຊື່ອມຕໍ່ຂາອອກພຽງອັນດຽວໄປຫາ Lunos Cloud (EU); ບໍ່ມີການເປີດພອດໃດໆ. /remote off ຈະສິ້ນສຸດມັນ.",
+  "session.remote.on.confirm": "ເປີດ",
+  "session.remote.off.title": "ການຄວບຄຸມທາງໄກເປີດຢູ່",
+  "session.remote.off.body": "ເຊດຊັນນີ້ສາມາດຕິດຕາມ ແລະ ຄວບຄຸມໄດ້ທີ່ {{url}}. ປິດການຄວບຄຸມທາງໄກບໍ? ມັນຈະສິ້ນສຸດທັນທີ.",
+  "session.remote.off.confirm": "ປິດ",
+  "toast.session.remote.on.title": "ການຄວບຄຸມທາງໄກເປີດຢູ່",
+  "toast.session.remote.on.copied": "ສຳເນົາລິ້ງແລ້ວ: {{url}}",
+  "toast.session.remote.already": "ການຄວບຄຸມທາງໄກເປີດຢູ່ແລ້ວ: {{url}}",
+  "toast.session.remote.off.title": "ການຄວບຄຸມທາງໄກປິດຢູ່",
+  "toast.session.remote.onFailed.title": "ບໍ່ສາມາດເປີດການຄວບຄຸມທາງໄກໄດ້",
+  "toast.session.remote.offFailed.title": "ບໍ່ສາມາດປິດການຄວບຄຸມທາງໄກໄດ້",
+  "toast.session.remote.noSession": "ເລີ່ມເຊດຊັນກ່ອນ; /remote ຈະເຮັດໃຫ້ເຊດຊັນນັ້ນຄວບຄຸມທາງໄກໄດ້.",
 }

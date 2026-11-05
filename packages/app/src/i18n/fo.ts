@@ -1384,4 +1384,22 @@ export const dict = {
   "feedback.sent": "Takk. Afturmeldingin er komin til Lunos-toymið.",
   "feedback.failed": "Afturmeldingin varð ikki send",
   "prompt.placeholder.accountDisabled": "Lunos-kontan hjá tær er óvirkin: nýggjar fyrispurningar kunnu ikki sendast",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Fjarstýring",
+  "command.session.remote.description": "Fylg við og stýr hesi setuni frá app.lunos.tech",
+  "session.remote.on.title": "Tendra fjarstýring?",
+  "session.remote.on.body":
+    "Tá ið tú ert innritað/ur á Lunos-kontuna hjá tær, kanst tú fylgja hesi setuni á app.lunos.tech, svara góðkenningum og spurningum hennar, senda boð og steðga henni, í upp til 12 tímar. Hon koyrir framvegis her, eftir politikki hesar teldu. Lunos heldur eitt útgangandi samband við Lunos Cloud (EU); eingin portur verður latin upp. /remote off endar fjarstýringina.",
+  "session.remote.on.confirm": "Tendra",
+  "session.remote.off.title": "Fjarstýring er tendrað",
+  "session.remote.off.body":
+    "Tú kanst fylgja við og stýra hesi setuni á {{url}}. Sløkkja fjarstýring? Hon endar beinanvegin.",
+  "session.remote.off.confirm": "Sløkk",
+  "toast.session.remote.on.title": "Fjarstýring er tendrað",
+  "toast.session.remote.on.copied": "Leinki avritað: {{url}}",
+  "toast.session.remote.already": "Fjarstýring er longu tendrað: {{url}}",
+  "toast.session.remote.off.title": "Fjarstýring er sløkt",
+  "toast.session.remote.onFailed.title": "Kundi ikki tendra fjarstýring",
+  "toast.session.remote.offFailed.title": "Kundi ikki sløkkja fjarstýring",
+  "toast.session.remote.noSession": "Byrja eina setu fyrst; /remote ger ta setuna fjarstýrda.",
 }

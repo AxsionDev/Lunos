@@ -1391,4 +1391,22 @@ export const dict = {
   "feedback.sent": "شکریہ۔ آپ کی رائے Lunos ٹیم تک پہنچ گئی۔",
   "feedback.failed": "آپ کی رائے نہیں بھیجی گئی",
   "prompt.placeholder.accountDisabled": "آپ کا Lunos اکاؤنٹ غیر فعال کر دیا گیا ہے: نئے پرامپٹ نہیں بھیجے جا سکتے",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "ریموٹ کنٹرول",
+  "command.session.remote.description": "اس سیشن کو app.lunos.tech سے فالو کریں اور چلائیں",
+  "session.remote.on.title": "ریموٹ کنٹرول آن کریں؟",
+  "session.remote.on.body":
+    "اپنے Lunos اکاؤنٹ میں سائن ان ہو کر آپ 12 گھنٹے تک app.lunos.tech پر اس سیشن کو فالو کر سکیں گے، اس کی منظوریوں اور سوالات کا جواب دے سکیں گے، پرامپٹ بھیج سکیں گے اور اسے روک سکیں گے۔ یہ بدستور یہیں، اس کمپیوٹر کی پالیسی کے تحت چلتا ہے۔ Lunos، Lunos Cloud (EU) سے صرف ایک آؤٹ گوئنگ کنکشن رکھتا ہے؛ کوئی پورٹ نہیں کھولا جاتا۔ /remote off اسے ختم کر دیتا ہے۔",
+  "session.remote.on.confirm": "آن کریں",
+  "session.remote.off.title": "ریموٹ کنٹرول آن ہے",
+  "session.remote.off.body":
+    "اس سیشن کو {{url}} پر فالو کیا اور چلایا جا سکتا ہے۔ ریموٹ کنٹرول آف کریں؟ یہ فوراً ختم ہو جائے گا۔",
+  "session.remote.off.confirm": "آف کریں",
+  "toast.session.remote.on.title": "ریموٹ کنٹرول آن ہے",
+  "toast.session.remote.on.copied": "لنک کاپی ہو گیا: {{url}}",
+  "toast.session.remote.already": "ریموٹ کنٹرول پہلے سے آن ہے: {{url}}",
+  "toast.session.remote.off.title": "ریموٹ کنٹرول آف ہے",
+  "toast.session.remote.onFailed.title": "ریموٹ کنٹرول آن نہیں ہو سکا",
+  "toast.session.remote.offFailed.title": "ریموٹ کنٹرول آف نہیں ہو سکا",
+  "toast.session.remote.noSession": "پہلے ایک سیشن شروع کریں؛ /remote اس سیشن کو ریموٹ بنا دیتا ہے۔",
 }

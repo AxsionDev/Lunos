@@ -1403,4 +1403,22 @@ export const dict = {
   "feedback.sent": "Ďakujeme. Vaša spätná väzba sa dostala k tímu Lunos.",
   "feedback.failed": "Vaša spätná väzba nebola odoslaná",
   "prompt.placeholder.accountDisabled": "Váš účet Lunos je deaktivovaný: nové prompty nie je možné odoslať",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Vzdialené ovládanie",
+  "command.session.remote.description": "Sledujte a riaďte túto reláciu z app.lunos.tech",
+  "session.remote.on.title": "Zapnúť vzdialené ovládanie?",
+  "session.remote.on.body":
+    "Po prihlásení do svojho účtu Lunos potom môžete až 12 hodín sledovať túto reláciu na app.lunos.tech, odpovedať na jej žiadosti o schválenie a otázky, posielať prompty a zastaviť ju. Relácia naďalej beží tu, podľa zásad tohto počítača. Lunos udržiava jediné odchádzajúce pripojenie k Lunos Cloud (EU); neotvára sa žiadny port. /remote off ho ukončí.",
+  "session.remote.on.confirm": "Zapnúť",
+  "session.remote.off.title": "Vzdialené ovládanie je zapnuté",
+  "session.remote.off.body":
+    "Túto reláciu možno sledovať a riadiť na {{url}}. Vypnúť vzdialené ovládanie? Skončí okamžite.",
+  "session.remote.off.confirm": "Vypnúť",
+  "toast.session.remote.on.title": "Vzdialené ovládanie je zapnuté",
+  "toast.session.remote.on.copied": "Odkaz skopírovaný: {{url}}",
+  "toast.session.remote.already": "Vzdialené ovládanie je už zapnuté: {{url}}",
+  "toast.session.remote.off.title": "Vzdialené ovládanie je vypnuté",
+  "toast.session.remote.onFailed.title": "Vzdialené ovládanie sa nepodarilo zapnúť",
+  "toast.session.remote.offFailed.title": "Vzdialené ovládanie sa nepodarilo vypnúť",
+  "toast.session.remote.noSession": "Najprv spustite reláciu; /remote z nej urobí vzdialene ovládanú reláciu.",
 }

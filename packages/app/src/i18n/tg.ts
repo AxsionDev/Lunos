@@ -1399,4 +1399,22 @@ export const dict = {
   "feedback.failed": "Фикри шумо фиристода нашуд",
   "prompt.placeholder.accountDisabled":
     "Ҳисоби Lunos-и шумо ғайрифаъол шудааст: дархостҳои навро фиристодан мумкин нест",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Идоракунии дурдаст",
+  "command.session.remote.description": "Ин сеансро аз app.lunos.tech пайгирӣ ва идора кунед",
+  "session.remote.on.title": "Идоракунии дурдаст фаъол карда шавад?",
+  "session.remote.on.body":
+    "Пас аз ворид шудан ба ҳисоби Lunos-и худ, шумо метавонед то 12 соат ин сеансро дар app.lunos.tech пайгирӣ кунед, ба тасдиқҳо ва саволҳои он ҷавоб диҳед, дархост фиристед ва онро қатъ кунед. Он ҳамчунон дар ин ҷо, тибқи сиёсати ин компютер кор мекунад. Lunos бо Lunos Cloud (EU) танҳо як пайвасти баромадиро нигоҳ медорад; ягон порт кушода намешавад. /remote off онро хотима медиҳад.",
+  "session.remote.on.confirm": "Фаъол кардан",
+  "session.remote.off.title": "Идоракунии дурдаст фаъол аст",
+  "session.remote.off.body":
+    "Ин сеансро дар {{url}} пайгирӣ ва идора кардан мумкин аст. Идоракунии дурдаст хомӯш карда шавад? Он фавран хотима меёбад.",
+  "session.remote.off.confirm": "Хомӯш кардан",
+  "toast.session.remote.on.title": "Идоракунии дурдаст фаъол аст",
+  "toast.session.remote.on.copied": "Пайванд нусхабардорӣ шуд: {{url}}",
+  "toast.session.remote.already": "Идоракунии дурдаст аллакай фаъол аст: {{url}}",
+  "toast.session.remote.off.title": "Идоракунии дурдаст хомӯш аст",
+  "toast.session.remote.onFailed.title": "Идоракунии дурдастро фаъол кардан нашуд",
+  "toast.session.remote.offFailed.title": "Идоракунии дурдастро хомӯш кардан нашуд",
+  "toast.session.remote.noSession": "Аввал сеанс оғоз кунед; /remote он сеансро дурдаст идорашаванда мегардонад.",
 }

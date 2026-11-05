@@ -1396,4 +1396,21 @@ export const dict = {
   "feedback.sent": "감사합니다. 피드백이 Lunos 팀에 전달되었습니다.",
   "feedback.failed": "피드백을 보내지 못했습니다",
   "prompt.placeholder.accountDisabled": "Lunos 계정이 비활성화되었습니다: 새 프롬프트를 보낼 수 없습니다",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "원격 제어",
+  "command.session.remote.description": "app.lunos.tech에서 이 세션을 따라가고 조종",
+  "session.remote.on.title": "원격 제어를 켤까요?",
+  "session.remote.on.body":
+    "Lunos 계정에 로그인한 상태에서 최대 12시간 동안 app.lunos.tech에서 이 세션을 따라가고, 승인 요청과 질문에 답하고, 프롬프트를 보내고, 중지할 수 있습니다. 세션은 계속 여기에서 이 컴퓨터의 정책에 따라 실행됩니다. Lunos는 Lunos Cloud (EU)로 나가는 연결 하나만 유지하며 포트를 열지 않습니다. /remote off로 종료합니다.",
+  "session.remote.on.confirm": "켜기",
+  "session.remote.off.title": "원격 제어가 켜져 있습니다",
+  "session.remote.off.body": "이 세션은 {{url}}에서 따라가고 조종할 수 있습니다. 원격 제어를 끌까요? 즉시 종료됩니다.",
+  "session.remote.off.confirm": "끄기",
+  "toast.session.remote.on.title": "원격 제어 켜짐",
+  "toast.session.remote.on.copied": "링크 복사됨: {{url}}",
+  "toast.session.remote.already": "원격 제어가 이미 켜져 있음: {{url}}",
+  "toast.session.remote.off.title": "원격 제어 꺼짐",
+  "toast.session.remote.onFailed.title": "원격 제어를 켤 수 없음",
+  "toast.session.remote.offFailed.title": "원격 제어를 끌 수 없음",
+  "toast.session.remote.noSession": "먼저 세션을 시작하세요. /remote는 그 세션을 원격으로 제어할 수 있게 합니다.",
 }

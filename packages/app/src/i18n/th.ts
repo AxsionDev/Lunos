@@ -1466,4 +1466,22 @@ export const dict = {
   "feedback.sent": "ขอบคุณ ความคิดเห็นของคุณถึงทีม Lunos แล้ว",
   "feedback.failed": "ไม่ได้ส่งความคิดเห็นของคุณ",
   "prompt.placeholder.accountDisabled": "บัญชี Lunos ของคุณถูกปิดใช้งาน: ไม่สามารถส่งพรอมต์ใหม่ได้",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "การควบคุมระยะไกล",
+  "command.session.remote.description": "ติดตามและควบคุมเซสชันนี้จาก app.lunos.tech",
+  "session.remote.on.title": "เปิดการควบคุมระยะไกลหรือไม่",
+  "session.remote.on.body":
+    "เมื่อลงชื่อเข้าใช้บัญชี Lunos ของคุณแล้ว คุณจะติดตามเซสชันนี้ที่ app.lunos.tech ตอบการอนุมัติและคำถามของเซสชัน ส่งพรอมต์ และหยุดเซสชันได้นานสูงสุด 12 ชั่วโมง เซสชันยังคงทำงานที่นี่ภายใต้นโยบายของคอมพิวเตอร์เครื่องนี้ Lunos คงการเชื่อมต่อขาออกไปยัง Lunos Cloud (EU) ไว้เพียงรายการเดียว และไม่มีการเปิดพอร์ตใดๆ /remote off จะสิ้นสุดการควบคุมนี้",
+  "session.remote.on.confirm": "เปิด",
+  "session.remote.off.title": "การควบคุมระยะไกลเปิดอยู่",
+  "session.remote.off.body":
+    "เซสชันนี้สามารถติดตามและควบคุมได้ที่ {{url}} ปิดการควบคุมระยะไกลหรือไม่ การควบคุมจะสิ้นสุดทันที",
+  "session.remote.off.confirm": "ปิด",
+  "toast.session.remote.on.title": "การควบคุมระยะไกลเปิดอยู่",
+  "toast.session.remote.on.copied": "คัดลอกลิงก์แล้ว: {{url}}",
+  "toast.session.remote.already": "การควบคุมระยะไกลเปิดอยู่แล้ว: {{url}}",
+  "toast.session.remote.off.title": "การควบคุมระยะไกลปิดอยู่",
+  "toast.session.remote.onFailed.title": "ไม่สามารถเปิดการควบคุมระยะไกล",
+  "toast.session.remote.offFailed.title": "ไม่สามารถปิดการควบคุมระยะไกล",
+  "toast.session.remote.noSession": "เริ่มเซสชันก่อน /remote จะทำให้เซสชันนั้นควบคุมระยะไกลได้",
 }

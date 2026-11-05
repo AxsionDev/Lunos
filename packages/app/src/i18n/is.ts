@@ -1385,4 +1385,22 @@ export const dict = {
   "feedback.sent": "Takk. Ábendingin þín barst Lunos-teyminu.",
   "feedback.failed": "Ábendingin þín var ekki send",
   "prompt.placeholder.accountDisabled": "Lunos-reikningurinn þinn er óvirkur: ekki er hægt að senda nýjar fyrirspurnir",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Fjarstýring",
+  "command.session.remote.description": "Fylgstu með og stýrðu þessari setu frá app.lunos.tech",
+  "session.remote.on.title": "Kveikja á fjarstýringu?",
+  "session.remote.on.body":
+    "Þegar þú ert skráð(ur) inn á Lunos-reikninginn þinn getur þú fylgst með þessari setu á app.lunos.tech, svarað samþykkisbeiðnum hennar og spurningum, sent kvaðningar og stöðvað hana, í allt að 12 klukkustundir. Hún keyrir áfram hér, samkvæmt stefnu þessarar tölvu. Lunos heldur einni útleiðandi tengingu við Lunos Cloud (EU); engin gátt er opnuð. /remote off slekkur á fjarstýringunni.",
+  "session.remote.on.confirm": "Kveikja",
+  "session.remote.off.title": "Kveikt er á fjarstýringu",
+  "session.remote.off.body":
+    "Hægt er að fylgjast með og stýra þessari setu á {{url}}. Slökkva á fjarstýringu? Henni lýkur strax.",
+  "session.remote.off.confirm": "Slökkva",
+  "toast.session.remote.on.title": "Kveikt er á fjarstýringu",
+  "toast.session.remote.on.copied": "Tengill afritaður: {{url}}",
+  "toast.session.remote.already": "Þegar er kveikt á fjarstýringu: {{url}}",
+  "toast.session.remote.off.title": "Slökkt er á fjarstýringu",
+  "toast.session.remote.onFailed.title": "Ekki tókst að kveikja á fjarstýringu",
+  "toast.session.remote.offFailed.title": "Ekki tókst að slökkva á fjarstýringu",
+  "toast.session.remote.noSession": "Byrjaðu fyrst setu; /remote gerir þá setu fjarstýrða.",
 }

@@ -1403,4 +1403,23 @@ export const dict = {
   "feedback.sent": "Köszönjük. Visszajelzése eljutott a Lunos csapatához.",
   "feedback.failed": "A visszajelzés nem lett elküldve",
   "prompt.placeholder.accountDisabled": "A Lunos-fiókod le van tiltva: új promptot nem lehet küldeni",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Távvezérlés",
+  "command.session.remote.description": "A munkamenet követése és irányítása az app.lunos.tech oldalról",
+  "session.remote.on.title": "Bekapcsolod a távvezérlést?",
+  "session.remote.on.body":
+    "A Lunos-fiókodba bejelentkezve ezután legfeljebb 12 órán át követheted ezt a munkamenetet az app.lunos.tech oldalon, válaszolhatsz a jóváhagyási kéréseire és kérdéseire, promptokat küldhetsz, és leállíthatod. Továbbra is itt fut, ennek a számítógépnek a szabályzata szerint. A Lunos egyetlen kimenő kapcsolatot tart fenn a Lunos Cloud (EU) felé; nem nyílik meg port. A /remote off befejezi.",
+  "session.remote.on.confirm": "Bekapcsolás",
+  "session.remote.off.title": "A távvezérlés be van kapcsolva",
+  "session.remote.off.body":
+    "Ez a munkamenet követhető és irányítható itt: {{url}}. Kikapcsolod a távvezérlést? Azonnal véget ér.",
+  "session.remote.off.confirm": "Kikapcsolás",
+  "toast.session.remote.on.title": "A távvezérlés be van kapcsolva",
+  "toast.session.remote.on.copied": "Hivatkozás másolva: {{url}}",
+  "toast.session.remote.already": "A távvezérlés már be van kapcsolva: {{url}}",
+  "toast.session.remote.off.title": "A távvezérlés ki van kapcsolva",
+  "toast.session.remote.onFailed.title": "Nem sikerült bekapcsolni a távvezérlést",
+  "toast.session.remote.offFailed.title": "Nem sikerült kikapcsolni a távvezérlést",
+  "toast.session.remote.noSession":
+    "Előbb indíts egy munkamenetet; a /remote távvezérelhetővé teszi azt a munkamenetet.",
 }

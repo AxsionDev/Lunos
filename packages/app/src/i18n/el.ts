@@ -1407,4 +1407,22 @@ export const dict = {
   "feedback.failed": "Τα σχόλιά σας δεν στάλθηκαν",
   "prompt.placeholder.accountDisabled":
     "Ο λογαριασμός σας στο Lunos έχει απενεργοποιηθεί: δεν μπορούν να σταλούν νέα prompts",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Απομακρυσμένος έλεγχος",
+  "command.session.remote.description": "Παρακολουθήστε και καθοδηγήστε αυτή τη συνεδρία από το app.lunos.tech",
+  "session.remote.on.title": "Ενεργοποίηση απομακρυσμένου ελέγχου;",
+  "session.remote.on.body":
+    "Συνδεδεμένοι στον λογαριασμό σας στο Lunos, θα μπορείτε στη συνέχεια να παρακολουθείτε αυτή τη συνεδρία στο app.lunos.tech, να απαντάτε στις εγκρίσεις και τις ερωτήσεις της, να στέλνετε prompts και να τη σταματάτε, για έως 12 ώρες. Συνεχίζει να εκτελείται εδώ, σύμφωνα με την πολιτική αυτού του υπολογιστή. Το Lunos διατηρεί μία μόνο εξερχόμενη σύνδεση με το Lunos Cloud (EU)· δεν ανοίγει καμία θύρα. Το /remote off τον τερματίζει.",
+  "session.remote.on.confirm": "Ενεργοποίηση",
+  "session.remote.off.title": "Ο απομακρυσμένος έλεγχος είναι ενεργός",
+  "session.remote.off.body":
+    "Αυτή η συνεδρία μπορεί να παρακολουθείται και να καθοδηγείται στο {{url}}. Απενεργοποίηση απομακρυσμένου ελέγχου; Τερματίζεται αμέσως.",
+  "session.remote.off.confirm": "Απενεργοποίηση",
+  "toast.session.remote.on.title": "Ο απομακρυσμένος έλεγχος είναι ενεργός",
+  "toast.session.remote.on.copied": "Ο σύνδεσμος αντιγράφηκε: {{url}}",
+  "toast.session.remote.already": "Ο απομακρυσμένος έλεγχος είναι ήδη ενεργός: {{url}}",
+  "toast.session.remote.off.title": "Ο απομακρυσμένος έλεγχος είναι ανενεργός",
+  "toast.session.remote.onFailed.title": "Δεν ήταν δυνατή η ενεργοποίηση του απομακρυσμένου ελέγχου",
+  "toast.session.remote.offFailed.title": "Δεν ήταν δυνατή η απενεργοποίηση του απομακρυσμένου ελέγχου",
+  "toast.session.remote.noSession": "Ξεκινήστε πρώτα μια συνεδρία· το /remote κάνει αυτή τη συνεδρία απομακρυσμένη.",
 }

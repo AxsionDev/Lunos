@@ -1397,4 +1397,22 @@ export const dict = {
   "feedback.sent": "Շնորհակալություն։ Ձեր կարծիքը հասավ Lunos-ի թիմին։",
   "feedback.failed": "Ձեր կարծիքը չուղարկվեց",
   "prompt.placeholder.accountDisabled": "Ձեր Lunos հաշիվն անջատված է․ նոր հարցումներ ուղարկել հնարավոր չէ",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Հեռակառավարում",
+  "command.session.remote.description": "Հետևել և ղեկավարել այս նիստը app.lunos.tech-ից",
+  "session.remote.on.title": "Միացնե՞լ հեռակառավարումը",
+  "session.remote.on.body":
+    "Ձեր Lunos հաշիվ մուտք գործելուց հետո դուք կկարողանաք մինչև 12 ժամ հետևել այս նիստին app.lunos.tech-ում, պատասխանել դրա հաստատման հարցումներին և հարցերին, ուղարկել հուշումներ և կանգնեցնել այն։ Այն շարունակում է աշխատել այստեղ՝ այս համակարգչի քաղաքականությամբ։ Lunos-ը պահպանում է միայն մեկ ելքային կապ Lunos Cloud-ի (EU) հետ. ոչ մի պորտ չի բացվում։ /remote off հրամանը ավարտում է այն։",
+  "session.remote.on.confirm": "Միացնել",
+  "session.remote.off.title": "Հեռակառավարումը միացված է",
+  "session.remote.off.body":
+    "Այս նիստին կարելի է հետևել և այն ղեկավարել {{url}} հասցեում։ Անջատե՞լ հեռակառավարումը։ Այն անմիջապես կավարտվի։",
+  "session.remote.off.confirm": "Անջատել",
+  "toast.session.remote.on.title": "Հեռակառավարումը միացված է",
+  "toast.session.remote.on.copied": "Հղումը պատճենվեց՝ {{url}}",
+  "toast.session.remote.already": "Հեռակառավարումն արդեն միացված է՝ {{url}}",
+  "toast.session.remote.off.title": "Հեռակառավարումն անջատված է",
+  "toast.session.remote.onFailed.title": "Չհաջողվեց միացնել հեռակառավարումը",
+  "toast.session.remote.offFailed.title": "Չհաջողվեց անջատել հեռակառավարումը",
+  "toast.session.remote.noSession": "Նախ սկսեք նիստ. /remote հրամանը այդ նիստը դարձնում է հեռակառավարվող։",
 }

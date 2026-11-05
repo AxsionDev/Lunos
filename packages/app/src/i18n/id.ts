@@ -1480,4 +1480,23 @@ export const dict = {
   "feedback.sent": "Terima kasih. Masukan Anda sudah sampai ke tim Lunos.",
   "feedback.failed": "Masukan Anda tidak terkirim",
   "prompt.placeholder.accountDisabled": "Akun Lunos Anda dinonaktifkan: prompt baru tidak dapat dikirim",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Kontrol jarak jauh",
+  "command.session.remote.description": "Ikuti dan arahkan sesi ini dari app.lunos.tech",
+  "session.remote.on.title": "Aktifkan kontrol jarak jauh?",
+  "session.remote.on.body":
+    "Setelah masuk ke akun Lunos Anda, Anda dapat mengikuti sesi ini di app.lunos.tech, menanggapi persetujuan dan pertanyaannya, mengirim prompt, dan menghentikannya, hingga 12 jam. Sesi tetap berjalan di sini, sesuai kebijakan komputer ini. Lunos hanya mempertahankan satu koneksi keluar ke Lunos Cloud (EU); tidak ada port yang dibuka. /remote off mengakhirinya.",
+  "session.remote.on.confirm": "Aktifkan",
+  "session.remote.off.title": "Kontrol jarak jauh aktif",
+  "session.remote.off.body":
+    "Sesi ini dapat diikuti dan diarahkan di {{url}}. Nonaktifkan kontrol jarak jauh? Kontrol akan langsung berakhir.",
+  "session.remote.off.confirm": "Nonaktifkan",
+  "toast.session.remote.on.title": "Kontrol jarak jauh aktif",
+  "toast.session.remote.on.copied": "Tautan disalin: {{url}}",
+  "toast.session.remote.already": "Kontrol jarak jauh sudah aktif: {{url}}",
+  "toast.session.remote.off.title": "Kontrol jarak jauh nonaktif",
+  "toast.session.remote.onFailed.title": "Tidak dapat mengaktifkan kontrol jarak jauh",
+  "toast.session.remote.offFailed.title": "Tidak dapat menonaktifkan kontrol jarak jauh",
+  "toast.session.remote.noSession":
+    "Mulai sesi terlebih dahulu; /remote menjadikan sesi itu dapat dikendalikan dari jarak jauh.",
 }

@@ -1413,4 +1413,23 @@ export const dict: Record<string, string> = {
   "feedback.sent": "བཀའ་དྲིན་ཆེ། ཁྱོད་ཀྱི་བསམ་འཆར་ Lunos སྡེ་ཚན་ལུ་ལྷོད་ཡི།",
   "feedback.failed": "ཁྱོད་ཀྱི་བསམ་འཆར་ གཏང་མ་ཚུགས།",
   "prompt.placeholder.accountDisabled": "ཁྱོད་ཀྱི་ Lunos རྩིས་ཐོ་ ལག་ལེན་མེད་པར་བཟོ་ཡོདཔ: དྲི་བ་གསརཔ་ གཏང་མི་ཚུགས།",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "ཐག་རིང་ཚད་འཛིན།",
+  "command.session.remote.description": "app.lunos.tech ལས་ ལཱ་ཡུན་འདི་ རྗེས་འདེད་དང་ ཚད་འཛིན་འབད།",
+  "session.remote.on.title": "ཐག་རིང་ཚད་འཛིན་ ཤུགས་ལྡན་བཟོ་ནི་ཨིན་ན?",
+  "session.remote.on.body":
+    "ཁྱོད་ཀྱི་ Lunos རྩིས་ཐོ་ནང་ ནང་བསྐྱོད་འབད་དེ་ཡོད་པ་ཅིན་ ཆུ་ཚོད་ 12 ཚུན་ app.lunos.tech གུ་ ལཱ་ཡུན་འདི་ རྗེས་འདེད་འབད་ནི་དང་ དེའི་ཆོག་ཐམ་དང་དྲི་བ་ཚུ་ལུ་ ལན་སློག་ནི་ བཀོད་རྒྱ་གཏང་ནི་ དེ་བཀག་ནི་ཚུ་ འབད་ཚུགས། དེ་ ད་ལྟོ་ཡང་ ནཱ་ལུ་ གློག་རིག་འདི་གི་ སྲིད་བྱུས་ལྟར་ གཡོག་བཀོལ་དོ། Lunos གིས་ Lunos Cloud (EU) ལུ་ ཕྱིར་འགྲོ་མཐུད་ལམ་ གཅིག་རྐྱངམ་ཅིག་ བཞགཔ་ཨིན། འདྲེན་སྒོ་ག་ནི་ཡང་ ཁ་མི་ཕྱེ། /remote off གིས་ དེ་མཇུག་བསྡུཝ་ཨིན།",
+  "session.remote.on.confirm": "ཤུགས་ལྡན་བཟོ།",
+  "session.remote.off.title": "ཐག་རིང་ཚད་འཛིན་ ཤུགས་ལྡན་ཨིན།",
+  "session.remote.off.body":
+    "ལཱ་ཡུན་འདི་ {{url}} གུ་ རྗེས་འདེད་དང་ཚད་འཛིན་འབད་ཚུགས། ཐག་རིང་ཚད་འཛིན་ ཤུགས་མེད་བཟོ་ནི་ཨིན་ན? དེ་ཕྱིར་ཐོག་ལས་ མཇུག་བསྡུ་འོང་།",
+  "session.remote.off.confirm": "ཤུགས་མེད་བཟོ།",
+  "toast.session.remote.on.title": "ཐག་རིང་ཚད་འཛིན་ ཤུགས་ལྡན་ཨིན།",
+  "toast.session.remote.on.copied": "འབྲེལ་མཐུད་ འདྲ་བཤུས་རྐྱབ་ཡོདཔ: {{url}}",
+  "toast.session.remote.already": "ཐག་རིང་ཚད་འཛིན་ ཧེ་མ་ལས་ ཤུགས་ལྡན་ཨིན: {{url}}",
+  "toast.session.remote.off.title": "ཐག་རིང་ཚད་འཛིན་ ཤུགས་མེད་ཨིན།",
+  "toast.session.remote.onFailed.title": "ཐག་རིང་ཚད་འཛིན་ ཤུགས་ལྡན་བཟོ་མ་ཚུགས།",
+  "toast.session.remote.offFailed.title": "ཐག་རིང་ཚད་འཛིན་ ཤུགས་མེད་བཟོ་མ་ཚུགས།",
+  "toast.session.remote.noSession":
+    "ཧེ་མ་ལཱ་ཡུན་ཅིག་ འགོ་བཙུགས། /remote གིས་ ལཱ་ཡུན་དེ་ ཐག་རིང་ལས་ ཚད་འཛིན་འབད་བཏུབ་བཟོཝ་ཨིན།",
 }

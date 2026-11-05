@@ -1491,4 +1491,22 @@ export const dict = {
   "feedback.sent": "Teşekkürler. Geri bildiriminiz Lunos ekibine ulaştı.",
   "feedback.failed": "Geri bildiriminiz gönderilmedi",
   "prompt.placeholder.accountDisabled": "Lunos hesabınız devre dışı bırakıldı: yeni istem gönderilemez",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Uzaktan kontrol",
+  "command.session.remote.description": "Bu oturumu app.lunos.tech üzerinden izleyin ve yönlendirin",
+  "session.remote.on.title": "Uzaktan kontrol açılsın mı?",
+  "session.remote.on.body":
+    "Lunos hesabınızla giriş yapmışken bu oturumu en fazla 12 saat boyunca app.lunos.tech adresinde izleyebilir, onaylarını ve sorularını yanıtlayabilir, istem gönderebilir ve oturumu durdurabilirsiniz. Oturum yine burada, bu bilgisayarın politikasına göre çalışır. Lunos, Lunos Cloud (EU) ile yalnızca bir giden bağlantı sürdürür; hiçbir bağlantı noktası açılmaz. /remote off uzaktan kontrolü sonlandırır.",
+  "session.remote.on.confirm": "Aç",
+  "session.remote.off.title": "Uzaktan kontrol açık",
+  "session.remote.off.body":
+    "Bu oturum {{url}} adresinde izlenebilir ve yönlendirilebilir. Uzaktan kontrol kapatılsın mı? Hemen sona erer.",
+  "session.remote.off.confirm": "Kapat",
+  "toast.session.remote.on.title": "Uzaktan kontrol açık",
+  "toast.session.remote.on.copied": "Bağlantı kopyalandı: {{url}}",
+  "toast.session.remote.already": "Uzaktan kontrol zaten açık: {{url}}",
+  "toast.session.remote.off.title": "Uzaktan kontrol kapalı",
+  "toast.session.remote.onFailed.title": "Uzaktan kontrol açılamadı",
+  "toast.session.remote.offFailed.title": "Uzaktan kontrol kapatılamadı",
+  "toast.session.remote.noSession": "Önce bir oturum başlatın; /remote o oturumu uzaktan kontrol edilebilir yapar.",
 } satisfies Partial<Record<Keys, string>>

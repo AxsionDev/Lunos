@@ -1400,4 +1400,23 @@ export const dict = {
   "feedback.sent": "ありがとうございます。フィードバックは Lunos チームに届きました。",
   "feedback.failed": "フィードバックは送信されませんでした",
   "prompt.placeholder.accountDisabled": "Lunos アカウントは無効になっています: 新しいプロンプトは送信できません",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "リモート操作",
+  "command.session.remote.description": "app.lunos.tech からこのセッションを追跡・操作",
+  "session.remote.on.title": "リモート操作をオンにしますか?",
+  "session.remote.on.body":
+    "Lunos アカウントにサインインしていれば、app.lunos.tech でこのセッションを最大 12 時間追跡し、承認や質問に応答し、プロンプトを送信し、停止できます。セッションは引き続きここで、このコンピューターのポリシーに従って実行されます。Lunos は Lunos Cloud (EU) への送信接続を 1 本だけ維持し、ポートは開きません。/remote off で終了します。",
+  "session.remote.on.confirm": "オンにする",
+  "session.remote.off.title": "リモート操作はオンです",
+  "session.remote.off.body":
+    "このセッションは {{url}} で追跡・操作できます。リモート操作をオフにしますか? すぐに終了します。",
+  "session.remote.off.confirm": "オフにする",
+  "toast.session.remote.on.title": "リモート操作はオンです",
+  "toast.session.remote.on.copied": "リンクをコピーしました: {{url}}",
+  "toast.session.remote.already": "リモート操作はすでにオンです: {{url}}",
+  "toast.session.remote.off.title": "リモート操作はオフです",
+  "toast.session.remote.onFailed.title": "リモート操作をオンにできませんでした",
+  "toast.session.remote.offFailed.title": "リモート操作をオフにできませんでした",
+  "toast.session.remote.noSession":
+    "先にセッションを開始してください。/remote でそのセッションをリモート操作できるようになります。",
 }

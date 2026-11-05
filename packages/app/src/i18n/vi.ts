@@ -1397,4 +1397,22 @@ export const dict = {
   "feedback.sent": "Cảm ơn bạn. Phản hồi của bạn đã đến nhóm Lunos.",
   "feedback.failed": "Phản hồi của bạn chưa được gửi",
   "prompt.placeholder.accountDisabled": "Tài khoản Lunos của bạn đã bị vô hiệu hóa: không thể gửi prompt mới",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Điều khiển từ xa",
+  "command.session.remote.description": "Theo dõi và điều khiển phiên này từ app.lunos.tech",
+  "session.remote.on.title": "Bật điều khiển từ xa?",
+  "session.remote.on.body":
+    "Khi đã đăng nhập tài khoản Lunos, bạn có thể theo dõi phiên này tại app.lunos.tech, trả lời các yêu cầu phê duyệt và câu hỏi của phiên, gửi prompt và dừng phiên, trong tối đa 12 giờ. Phiên vẫn chạy tại đây, theo chính sách của máy tính này. Lunos chỉ duy trì một kết nối đi ra tới Lunos Cloud (EU); không mở cổng nào. /remote off sẽ kết thúc điều khiển từ xa.",
+  "session.remote.on.confirm": "Bật",
+  "session.remote.off.title": "Điều khiển từ xa đang bật",
+  "session.remote.off.body":
+    "Có thể theo dõi và điều khiển phiên này tại {{url}}. Tắt điều khiển từ xa? Việc điều khiển sẽ kết thúc ngay lập tức.",
+  "session.remote.off.confirm": "Tắt",
+  "toast.session.remote.on.title": "Điều khiển từ xa đang bật",
+  "toast.session.remote.on.copied": "Đã sao chép liên kết: {{url}}",
+  "toast.session.remote.already": "Điều khiển từ xa đã được bật: {{url}}",
+  "toast.session.remote.off.title": "Điều khiển từ xa đã tắt",
+  "toast.session.remote.onFailed.title": "Không thể bật điều khiển từ xa",
+  "toast.session.remote.offFailed.title": "Không thể tắt điều khiển từ xa",
+  "toast.session.remote.noSession": "Hãy bắt đầu một phiên trước; /remote sẽ cho phép điều khiển phiên đó từ xa.",
 }

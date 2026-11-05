@@ -1420,4 +1420,22 @@ export const dict = {
   "feedback.sent": "Obrigado. Seu feedback chegou à equipe do Lunos.",
   "feedback.failed": "Seu feedback não foi enviado",
   "prompt.placeholder.accountDisabled": "Sua conta Lunos está desativada: não é possível enviar novos prompts",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Controle remoto",
+  "command.session.remote.description": "Acompanhar e conduzir esta sessão pelo app.lunos.tech",
+  "session.remote.on.title": "Ativar o controle remoto?",
+  "session.remote.on.body":
+    "Você (conectado à sua conta Lunos) poderá acompanhar esta sessão em app.lunos.tech, responder às aprovações e perguntas dela, enviar prompts e pará-la, por até 12 horas. Ela continua rodando aqui, sob a política deste computador. O Lunos mantém uma única conexão de saída com o Lunos Cloud (EU); nenhuma porta é aberta. /remote off encerra o controle remoto.",
+  "session.remote.on.confirm": "Ativar",
+  "session.remote.off.title": "O controle remoto está ativado",
+  "session.remote.off.body":
+    "Esta sessão pode ser acompanhada e conduzida em {{url}}. Desativar o controle remoto? Ele termina imediatamente.",
+  "session.remote.off.confirm": "Desativar",
+  "toast.session.remote.on.title": "Controle remoto ativado",
+  "toast.session.remote.on.copied": "Link copiado: {{url}}",
+  "toast.session.remote.already": "O controle remoto já está ativado: {{url}}",
+  "toast.session.remote.off.title": "Controle remoto desativado",
+  "toast.session.remote.onFailed.title": "Não foi possível ativar o controle remoto",
+  "toast.session.remote.offFailed.title": "Não foi possível desativar o controle remoto",
+  "toast.session.remote.noSession": "Inicie uma sessão primeiro; /remote torna essa sessão remota.",
 }

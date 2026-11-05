@@ -1403,4 +1403,22 @@ export const dict = {
   "feedback.failed": "Je feedback is niet verstuurd",
   "prompt.placeholder.accountDisabled":
     "Je Lunos-account is uitgeschakeld: nieuwe prompts kunnen niet worden verzonden",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Bediening op afstand",
+  "command.session.remote.description": "Volg en stuur deze sessie vanuit app.lunos.tech",
+  "session.remote.on.title": "Bediening op afstand inschakelen?",
+  "session.remote.on.body":
+    "Je kunt deze sessie dan (aangemeld met je Lunos-account) tot 12 uur lang volgen op app.lunos.tech, de goedkeuringen en vragen ervan beantwoorden, prompts sturen en de sessie stoppen. De sessie blijft hier draaien, onder het beleid van deze computer. Lunos houdt één uitgaande verbinding met Lunos Cloud (EU) open; er wordt geen poort geopend. /remote off beëindigt de bediening op afstand.",
+  "session.remote.on.confirm": "Inschakelen",
+  "session.remote.off.title": "Bediening op afstand staat aan",
+  "session.remote.off.body":
+    "Deze sessie kan worden gevolgd en gestuurd op {{url}}. Bediening op afstand uitschakelen? Die stopt meteen.",
+  "session.remote.off.confirm": "Uitschakelen",
+  "toast.session.remote.on.title": "Bediening op afstand staat aan",
+  "toast.session.remote.on.copied": "Link gekopieerd: {{url}}",
+  "toast.session.remote.already": "Bediening op afstand staat al aan: {{url}}",
+  "toast.session.remote.off.title": "Bediening op afstand staat uit",
+  "toast.session.remote.onFailed.title": "Kan bediening op afstand niet inschakelen",
+  "toast.session.remote.offFailed.title": "Kan bediening op afstand niet uitschakelen",
+  "toast.session.remote.noSession": "Start eerst een sessie; /remote maakt die sessie op afstand bedienbaar.",
 }

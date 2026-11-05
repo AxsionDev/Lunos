@@ -1403,4 +1403,22 @@ export const dict = {
   "feedback.sent": "Rahmat. Fikringiz Lunos jamoasiga yetib bordi.",
   "feedback.failed": "Fikringiz yuborilmadi",
   "prompt.placeholder.accountDisabled": "Lunos hisobingiz o‘chirilgan: yangi so‘rovlarni yuborib bo‘lmaydi",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Masofaviy boshqaruv",
+  "command.session.remote.description": "Bu seansni app.lunos.tech orqali kuzating va boshqaring",
+  "session.remote.on.title": "Masofaviy boshqaruv yoqilsinmi?",
+  "session.remote.on.body":
+    "Lunos hisobingizga kirgan holda bu seansni 12 soatgacha app.lunos.tech saytida kuzatishingiz, uning tasdiqlash so‘rovlari va savollariga javob berishingiz, so‘rovlar yuborishingiz va uni to‘xtatishingiz mumkin. U hamon shu yerda, ushbu kompyuter siyosatiga muvofiq ishlaydi. Lunos Lunos Cloud (EU) bilan faqat bitta chiquvchi ulanishni saqlaydi; hech qanday port ochilmaydi. /remote off uni tugatadi.",
+  "session.remote.on.confirm": "Yoqish",
+  "session.remote.off.title": "Masofaviy boshqaruv yoqilgan",
+  "session.remote.off.body":
+    "Bu seansni {{url}} manzilida kuzatish va boshqarish mumkin. Masofaviy boshqaruv o‘chirilsinmi? U darhol tugaydi.",
+  "session.remote.off.confirm": "O‘chirish",
+  "toast.session.remote.on.title": "Masofaviy boshqaruv yoqilgan",
+  "toast.session.remote.on.copied": "Havola nusxalandi: {{url}}",
+  "toast.session.remote.already": "Masofaviy boshqaruv allaqachon yoqilgan: {{url}}",
+  "toast.session.remote.off.title": "Masofaviy boshqaruv o‘chirilgan",
+  "toast.session.remote.onFailed.title": "Masofaviy boshqaruvni yoqib bo‘lmadi",
+  "toast.session.remote.offFailed.title": "Masofaviy boshqaruvni o‘chirib bo‘lmadi",
+  "toast.session.remote.noSession": "Avval seans boshlang; /remote o‘sha seansni masofadan boshqariladigan qiladi.",
 }

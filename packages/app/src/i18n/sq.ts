@@ -1391,4 +1391,22 @@ export const dict = {
   "feedback.sent": "Faleminderit. Komentet tuaja arritën te ekipi i Lunos.",
   "feedback.failed": "Komentet tuaja nuk u dërguan",
   "prompt.placeholder.accountDisabled": "Llogaria jote Lunos është çaktivizuar: nuk mund të dërgohen kërkesa të reja",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Kontroll në distancë",
+  "command.session.remote.description": "Ndiq dhe drejto këtë sesion nga app.lunos.tech",
+  "session.remote.on.title": "Të aktivizohet kontrolli në distancë?",
+  "session.remote.on.body":
+    "Pasi të identifikohesh në llogarinë tënde Lunos, mund ta ndjekësh këtë sesion në app.lunos.tech, t'u përgjigjesh miratimeve dhe pyetjeve të tij, të dërgosh kërkesa dhe ta ndalosh, deri në 12 orë. Ai vazhdon të ekzekutohet këtu, sipas politikës së këtij kompjuteri. Lunos mban vetëm një lidhje dalëse me Lunos Cloud (EU); nuk hapet asnjë portë. /remote off e përfundon.",
+  "session.remote.on.confirm": "Aktivizo",
+  "session.remote.off.title": "Kontrolli në distancë është aktiv",
+  "session.remote.off.body":
+    "Ky sesion mund të ndiqet dhe të drejtohet në {{url}}. Të çaktivizohet kontrolli në distancë? Përfundon menjëherë.",
+  "session.remote.off.confirm": "Çaktivizo",
+  "toast.session.remote.on.title": "Kontrolli në distancë është aktiv",
+  "toast.session.remote.on.copied": "Lidhja u kopjua: {{url}}",
+  "toast.session.remote.already": "Kontrolli në distancë është tashmë aktiv: {{url}}",
+  "toast.session.remote.off.title": "Kontrolli në distancë është joaktiv",
+  "toast.session.remote.onFailed.title": "Kontrolli në distancë nuk u aktivizua dot",
+  "toast.session.remote.offFailed.title": "Kontrolli në distancë nuk u çaktivizua dot",
+  "toast.session.remote.noSession": "Fillo së pari një sesion; /remote e bën atë sesion të kontrollueshëm në distancë.",
 }

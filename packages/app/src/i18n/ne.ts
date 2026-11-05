@@ -1386,4 +1386,22 @@ export const dict: Record<string, string> = {
   "feedback.sent": "धन्यवाद। तपाईंको प्रतिक्रिया Lunos टोलीमा पुग्यो।",
   "feedback.failed": "तपाईंको प्रतिक्रिया पठाइएन",
   "prompt.placeholder.accountDisabled": "तपाईंको Lunos खाता निष्क्रिय गरिएको छ: नयाँ प्रम्प्ट पठाउन सकिँदैन",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "रिमोट नियन्त्रण",
+  "command.session.remote.description": "app.lunos.tech बाट यो सत्र पछ्याउनुहोस् र सञ्चालन गर्नुहोस्",
+  "session.remote.on.title": "रिमोट नियन्त्रण सक्रिय गर्ने हो?",
+  "session.remote.on.body":
+    "आफ्नो Lunos खातामा साइन इन भएर तपाईं 12 घण्टासम्म app.lunos.tech मा यो सत्र पछ्याउन, यसका स्वीकृति र प्रश्नहरूको जवाफ दिन, प्रम्प्ट पठाउन र यसलाई रोक्न सक्नुहुन्छ। यो अझै यहीँ, यस कम्प्युटरको नीतिअनुसार चल्छ। Lunos ले Lunos Cloud (EU) सँग एउटा मात्र बाहिरी जडान राख्छ; कुनै पोर्ट खोलिँदैन। /remote off ले यसलाई अन्त्य गर्छ।",
+  "session.remote.on.confirm": "सक्रिय गर्नुहोस्",
+  "session.remote.off.title": "रिमोट नियन्त्रण सक्रिय छ",
+  "session.remote.off.body":
+    "यो सत्र {{url}} मा पछ्याउन र सञ्चालन गर्न सकिन्छ। रिमोट नियन्त्रण निष्क्रिय गर्ने हो? यो तुरुन्तै अन्त्य हुन्छ।",
+  "session.remote.off.confirm": "निष्क्रिय गर्नुहोस्",
+  "toast.session.remote.on.title": "रिमोट नियन्त्रण सक्रिय छ",
+  "toast.session.remote.on.copied": "लिङ्क प्रतिलिपि गरियो: {{url}}",
+  "toast.session.remote.already": "रिमोट नियन्त्रण पहिले नै सक्रिय छ: {{url}}",
+  "toast.session.remote.off.title": "रिमोट नियन्त्रण निष्क्रिय छ",
+  "toast.session.remote.onFailed.title": "रिमोट नियन्त्रण सक्रिय गर्न सकिएन",
+  "toast.session.remote.offFailed.title": "रिमोट नियन्त्रण निष्क्रिय गर्न सकिएन",
+  "toast.session.remote.noSession": "पहिले एउटा सत्र सुरु गर्नुहोस्; /remote ले त्यो सत्रलाई रिमोट बनाउँछ।",
 }
