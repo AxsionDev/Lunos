@@ -137,6 +137,8 @@ export function bridge(input: BridgeInput) {
   const parts = new Map<string, Map<string, Part>>()
   const pending = new Map<string, CloudRemoteLink.Event>()
   let open = true
+  /** False once `/remote off` began: no command runs any more, even while the last events are sent. */
+  let commanding = true
   let timer: ReturnType<typeof setTimeout> | undefined
   let flushing: Promise<void> = Promise.resolve()
 
@@ -404,7 +406,7 @@ export function bridge(input: BridgeInput) {
 
   async function poll() {
     let failures = 0
-    while (open) {
+    while (open && commanding) {
       let commands: CloudRemoteLink.Command[]
       try {
         commands = await CloudRemoteLink.collect(input.opts, input.link)
@@ -423,7 +425,7 @@ export function bridge(input: BridgeInput) {
       }
       for (const command of commands) {
         // `/remote off` may have come while this poll was in flight: nothing it brought runs.
-        if (!open) return
+        if (!open || !commanding) return
         const result = await run(command).catch((error) => ({
           ok: false,
           error: error instanceof Error ? error.message : String(error),
@@ -469,6 +471,8 @@ export function bridge(input: BridgeInput) {
 
   return {
     close,
+    /** Stops running commands from the web at once; events still go until close(). */
+    stopCommands: () => void (commanding = false),
     get open() {
       return open
     },
@@ -639,6 +643,10 @@ export async function disable(sessionID: string, reason = "off") {
   const a = active.get(sessionID)
   if (!a) return { on: false } as Status
   active.delete(sessionID)
+  // What the session already did still reaches the web (a run's last answer, a command's result);
+  // nothing more runs: the commands are only ever taken by the poll, which close() stops.
+  a.bridge.stopCommands()
+  await Promise.race([a.bridge.flush().catch(() => undefined), Bun.sleep(2_000)])
   a.bridge.close()
   AuditLog.emit("remote.off", { session: sessionID, link: a.link.id, reason })
   await CloudRemoteLink.close(a.opts, a.link)

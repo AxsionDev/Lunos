@@ -32,6 +32,7 @@ import { RunBudget } from "@/agent/run-budget"
 import { RunEnding } from "./run/ending"
 import { RunSettle } from "./run/settle"
 import { ShareNotice } from "@/share/notice"
+import { RunRemote } from "./run/remote"
 
 const isAbort = (error: unknown) =>
   !!error && typeof error === "object" && (error as { name?: unknown }).name === "MessageAbortedError"
@@ -205,6 +206,12 @@ export const RunCommand = effectCmd({
         type: "boolean",
         describe: "share the session",
       })
+      .option("remote", {
+        // XCOD-338: /remote for a run. Approvals wait for an answer from app.lunos.tech instead of being refused.
+        type: "boolean",
+        describe:
+          "follow and steer this run from app.lunos.tech (your phone or another computer) while it lasts; approvals wait for your answer there instead of being refused",
+      })
       .option("model", {
         type: "string",
         alias: ["m"],
@@ -351,6 +358,13 @@ export const RunCommand = effectCmd({
         if (strictArg()) argv.sandbox = true
       }, true),
   handler: Effect.fn("Cli.run")(function* (args) {
+    const remoteConflict = RunRemote.conflict({
+      remote: args.remote,
+      mini: args.mini,
+      cloud: args.cloud,
+      sandbox: sandboxWanted(args),
+    })
+    if (remoteConflict) return yield* fail(remoteConflict)
     if (args.sandbox === false && !args.attach) {
       const { refuseHost } = yield* Effect.promise(() => import("./sandbox"))
       const refused = yield* Effect.promise(() => refuseHost("`lunos run --no-sandbox`"))
@@ -590,25 +604,8 @@ export const RunCommand = effectCmd({
         process.exit(1)
       }
 
-      const rules: PermissionV1.Ruleset = interactive
-        ? []
-        : [
-            {
-              permission: "question",
-              action: "deny",
-              pattern: "*",
-            },
-            {
-              permission: "plan_enter",
-              action: "deny",
-              pattern: "*",
-            },
-            {
-              permission: "plan_exit",
-              action: "deny",
-              pattern: "*",
-            },
-          ]
+      // XCOD-338: with --remote, questions can be answered at app.lunos.tech (run/remote.ts).
+      const rules: PermissionV1.Ruleset = interactive ? [] : RunRemote.rules(!!args.remote)
 
       function title() {
         if (args.title === undefined) return
@@ -859,6 +856,7 @@ export const RunCommand = effectCmd({
         }
         const sessionID = sess.id
         let timeUp = false
+        let remote: RunRemote.Status | undefined
 
         function emit(type: string, data: Record<string, unknown>) {
           if (args.format === "json") {
@@ -1048,17 +1046,40 @@ export const RunCommand = effectCmd({
               if (next.end) break
             }
 
+            if (event.type === "question.asked" && remote && sessions.has(event.properties.sessionID)) {
+              if (!emit("question_waiting", { url: remote.url }))
+                process.stderr.write(`! the session asks a question; answer it at ${remote.url}${EOL}`)
+            }
+
             if (event.type === "permission.asked") {
               const permission = event.properties
               if (!sessions.has(permission.sessionID)) continue
 
               // XCOD-327: --auto never answers a request marked manual (browser control's site
               // approvals and confirmations): nobody is there to approve it, so it's refused.
-              if (auto && permission.metadata?.["manual"] !== true) {
+              // XCOD-338: with --remote it waits for an answer from app.lunos.tech instead.
+              const policy = RunRemote.onAsk({
+                auto: !!auto,
+                remote: !!remote,
+                manual: permission.metadata?.["manual"] === true,
+              })
+              if (policy === "approve") {
                 await client.permission.reply({
                   requestID: permission.id,
                   reply: "once",
                 })
+              } else if (policy === "wait") {
+                if (
+                  !emit("permission_waiting", {
+                    permission: permission.permission,
+                    patterns: permission.patterns,
+                    childSession: permission.sessionID !== sessionID,
+                    url: remote?.url,
+                  })
+                )
+                  process.stderr.write(
+                    `! permission requested: ${permission.permission} (${permission.patterns.join(", ")}); waiting for your answer at ${remote?.url}${EOL}`,
+                  )
               } else {
                 // XCOD-211: every refusal is in the JSON stream, so an unattended run can report it.
                 emit("permission_rejected", {
@@ -1119,7 +1140,35 @@ export const RunCommand = effectCmd({
 
         await share(client, sessionID)
 
+        // XCOD-338: on before the prompt, so its first approval already has somewhere to go; a
+        // refusal ends the run before anything is sent.
+        if (args.remote && !interactive) {
+          remote = await RunRemote.start(client, sessionID).catch((error: unknown) => {
+            const message = `remote control: ${error instanceof Error ? error.message : String(error)}`
+            emit("error", { error: { name: "RemoteControlRefused", data: { message } } })
+            UI.error(message)
+            process.exit(1)
+          })
+          if (!emit("remote", { url: remote.url, expiresAt: remote.expiresAt }))
+            process.stderr.write(`~  remote control is on: ${remote.url}${EOL}`)
+          // Ctrl+C: with --attach the link lives in the server, which goes on running.
+          const sessionToStop = sessionID
+          process.once("SIGINT", () => {
+            const timeout = new Promise((resolve) => setTimeout(resolve, 2_000).unref())
+            void Promise.race([RunRemote.stop(client, sessionToStop), timeout]).finally(() => process.exit(130))
+          })
+        }
+
         if (!interactive) {
+          try {
+            await prompted()
+          } finally {
+            if (remote) await RunRemote.stop(client, sessionID)
+          }
+          return
+        }
+
+        async function prompted() {
           const events = await client.event.subscribe()
           const completed = loop(client, events).catch((e) => {
             // XCOD-236: Ctrl+C on an attached run stops its server, which closes this stream.
@@ -1187,7 +1236,6 @@ export const RunCommand = effectCmd({
             return
           }
           await finish(result.data)
-          return
         }
 
         const model = pick(args.model)
@@ -1306,6 +1354,7 @@ export async function runMini(input: MiniCommandInput) {
     session: input.session,
     fork: input.fork,
     share: undefined,
+    remote: undefined,
     model: input.model,
     mode: input.mode,
     agent: undefined,

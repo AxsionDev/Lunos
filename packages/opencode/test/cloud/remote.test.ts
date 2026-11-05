@@ -462,6 +462,20 @@ describe("CloudRemote bridge (XCOD-338)", () => {
     )
   })
 
+  test("off still sends what the session already did (a run's last answer), but runs no command after it began", async () => {
+    const r = await turnOn()
+    emit({
+      type: "message.part.updated",
+      properties: { part: { id: "prt_last", messageID: "msg_1", sessionID: "ses_1", type: "text", text: "done" } },
+    })
+    const off = CloudRemote.disable("ses_1")
+    relay.send({ type: "permission", requestID: "per_1", reply: "once" })
+    await off
+    expect(relay.events.find((e) => e.key === "part:prt_last")?.data).toMatchObject({ text: "done" })
+    await Bun.sleep(300)
+    expect(r.marked).toEqual([])
+  })
+
   test("AC4: revoked on the web, or the session deleted, ends it here too", async () => {
     await turnOn()
     relay.revoke()
