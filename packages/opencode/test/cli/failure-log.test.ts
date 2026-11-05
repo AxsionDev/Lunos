@@ -224,7 +224,8 @@ describe("a failing sandboxed run (the reported case: Docker not running)", () =
       expect(doctor).toMatch(/FAIL {2}\S/)
       expect(doctor).toContain("nonexistent-lunos-test.sock")
       expect(doctor).toContain("command: docker info")
-      expect(doctor).toContain("exit code: 1")
+      // 1, or 0 from a Docker CLI before 29 that printed no server version (still not running).
+      expect(doctor).toMatch(/exit code: [01]\b/)
       expect(Bun.spawnSync(["unzip", "-p", zip, "system.txt"]).stdout.toString()).toContain("docker version")
       const contents = Bun.spawnSync(["unzip", "-p", zip]).stdout.toString()
       for (const seed of Object.values(SEEDS)) expect(contents).not.toContain(seed)
