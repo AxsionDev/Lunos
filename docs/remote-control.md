@@ -6,6 +6,10 @@ Follow and steer a session that runs on your computer from app.lunos.tech, on yo
 
 In the TUI, run `/remote on` in the session (or pick **Remote control** in the command palette; `/remote` alone toggles). Lunos asks you to confirm, then shows the link (`https://app.lunos.tech/remote/<link>`) and copies it. Open it signed in to the same Lunos account. `/remote off` ends it at once.
 
+In the desktop app, type `/remote`, `/remote on` or `/remote off` in the session's prompt, or pick **Remote control** in the command palette. It asks and behaves as in the TUI.
+
+For a run, `lunos run --remote "…"` turns it on for the run's session before the prompt is sent, prints the link (on stderr; with `--format json`, as a `remote` event), and turns it off when the run ends, Ctrl+C included. While it is on, an approval the run would refuse waits for your answer at app.lunos.tech instead (`--auto` still approves what it may, and a manual approval waits), and the agent may ask questions; each one is printed (`permission_waiting` / `question_waiting` in JSON). If remote control is refused, the run says why and exits 1 before anything is sent. `--remote` can't be combined with `--mini`, `--cloud` or `--sandbox` yet.
+
 The session sidebar shows **Remote** too. While it's off, clicking "turn on" does the same as `/remote`, so it asks first. While it's on, it shows the link and the time left, and clicking it turns remote control off. The row updates within a few seconds when the session is ended from app.lunos.tech, or when its 12 hours run out.
 
 It is **off by default**, per session. It also ends:
@@ -54,7 +58,8 @@ On your computer (when the audit log is on): `remote.on`, `remote.off` (with the
 
 On Lunos Cloud: `remote.opened`, `remote.command` (kind only) and `remote.ended`.
 
+Approvals and questions are forwarded the same way whichever session core raised them (V1, or the newer V2 core); an answer goes back through the route that holds the request. A V2 approval answered from the web is audited here as `permission.decision` with `via: "remote"`, and stopping a session rejects its V2 approvals and questions too.
+
 ## Not yet
 
-- The desktop app and `lunos run` have no `/remote` yet; the HTTP route (`POST /experimental/session/:id/remote`) is there for them.
-- Sessions on the V2 session core: their approvals aren't forwarded yet (the TUI's own approvals are V1).
+- `/remote` in `lunos --mini` (the interactive split-footer mode), and `lunos run --remote` with `--cloud` or `--sandbox`.

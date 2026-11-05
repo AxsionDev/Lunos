@@ -1384,4 +1384,22 @@ export const dict = {
   "feedback.sent": "سپاس. بازخورد شما به تیم Lunos رسید.",
   "feedback.failed": "بازخورد شما فرستاده نشد",
   "prompt.placeholder.accountDisabled": "حساب Lunos شما غیرفعال شده است: ارسال درخواست جدید ممکن نیست",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "کنترل از راه دور",
+  "command.session.remote.description": "این جلسه را از app.lunos.tech دنبال و هدایت کنید",
+  "session.remote.on.title": "کنترل از راه دور روشن شود؟",
+  "session.remote.on.body":
+    "پس از ورود به حساب Lunos خود، می‌توانید تا 12 ساعت این جلسه را در app.lunos.tech دنبال کنید، به درخواست‌های تأیید و پرسش‌های آن پاسخ دهید، پرامپت بفرستید و آن را متوقف کنید. جلسه همچنان اینجا و طبق سیاست این رایانه اجرا می‌شود. Lunos فقط یک اتصال خروجی به Lunos Cloud (EU) نگه می‌دارد؛ هیچ درگاهی باز نمی‌شود. /remote off آن را پایان می‌دهد.",
+  "session.remote.on.confirm": "روشن کردن",
+  "session.remote.off.title": "کنترل از راه دور روشن است",
+  "session.remote.off.body":
+    "این جلسه را می‌توان در {{url}} دنبال و هدایت کرد. کنترل از راه دور خاموش شود؟ فوراً پایان می‌یابد.",
+  "session.remote.off.confirm": "خاموش کردن",
+  "toast.session.remote.on.title": "کنترل از راه دور روشن است",
+  "toast.session.remote.on.copied": "پیوند کپی شد: {{url}}",
+  "toast.session.remote.already": "کنترل از راه دور از قبل روشن است: {{url}}",
+  "toast.session.remote.off.title": "کنترل از راه دور خاموش است",
+  "toast.session.remote.onFailed.title": "روشن کردن کنترل از راه دور ممکن نشد",
+  "toast.session.remote.offFailed.title": "خاموش کردن کنترل از راه دور ممکن نشد",
+  "toast.session.remote.noSession": "ابتدا یک جلسه را شروع کنید؛ /remote آن جلسه را از راه دور قابل کنترل می‌کند.",
 }

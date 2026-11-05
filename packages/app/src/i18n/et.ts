@@ -1379,4 +1379,22 @@ export const dict = {
   "feedback.sent": "Aitäh. Sinu tagasiside jõudis Lunose meeskonnani.",
   "feedback.failed": "Sinu tagasisidet ei saadetud",
   "prompt.placeholder.accountDisabled": "Sinu Lunose konto on keelatud: uusi päringuid ei saa saata",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Kaugjuhtimine",
+  "command.session.remote.description": "Jälgi ja juhi seda seanssi aadressilt app.lunos.tech",
+  "session.remote.on.title": "Kas lülitada kaugjuhtimine sisse?",
+  "session.remote.on.body":
+    "Oma Lunose kontole sisse logituna saad seejärel kuni 12 tundi jälgida seda seanssi aadressil app.lunos.tech, vastata selle kinnitustaotlustele ja küsimustele, saata viipasid ja selle peatada. See töötab endiselt siin, selle arvuti poliitika järgi. Lunos hoiab üht väljuvat ühendust teenusega Lunos Cloud (EU); ühtegi porti ei avata. /remote off lõpetab kaugjuhtimise.",
+  "session.remote.on.confirm": "Lülita sisse",
+  "session.remote.off.title": "Kaugjuhtimine on sees",
+  "session.remote.off.body":
+    "Seda seanssi saab jälgida ja juhtida aadressil {{url}}. Kas lülitada kaugjuhtimine välja? See lõpeb kohe.",
+  "session.remote.off.confirm": "Lülita välja",
+  "toast.session.remote.on.title": "Kaugjuhtimine on sees",
+  "toast.session.remote.on.copied": "Link kopeeritud: {{url}}",
+  "toast.session.remote.already": "Kaugjuhtimine on juba sees: {{url}}",
+  "toast.session.remote.off.title": "Kaugjuhtimine on väljas",
+  "toast.session.remote.onFailed.title": "Kaugjuhtimise sisselülitamine ebaõnnestus",
+  "toast.session.remote.offFailed.title": "Kaugjuhtimise väljalülitamine ebaõnnestus",
+  "toast.session.remote.noSession": "Alusta kõigepealt seanssi; /remote muudab selle seansi kaugjuhitavaks.",
 }

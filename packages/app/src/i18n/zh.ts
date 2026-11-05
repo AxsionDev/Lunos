@@ -1473,4 +1473,21 @@ export const dict = {
   "feedback.sent": "谢谢。你的反馈已发送给 Lunos 团队。",
   "feedback.failed": "你的反馈未发送",
   "prompt.placeholder.accountDisabled": "你的 Lunos 账户已被停用：无法发送新的提示",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "远程控制",
+  "command.session.remote.description": "从 app.lunos.tech 跟进并操控此会话",
+  "session.remote.on.title": "要开启远程控制吗？",
+  "session.remote.on.body":
+    "登录 Lunos 账户后，你可以在 app.lunos.tech 上跟进此会话、回复其批准请求和问题、发送提示词并停止它，最长 12 小时。会话仍在这里运行，遵循本机的策略。Lunos 只保持一条到 Lunos Cloud (EU) 的出站连接，不开放任何端口。/remote off 可结束远程控制。",
+  "session.remote.on.confirm": "开启",
+  "session.remote.off.title": "远程控制已开启",
+  "session.remote.off.body": "可在 {{url}} 跟进并操控此会话。要关闭远程控制吗？关闭后立即结束。",
+  "session.remote.off.confirm": "关闭",
+  "toast.session.remote.on.title": "远程控制已开启",
+  "toast.session.remote.on.copied": "链接已复制：{{url}}",
+  "toast.session.remote.already": "远程控制已处于开启状态：{{url}}",
+  "toast.session.remote.off.title": "远程控制已关闭",
+  "toast.session.remote.onFailed.title": "无法开启远程控制",
+  "toast.session.remote.offFailed.title": "无法关闭远程控制",
+  "toast.session.remote.noSession": "请先开始一个会话；/remote 会让该会话可远程控制。",
 } satisfies Partial<Record<Keys, string>>

@@ -25,6 +25,7 @@ import { normalizeSessionInfo } from "@/utils/session"
 import { Event } from "@opencode-ai/schema/event"
 import { blobDataUrl } from "@/utils/draft-store"
 import type { SessionTakeover } from "./takeover"
+import { parseRemote } from "@/pages/session/remote-control"
 
 type PendingPrompt = {
   abort: AbortController
@@ -233,6 +234,8 @@ type PromptSubmitInput = {
   model?: ModelSelection
   /** XCOD-267: asks first when a Lunos that closed left prompts queued for the session. */
   takeover?: SessionTakeover
+  /** XCOD-338: `/remote`, `/remote on|off` typed in the prompt; never sent as a prompt. */
+  remote?: (sessionID: string, want: "toggle" | "on" | "off") => Promise<unknown>
 }
 
 export function createPromptSubmit(input: PromptSubmitInput) {
@@ -342,6 +345,19 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     // XCOD-312: a disabled Lunos account sends nothing; the draft stays, and the toast says why.
     if (account && !account.allowSend()) return
+
+    // XCOD-338: `/remote`, `/remote on` and `/remote off` act on this session here, never as a prompt.
+    const remote = mode === "normal" && images.length === 0 && input.remote ? parseRemote(text) : undefined
+    if (remote && input.remote) {
+      if (!params.id) {
+        showToast({ title: language.t("toast.session.remote.noSession") })
+        return
+      }
+      submission.clear()
+      input.setPopover(null)
+      await input.remote(params.id, remote)
+      return
+    }
 
     const modelSelection = input.model ?? local.model
     const currentModel = modelSelection.current()

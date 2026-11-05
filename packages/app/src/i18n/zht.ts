@@ -1445,4 +1445,21 @@ export const dict = {
   "feedback.sent": "謝謝。你的意見回饋已送達 Lunos 團隊。",
   "feedback.failed": "你的意見回饋未送出",
   "prompt.placeholder.accountDisabled": "你的 Lunos 帳戶已停用：無法傳送新的提示",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "遠端控制",
+  "command.session.remote.description": "從 app.lunos.tech 追蹤並操控此工作階段",
+  "session.remote.on.title": "要開啟遠端控制嗎？",
+  "session.remote.on.body":
+    "登入 Lunos 帳戶後，你可以在 app.lunos.tech 追蹤此工作階段、回覆其核准請求和問題、傳送提示詞並停止它，最長 12 小時。工作階段仍在這裡執行，遵循這台電腦的政策。Lunos 只維持一條連往 Lunos Cloud (EU) 的連出連線，不會開啟任何連接埠。/remote off 可結束遠端控制。",
+  "session.remote.on.confirm": "開啟",
+  "session.remote.off.title": "遠端控制已開啟",
+  "session.remote.off.body": "可在 {{url}} 追蹤並操控此工作階段。要關閉遠端控制嗎？關閉後會立即結束。",
+  "session.remote.off.confirm": "關閉",
+  "toast.session.remote.on.title": "遠端控制已開啟",
+  "toast.session.remote.on.copied": "已複製連結：{{url}}",
+  "toast.session.remote.already": "遠端控制已處於開啟狀態：{{url}}",
+  "toast.session.remote.off.title": "遠端控制已關閉",
+  "toast.session.remote.onFailed.title": "無法開啟遠端控制",
+  "toast.session.remote.offFailed.title": "無法關閉遠端控制",
+  "toast.session.remote.noSession": "請先開始一個工作階段；/remote 會讓該工作階段可遠端控制。",
 } satisfies Partial<Record<Keys, string>>

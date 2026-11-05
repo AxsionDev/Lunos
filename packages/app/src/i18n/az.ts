@@ -1397,4 +1397,22 @@ export const dict = {
   "feedback.sent": "Təşəkkürlər. Rəyiniz Lunos komandasına çatdı.",
   "feedback.failed": "Rəyiniz göndərilmədi",
   "prompt.placeholder.accountDisabled": "Lunos hesabınız deaktiv edilib: yeni sorğular göndərilə bilməz",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Uzaqdan idarəetmə",
+  "command.session.remote.description": "Bu sessiyanı app.lunos.tech-dən izlə və idarə et",
+  "session.remote.on.title": "Uzaqdan idarəetmə aktivləşdirilsin?",
+  "session.remote.on.body":
+    "Lunos hesabınıza daxil olmuş halda bu sessiyanı 12 saata qədər app.lunos.tech ünvanında izləyə, onun təsdiqlərinə və suallarına cavab verə, sorğular göndərə və onu dayandıra bilərsiniz. O, yenə də burada, bu kompüterin siyasətinə uyğun işləyir. Lunos Lunos Cloud (EU) ilə yalnız bir çıxan bağlantı saxlayır; heç bir port açılmır. /remote off onu sonlandırır.",
+  "session.remote.on.confirm": "Aktivləşdir",
+  "session.remote.off.title": "Uzaqdan idarəetmə aktivdir",
+  "session.remote.off.body":
+    "Bu sessiyanı {{url}} ünvanında izləmək və idarə etmək olar. Uzaqdan idarəetmə deaktiv edilsin? Dərhal bitir.",
+  "session.remote.off.confirm": "Deaktiv et",
+  "toast.session.remote.on.title": "Uzaqdan idarəetmə aktivdir",
+  "toast.session.remote.on.copied": "Keçid kopyalandı: {{url}}",
+  "toast.session.remote.already": "Uzaqdan idarəetmə artıq aktivdir: {{url}}",
+  "toast.session.remote.off.title": "Uzaqdan idarəetmə deaktivdir",
+  "toast.session.remote.onFailed.title": "Uzaqdan idarəetməni aktivləşdirmək mümkün olmadı",
+  "toast.session.remote.offFailed.title": "Uzaqdan idarəetməni deaktiv etmək mümkün olmadı",
+  "toast.session.remote.noSession": "Əvvəlcə sessiya başladın; /remote həmin sessiyanı uzaqdan idarə olunan edir.",
 }

@@ -1387,4 +1387,22 @@ export const dict = {
   "feedback.sent": "Sag boluň. Pikiriňiz Lunos toparyna ýetdi.",
   "feedback.failed": "Pikiriňiz iberilmedi",
   "prompt.placeholder.accountDisabled": "Lunos hasabyňyz öçürildi: täze haýyşlar iberilip bilinmeýär",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Uzakdan dolandyryş",
+  "command.session.remote.description": "Bu sessiýany app.lunos.tech-den yzarlaň we dolandyryň",
+  "session.remote.on.title": "Uzakdan dolandyryş açylsynmy?",
+  "session.remote.on.body":
+    "Lunos hasabyňyza giren ýagdaýyňyzda bu sessiýany 12 sagada çenli app.lunos.tech salgysynda yzarlap, onuň tassyklamalaryna we soraglaryna jogap berip, haýyşlar iberip we ony saklap bilersiňiz. Ol henizem şu ýerde, bu kompýuteriň syýasatyna laýyklykda işleýär. Lunos Lunos Cloud (EU) bilen diňe bir çykýan baglanyşygy saklaýar; hiç hili port açylmaýar. /remote off ony tamamlaýar.",
+  "session.remote.on.confirm": "Aç",
+  "session.remote.off.title": "Uzakdan dolandyryş açyk",
+  "session.remote.off.body":
+    "Bu sessiýany {{url}} salgysynda yzarlap we dolandyryp bolýar. Uzakdan dolandyryş öçürilsinmi? Ol derrew tamamlanýar.",
+  "session.remote.off.confirm": "Öçür",
+  "toast.session.remote.on.title": "Uzakdan dolandyryş açyk",
+  "toast.session.remote.on.copied": "Baglanyşyk göçürildi: {{url}}",
+  "toast.session.remote.already": "Uzakdan dolandyryş eýýäm açyk: {{url}}",
+  "toast.session.remote.off.title": "Uzakdan dolandyryş öçük",
+  "toast.session.remote.onFailed.title": "Uzakdan dolandyryşy açyp bolmady",
+  "toast.session.remote.offFailed.title": "Uzakdan dolandyryşy öçürip bolmady",
+  "toast.session.remote.noSession": "Ilki bilen sessiýa başlaň; /remote şol sessiýany uzakdan dolandyrylýan edýär.",
 }

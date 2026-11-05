@@ -1385,4 +1385,22 @@ export const dict = {
   "feedback.sent": "გმადლობთ. თქვენი გამოხმაურება Lunos-ის გუნდს მიუვიდა.",
   "feedback.failed": "თქვენი გამოხმაურება არ გაიგზავნა",
   "prompt.placeholder.accountDisabled": "თქვენი Lunos ანგარიში გათიშულია: ახალი მოთხოვნების გაგზავნა შეუძლებელია",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "დისტანციური მართვა",
+  "command.session.remote.description": "ამ სესიის თვალყურის დევნება და მართვა app.lunos.tech-დან",
+  "session.remote.on.title": "ჩაირთოს დისტანციური მართვა?",
+  "session.remote.on.body":
+    "Lunos-ის ანგარიშში შესვლის შემდეგ შეგეძლებათ 12 საათამდე ადევნოთ თვალი ამ სესიას app.lunos.tech-ზე, უპასუხოთ მის დასტურის მოთხოვნებს და კითხვებს, გააგზავნოთ მოთხოვნები და შეაჩეროთ ის. ის კვლავ აქ მუშაობს, ამ კომპიუტერის პოლიტიკით. Lunos ინარჩუნებს მხოლოდ ერთ გამავალ კავშირს Lunos Cloud-თან (EU); არცერთი პორტი არ იხსნება. /remote off ასრულებს მას.",
+  "session.remote.on.confirm": "ჩართვა",
+  "session.remote.off.title": "დისტანციური მართვა ჩართულია",
+  "session.remote.off.body":
+    "ამ სესიას შეგიძლიათ თვალი ადევნოთ და მართოთ მისამართზე {{url}}. გამოირთოს დისტანციური მართვა? ის მაშინვე დასრულდება.",
+  "session.remote.off.confirm": "გამორთვა",
+  "toast.session.remote.on.title": "დისტანციური მართვა ჩართულია",
+  "toast.session.remote.on.copied": "ბმული დაკოპირდა: {{url}}",
+  "toast.session.remote.already": "დისტანციური მართვა უკვე ჩართულია: {{url}}",
+  "toast.session.remote.off.title": "დისტანციური მართვა გამორთულია",
+  "toast.session.remote.onFailed.title": "დისტანციური მართვის ჩართვა ვერ მოხერხდა",
+  "toast.session.remote.offFailed.title": "დისტანციური მართვის გამორთვა ვერ მოხერხდა",
+  "toast.session.remote.noSession": "ჯერ დაიწყეთ სესია; /remote ამ სესიას დისტანციურად სამართავს ხდის.",
 }

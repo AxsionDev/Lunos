@@ -1430,4 +1430,22 @@ export const dict = {
   "feedback.sent": "Dziękujemy. Twoja opinia trafiła do zespołu Lunos.",
   "feedback.failed": "Twoja opinia nie została wysłana",
   "prompt.placeholder.accountDisabled": "Twoje konto Lunos jest wyłączone: nie można wysyłać nowych promptów",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Zdalne sterowanie",
+  "command.session.remote.description": "Śledź tę sesję i steruj nią z app.lunos.tech",
+  "session.remote.on.title": "Włączyć zdalne sterowanie?",
+  "session.remote.on.body":
+    "Po zalogowaniu na swoje konto Lunos możesz wtedy przez maksymalnie 12 godzin śledzić tę sesję w app.lunos.tech, odpowiadać na jej prośby o zgodę i pytania, wysyłać prompty i ją zatrzymać. Sesja nadal działa tutaj, zgodnie z zasadami tego komputera. Lunos utrzymuje jedno połączenie wychodzące z Lunos Cloud (EU); żaden port nie jest otwierany. /remote off kończy zdalne sterowanie.",
+  "session.remote.on.confirm": "Włącz",
+  "session.remote.off.title": "Zdalne sterowanie jest włączone",
+  "session.remote.off.body":
+    "Tę sesję można śledzić i sterować nią pod adresem {{url}}. Wyłączyć zdalne sterowanie? Zakończy się natychmiast.",
+  "session.remote.off.confirm": "Wyłącz",
+  "toast.session.remote.on.title": "Zdalne sterowanie jest włączone",
+  "toast.session.remote.on.copied": "Skopiowano link: {{url}}",
+  "toast.session.remote.already": "Zdalne sterowanie jest już włączone: {{url}}",
+  "toast.session.remote.off.title": "Zdalne sterowanie jest wyłączone",
+  "toast.session.remote.onFailed.title": "Nie udało się włączyć zdalnego sterowania",
+  "toast.session.remote.offFailed.title": "Nie udało się wyłączyć zdalnego sterowania",
+  "toast.session.remote.noSession": "Najpierw rozpocznij sesję; /remote włącza dla niej zdalne sterowanie.",
 }

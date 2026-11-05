@@ -1414,4 +1414,22 @@ export const dict = {
   "feedback.sent": "Grazie. Il tuo feedback è arrivato al team di Lunos.",
   "feedback.failed": "Il tuo feedback non è stato inviato",
   "prompt.placeholder.accountDisabled": "Il tuo account Lunos è disattivato: non è possibile inviare nuovi prompt",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Controllo remoto",
+  "command.session.remote.description": "Segui e guida questa sessione da app.lunos.tech",
+  "session.remote.on.title": "Attivare il controllo remoto?",
+  "session.remote.on.body":
+    "Tu (con l'accesso al tuo account Lunos) potrai seguire questa sessione su app.lunos.tech, rispondere alle sue richieste di approvazione e alle sue domande, inviare prompt e interromperla, per un massimo di 12 ore. Continua a essere eseguita qui, secondo i criteri di questo computer. Lunos mantiene una sola connessione in uscita verso Lunos Cloud (EU); nessuna porta viene aperta. /remote off lo disattiva.",
+  "session.remote.on.confirm": "Attiva",
+  "session.remote.off.title": "Il controllo remoto è attivo",
+  "session.remote.off.body":
+    "Questa sessione può essere seguita e guidata su {{url}}. Disattivare il controllo remoto? Termina subito.",
+  "session.remote.off.confirm": "Disattiva",
+  "toast.session.remote.on.title": "Il controllo remoto è attivo",
+  "toast.session.remote.on.copied": "Link copiato: {{url}}",
+  "toast.session.remote.already": "Il controllo remoto è già attivo: {{url}}",
+  "toast.session.remote.off.title": "Il controllo remoto è disattivato",
+  "toast.session.remote.onFailed.title": "Impossibile attivare il controllo remoto",
+  "toast.session.remote.offFailed.title": "Impossibile disattivare il controllo remoto",
+  "toast.session.remote.noSession": "Avvia prima una sessione; /remote rende remota quella sessione.",
 }

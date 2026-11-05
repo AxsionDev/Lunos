@@ -1409,4 +1409,23 @@ export const dict = {
   "feedback.sent": "ကျေးဇူးတင်ပါသည်။ သင့်အကြံပြုချက် Lunos အဖွဲ့ထံ ရောက်ပါပြီ။",
   "feedback.failed": "သင့်အကြံပြုချက် မပို့ရသေးပါ",
   "prompt.placeholder.accountDisabled": "သင့် Lunos အကောင့်ကို ပိတ်ထားသည်- prompt အသစ်များ ပို့၍မရပါ",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "အဝေးထိန်းချုပ်မှု",
+  "command.session.remote.description": "app.lunos.tech မှ ဤစက်ရှင်ကို လိုက်ကြည့်ပြီး ထိန်းချုပ်ပါ",
+  "session.remote.on.title": "အဝေးထိန်းချုပ်မှုကို ဖွင့်မလား။",
+  "session.remote.on.body":
+    "သင့် Lunos အကောင့်သို့ ဝင်ထားပါက app.lunos.tech တွင် ဤစက်ရှင်ကို အများဆုံး 12 နာရီကြာ လိုက်ကြည့်နိုင်၊ ၎င်း၏ ခွင့်ပြုချက်တောင်းခံမှုများနှင့် မေးခွန်းများကို ဖြေနိုင်၊ prompt များ ပို့နိုင်ပြီး ရပ်နိုင်ပါသည်။ ၎င်းသည် ဤနေရာတွင် ဤကွန်ပျူတာ၏ မူဝါဒအောက်တွင် ဆက်လက်လည်ပတ်နေပါသည်။ Lunos သည် Lunos Cloud (EU) သို့ အပြင်ထွက်ချိတ်ဆက်မှု တစ်ခုသာ ထားရှိပြီး port မဖွင့်ပါ။ /remote off ဖြင့် ၎င်းကို အဆုံးသတ်နိုင်သည်။",
+  "session.remote.on.confirm": "ဖွင့်ရန်",
+  "session.remote.off.title": "အဝေးထိန်းချုပ်မှု ဖွင့်ထားသည်",
+  "session.remote.off.body":
+    "ဤစက်ရှင်ကို {{url}} တွင် လိုက်ကြည့်ပြီး ထိန်းချုပ်နိုင်သည်။ အဝေးထိန်းချုပ်မှုကို ပိတ်မလား။ ချက်ချင်း ရပ်ဆိုင်းပါမည်။",
+  "session.remote.off.confirm": "ပိတ်ရန်",
+  "toast.session.remote.on.title": "အဝေးထိန်းချုပ်မှု ဖွင့်ထားသည်",
+  "toast.session.remote.on.copied": "လင့်ခ်ကို ကူးယူပြီးပါပြီ: {{url}}",
+  "toast.session.remote.already": "အဝေးထိန်းချုပ်မှု ဖွင့်ထားပြီးဖြစ်သည်: {{url}}",
+  "toast.session.remote.off.title": "အဝေးထိန်းချုပ်မှု ပိတ်ထားသည်",
+  "toast.session.remote.onFailed.title": "အဝေးထိန်းချုပ်မှုကို ဖွင့်၍ မရပါ",
+  "toast.session.remote.offFailed.title": "အဝေးထိန်းချုပ်မှုကို ပိတ်၍ မရပါ",
+  "toast.session.remote.noSession":
+    "စက်ရှင်တစ်ခုကို အရင်စတင်ပါ၊ /remote သည် ထိုစက်ရှင်ကို အဝေးမှ ထိန်းချုပ်နိုင်အောင် ပြုလုပ်သည်။",
 }

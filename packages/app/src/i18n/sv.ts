@@ -1390,4 +1390,22 @@ export const dict = {
   "feedback.sent": "Tack. Din feedback har nått Lunos-teamet.",
   "feedback.failed": "Din feedback skickades inte",
   "prompt.placeholder.accountDisabled": "Ditt Lunos-konto är inaktiverat: nya prompter kan inte skickas",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Fjärrstyrning",
+  "command.session.remote.description": "Följ och styr den här sessionen från app.lunos.tech",
+  "session.remote.on.title": "Slå på fjärrstyrning?",
+  "session.remote.on.body":
+    "Du (inloggad på ditt Lunos-konto) kan sedan följa den här sessionen på app.lunos.tech, svara på dess godkännanden och frågor, skicka prompter och stoppa den, i upp till 12 timmar. Den körs fortfarande här, enligt den här datorns policy. Lunos håller en enda utgående anslutning till Lunos Cloud (EU); ingen port öppnas. /remote off avslutar den.",
+  "session.remote.on.confirm": "Slå på",
+  "session.remote.off.title": "Fjärrstyrning är på",
+  "session.remote.off.body":
+    "Den här sessionen kan följas och styras på {{url}}. Slå av fjärrstyrning? Den avslutas direkt.",
+  "session.remote.off.confirm": "Slå av",
+  "toast.session.remote.on.title": "Fjärrstyrning är på",
+  "toast.session.remote.on.copied": "Länk kopierad: {{url}}",
+  "toast.session.remote.already": "Fjärrstyrning är redan på: {{url}}",
+  "toast.session.remote.off.title": "Fjärrstyrning är av",
+  "toast.session.remote.onFailed.title": "Det gick inte att slå på fjärrstyrning",
+  "toast.session.remote.offFailed.title": "Det gick inte att slå av fjärrstyrning",
+  "toast.session.remote.noSession": "Starta en session först; /remote gör den sessionen fjärrstyrd.",
 }

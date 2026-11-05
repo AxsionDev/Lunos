@@ -27,9 +27,10 @@ import { CloudSyncRedact } from "./sync-redact"
  * What leaves the machine follows the session sync rules (XCOD-185): never-upload files and
  * `sync.exclude` through the path rule, then every string through the credential scanner, on
  * whole parts (streamed text is accumulated here and sent as snapshots, so a secret split across
- * two deltas is still caught). Permission requests go with their kind and patterns only. Only the
- * V1 asks this process's TUI answers (`/permission`, `/question`) are forwarded; the V2 session
- * core's asks have no answering route here yet.
+ * two deltas is still caught). Permission requests go with their kind and patterns only. Both the
+ * V1 asks (`/permission`, `/question`) and the V2 session core's (`permission.v2.*`, `question.v2.*`,
+ * answered through `/api/session/:id/permission|question/...`) are forwarded, in the same shape, so
+ * the web doesn't tell them apart; an answer goes to whichever list holds the request.
  *
  * Every command from the web is checked again here before it runs: the link must still be on (a
  * poll in flight can outlive `/remote off`), a permission or question must be pending for this
@@ -136,6 +137,8 @@ export function bridge(input: BridgeInput) {
   const parts = new Map<string, Map<string, Part>>()
   const pending = new Map<string, CloudRemoteLink.Event>()
   let open = true
+  /** False once `/remote off` began: no command runs any more, even while the last events are sent. */
+  let commanding = true
   let timer: ReturnType<typeof setTimeout> | undefined
   let flushing: Promise<void> = Promise.resolve()
 
@@ -261,6 +264,7 @@ export function bridge(input: BridgeInput) {
           },
         ]
       case "permission.asked":
+      case "permission.v2.asked":
         if (!own(p.sessionID)) return []
         return [
           {
@@ -270,13 +274,15 @@ export function bridge(input: BridgeInput) {
               id: p.id,
               sessionID: p.sessionID,
               permission: p.permission ?? p.action,
-              patterns: (Array.isArray(p.patterns) ? p.patterns : []).map((x: unknown) =>
-                isSecret(String(x)) ? `[not synced: ${x}]` : String(x),
+              // V2 asks name their action and resources; V1 asks, their permission and patterns.
+              patterns: (Array.isArray(p.patterns) ? p.patterns : Array.isArray(p.resources) ? p.resources : []).map(
+                (x: unknown) => (isSecret(String(x)) ? `[not synced: ${x}]` : String(x)),
               ),
             }),
           },
         ]
       case "question.asked":
+      case "question.v2.asked":
         if (!own(p.sessionID)) return []
         return [
           {
@@ -288,6 +294,9 @@ export function bridge(input: BridgeInput) {
       case "permission.replied":
       case "question.replied":
       case "question.rejected":
+      case "permission.v2.replied":
+      case "question.v2.replied":
+      case "question.v2.rejected":
         if (!own(p.sessionID)) return []
         return [
           {
@@ -315,10 +324,27 @@ export function bridge(input: BridgeInput) {
     return []
   }
 
-  async function pendingFor(kind: "permission" | "question", requestID: string) {
-    const res = await input.api(`/${kind}`)
-    const list = res.ok ? ((await res.json()) as Array<{ id?: string; sessionID?: string }>) : []
-    return list.some((item) => item.id === requestID && own(item.sessionID))
+  type Ask = { id?: string; sessionID?: string; action?: string; resources?: string[] }
+
+  /**
+   * Where a request waits, if it waits for this session or one of its subagents: the V1 list first,
+   * then the V2 session core's (its list is `{ location, data }`, for the directory's location). The
+   * two use the same id prefixes, so the lists decide, never the id.
+   */
+  async function pendingFor(
+    kind: "permission" | "question",
+    requestID: string,
+  ): Promise<{ v2: boolean; ask: Ask } | undefined> {
+    const v1 = await input.api(`/${kind}`)
+    const list = v1.ok ? ((await v1.json().catch(() => [])) as Ask[]) : []
+    const found = Array.isArray(list) ? list.find((item) => item.id === requestID && own(item.sessionID)) : undefined
+    if (found) return { v2: false, ask: found }
+    const v2 = await input.api(v2Path(`/api/${kind}/request`, input.directory))
+    const body = v2.ok ? ((await v2.json().catch(() => undefined)) as { data?: Ask[] } | undefined) : undefined
+    const ask = (Array.isArray(body?.data) ? body.data : []).find(
+      (item) => item.id === requestID && own(item.sessionID),
+    )
+    return ask ? { v2: true, ask } : undefined
   }
 
   async function run(command: CloudRemoteLink.Command): Promise<{ ok: boolean; error?: string; delivery?: string }> {
@@ -329,21 +355,39 @@ export function bridge(input: BridgeInput) {
         return { ok: true, delivery: r.delivery }
       }
       case "permission": {
-        if (!(await pendingFor("permission", command.requestID)))
-          return { ok: false, error: "No such approval is waiting in this session." }
-        input.mark(command.requestID)
-        const res = await input.api(`/permission/${command.requestID}/reply`, {
+        const found = await pendingFor("permission", command.requestID)
+        if (!found) return { ok: false, error: "No such approval is waiting in this session." }
+        const body = JSON.stringify({ reply: command.reply, ...(command.message ? { message: command.message } : {}) })
+        if (!found.v2) {
+          input.mark(command.requestID)
+          const res = await input.api(`/permission/${command.requestID}/reply`, { method: "POST", body })
+          return res.ok ? { ok: true } : { ok: false, error: `The approval failed (${res.status}).` }
+        }
+        // The V2 core audits no decision of its own; a remote one is recorded here, as V1's is there.
+        const res = await input.api(`/api/session/${found.ask.sessionID}/permission/${command.requestID}/reply`, {
           method: "POST",
-          body: JSON.stringify({ reply: command.reply, ...(command.message ? { message: command.message } : {}) }),
+          body,
         })
-        return res.ok ? { ok: true } : { ok: false, error: `The approval failed (${res.status}).` }
+        if (!res.ok) return { ok: false, error: `The approval failed (${res.status}).` }
+        AuditLog.emit("permission.decision", {
+          session: found.ask.sessionID,
+          permission: found.ask.action,
+          patterns: found.ask.resources,
+          decision:
+            command.reply === "reject" ? "denied" : command.reply === "always" ? "allowed always" : "allowed once",
+          via: "remote",
+        })
+        return { ok: true }
       }
       case "question": {
-        if (!(await pendingFor("question", command.requestID)))
-          return { ok: false, error: "No such question is waiting in this session." }
+        const found = await pendingFor("question", command.requestID)
+        if (!found) return { ok: false, error: "No such question is waiting in this session." }
+        const base = found.v2
+          ? `/api/session/${found.ask.sessionID}/question/${command.requestID}`
+          : `/question/${command.requestID}`
         const res = command.reject
-          ? await input.api(`/question/${command.requestID}/reject`, { method: "POST", body: "null" })
-          : await input.api(`/question/${command.requestID}/reply`, {
+          ? await input.api(`${base}/reject`, { method: "POST", ...(found.v2 ? {} : { body: "null" }) })
+          : await input.api(`${base}/reply`, {
               method: "POST",
               body: JSON.stringify({ answers: command.answers ?? [] }),
             })
@@ -362,7 +406,7 @@ export function bridge(input: BridgeInput) {
 
   async function poll() {
     let failures = 0
-    while (open) {
+    while (open && commanding) {
       let commands: CloudRemoteLink.Command[]
       try {
         commands = await CloudRemoteLink.collect(input.opts, input.link)
@@ -381,7 +425,7 @@ export function bridge(input: BridgeInput) {
       }
       for (const command of commands) {
         // `/remote off` may have come while this poll was in flight: nothing it brought runs.
-        if (!open) return
+        if (!open || !commanding) return
         const result = await run(command).catch((error) => ({
           ok: false,
           error: error instanceof Error ? error.message : String(error),
@@ -427,17 +471,21 @@ export function bridge(input: BridgeInput) {
 
   return {
     close,
+    /** Stops running commands from the web at once; events still go until close(). */
+    stopCommands: () => void (commanding = false),
     get open() {
       return open
     },
     /** What the web sees first: the session, its recent messages and what it is waiting on. */
     snapshot: async () => {
-      const [session, messages, permissions, questions] = await Promise.all(
+      const [session, messages, permissions, questions, permissionsV2, questionsV2] = await Promise.all(
         [
           `/session/${input.sessionID}`,
           `/session/${input.sessionID}/message?limit=${SNAPSHOT_MESSAGES}`,
           "/permission",
           "/question",
+          v2Path("/api/permission/request", input.directory),
+          v2Path("/api/question/request", input.directory),
         ].map((path) =>
           input
             .api(path)
@@ -457,6 +505,10 @@ export function bridge(input: BridgeInput) {
         out.push({ payload: { type: "permission.asked", properties: ask } })
       for (const ask of Array.isArray(questions) ? questions : [])
         out.push({ payload: { type: "question.asked", properties: ask } })
+      for (const ask of Array.isArray(permissionsV2?.data) ? permissionsV2.data : [])
+        out.push({ payload: { type: "permission.v2.asked", properties: ask } })
+      for (const ask of Array.isArray(questionsV2?.data) ? questionsV2.data : [])
+        out.push({ payload: { type: "question.v2.asked", properties: ask } })
       queue(out.flatMap(translate))
       await new Promise((resolve) => setTimeout(resolve, FLUSH_MS + 10))
       await flushing
@@ -471,6 +523,14 @@ export function bridge(input: BridgeInput) {
     },
     polling,
   }
+}
+
+/**
+ * A V2 location route for the directory: those read `location[directory]`, not `directory` (which
+ * they would ignore, falling back to the process's working directory).
+ */
+export function v2Path(path: string, directory: string) {
+  return `${path}?${new URLSearchParams({ "location[directory]": directory })}`
 }
 
 function tokens(t: any) {
@@ -583,6 +643,10 @@ export async function disable(sessionID: string, reason = "off") {
   const a = active.get(sessionID)
   if (!a) return { on: false } as Status
   active.delete(sessionID)
+  // What the session already did still reaches the web (a run's last answer, a command's result);
+  // nothing more runs: the commands are only ever taken by the poll, which close() stops.
+  a.bridge.stopCommands()
+  await Promise.race([a.bridge.flush().catch(() => undefined), Bun.sleep(2_000)])
   a.bridge.close()
   AuditLog.emit("remote.off", { session: sessionID, link: a.link.id, reason })
   await CloudRemoteLink.close(a.opts, a.link)

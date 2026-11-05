@@ -19,6 +19,16 @@ entries" in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Remote control from the desktop app and from `lunos run`.** Type `/remote` in a session in the
+  desktop app (or pick Remote control in its command palette), as in the TUI. `lunos run --remote`
+  makes a run followable at app.lunos.tech for as long as it lasts: approvals it would otherwise refuse
+  wait for your answer there, and the agent may ask you questions. Sessions on the new session core
+  now send their approvals and questions to app.lunos.tech too. <!-- XCOD-338 -->
+
 ## [1.19.0] - 2026-11-02
 
 ### Added

@@ -1418,4 +1418,22 @@ export const dict = {
   "feedback.sent": "Danke. Ihr Feedback ist beim Lunos-Team angekommen.",
   "feedback.failed": "Ihr Feedback wurde nicht gesendet",
   "prompt.placeholder.accountDisabled": "Ihr Lunos-Konto ist deaktiviert: Neue Prompts können nicht gesendet werden",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Fernsteuerung",
+  "command.session.remote.description": "Diese Sitzung über app.lunos.tech verfolgen und steuern",
+  "session.remote.on.title": "Fernsteuerung einschalten?",
+  "session.remote.on.body":
+    "Sie (angemeldet mit Ihrem Lunos-Konto) können diese Sitzung dann bis zu 12 Stunden lang unter app.lunos.tech verfolgen, ihre Freigaben und Fragen beantworten, Prompts senden und sie stoppen. Sie läuft weiterhin hier, unter der Richtlinie dieses Computers. Lunos hält eine einzige ausgehende Verbindung zu Lunos Cloud (EU); es wird kein Port geöffnet. /remote off beendet die Fernsteuerung.",
+  "session.remote.on.confirm": "Einschalten",
+  "session.remote.off.title": "Fernsteuerung ist aktiv",
+  "session.remote.off.body":
+    "Diese Sitzung kann unter {{url}} verfolgt und gesteuert werden. Fernsteuerung ausschalten? Sie endet sofort.",
+  "session.remote.off.confirm": "Ausschalten",
+  "toast.session.remote.on.title": "Fernsteuerung ist aktiv",
+  "toast.session.remote.on.copied": "Link kopiert: {{url}}",
+  "toast.session.remote.already": "Fernsteuerung ist bereits aktiv: {{url}}",
+  "toast.session.remote.off.title": "Fernsteuerung ist aus",
+  "toast.session.remote.onFailed.title": "Fernsteuerung konnte nicht eingeschaltet werden",
+  "toast.session.remote.offFailed.title": "Fernsteuerung konnte nicht ausgeschaltet werden",
+  "toast.session.remote.noSession": "Starten Sie zuerst eine Sitzung; /remote macht diese Sitzung fernsteuerbar.",
 } satisfies Partial<Record<Keys, string>>

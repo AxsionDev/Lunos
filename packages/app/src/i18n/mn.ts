@@ -1396,4 +1396,22 @@ export const dict = {
   "feedback.sent": "Баярлалаа. Таны санал Lunos багт хүрлээ.",
   "feedback.failed": "Таны санал илгээгдсэнгүй",
   "prompt.placeholder.accountDisabled": "Таны Lunos бүртгэл идэвхгүй болсон: шинэ хүсэлт илгээх боломжгүй",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Алсын удирдлага",
+  "command.session.remote.description": "Энэ сессийг app.lunos.tech-ээс дагаж, удирдах",
+  "session.remote.on.title": "Алсын удирдлагыг асаах уу?",
+  "session.remote.on.body":
+    "Lunos бүртгэлдээ нэвтэрсэн байхад та энэ сессийг 12 цаг хүртэл app.lunos.tech дээр дагаж, түүний зөвшөөрлийн хүсэлт болон асуултад хариулж, хүсэлт илгээж, зогсоож болно. Энэ нь энд, энэ компьютерийн бодлогын дагуу ажилласаар байна. Lunos нь Lunos Cloud (EU) руу ганцхан гарах холболт барина; ямар ч порт нээгдэхгүй. /remote off үүнийг дуусгана.",
+  "session.remote.on.confirm": "Асаах",
+  "session.remote.off.title": "Алсын удирдлага асаалттай",
+  "session.remote.off.body":
+    "Энэ сессийг {{url}} дээр дагаж, удирдах боломжтой. Алсын удирдлагыг унтраах уу? Шууд дуусна.",
+  "session.remote.off.confirm": "Унтраах",
+  "toast.session.remote.on.title": "Алсын удирдлага асаалттай",
+  "toast.session.remote.on.copied": "Холбоос хуулагдлаа: {{url}}",
+  "toast.session.remote.already": "Алсын удирдлага аль хэдийн асаалттай: {{url}}",
+  "toast.session.remote.off.title": "Алсын удирдлага унтарсан",
+  "toast.session.remote.onFailed.title": "Алсын удирдлагыг асааж чадсангүй",
+  "toast.session.remote.offFailed.title": "Алсын удирдлагыг унтрааж чадсангүй",
+  "toast.session.remote.noSession": "Эхлээд сесс эхлүүлнэ үү; /remote тэр сессийг алсаас удирдах боломжтой болгоно.",
 }

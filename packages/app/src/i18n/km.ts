@@ -1379,4 +1379,21 @@ export const dict = {
   "feedback.sent": "អរគុណ។ មតិកែលម្អរបស់អ្នកបានទៅដល់ក្រុម Lunos ហើយ។",
   "feedback.failed": "មតិកែលម្អរបស់អ្នកមិនត្រូវបានផ្ញើទេ",
   "prompt.placeholder.accountDisabled": "គណនី Lunos របស់អ្នកត្រូវបានបិទ៖ មិនអាចផ្ញើសំណើថ្មីបានទេ",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "ការគ្រប់គ្រងពីចម្ងាយ",
+  "command.session.remote.description": "តាមដាន និងគ្រប់គ្រងសម័យនេះពី app.lunos.tech",
+  "session.remote.on.title": "បើកការគ្រប់គ្រងពីចម្ងាយឬ?",
+  "session.remote.on.body":
+    "នៅពេលចូលគណនី Lunos របស់អ្នក អ្នកអាចតាមដានសម័យនេះនៅ app.lunos.tech ឆ្លើយការយល់ព្រម និងសំណួររបស់វា ផ្ញើសំណើ និងបញ្ឈប់វា បានរហូតដល់ 12 ម៉ោង។ វានៅតែដំណើរការនៅទីនេះ ក្រោមគោលការណ៍របស់កុំព្យូទ័រនេះ។ Lunos រក្សាការតភ្ជាប់ចេញតែមួយប៉ុណ្ណោះទៅ Lunos Cloud (EU); គ្មានច្រកណាមួយត្រូវបានបើកទេ។ /remote off បញ្ចប់វា។",
+  "session.remote.on.confirm": "បើក",
+  "session.remote.off.title": "ការគ្រប់គ្រងពីចម្ងាយបានបើក",
+  "session.remote.off.body": "សម័យនេះអាចតាមដាន និងគ្រប់គ្រងបាននៅ {{url}}។ បិទការគ្រប់គ្រងពីចម្ងាយឬ? វានឹងបញ្ចប់ភ្លាមៗ។",
+  "session.remote.off.confirm": "បិទ",
+  "toast.session.remote.on.title": "ការគ្រប់គ្រងពីចម្ងាយបានបើក",
+  "toast.session.remote.on.copied": "បានចម្លងតំណ៖ {{url}}",
+  "toast.session.remote.already": "ការគ្រប់គ្រងពីចម្ងាយបានបើករួចហើយ៖ {{url}}",
+  "toast.session.remote.off.title": "ការគ្រប់គ្រងពីចម្ងាយបានបិទ",
+  "toast.session.remote.onFailed.title": "មិនអាចបើកការគ្រប់គ្រងពីចម្ងាយបានទេ",
+  "toast.session.remote.offFailed.title": "មិនអាចបិទការគ្រប់គ្រងពីចម្ងាយបានទេ",
+  "toast.session.remote.noSession": "ចាប់ផ្ដើមសម័យមួយជាមុនសិន; /remote ធ្វើឱ្យសម័យនោះអាចគ្រប់គ្រងពីចម្ងាយបាន។",
 }

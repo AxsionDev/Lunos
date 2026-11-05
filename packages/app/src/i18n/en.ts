@@ -1374,4 +1374,22 @@ export const dict = {
   "feedback.sent": "Thank you. Your feedback went to the Lunos team.",
   "feedback.failed": "Your feedback wasn't sent",
   "prompt.placeholder.accountDisabled": "Your Lunos account is disabled: new prompts can't be sent",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Remote control",
+  "command.session.remote.description": "Follow and steer this session from app.lunos.tech",
+  "session.remote.on.title": "Turn remote control on?",
+  "session.remote.on.body":
+    "You (signed in to your Lunos account) can then follow this session at app.lunos.tech, answer its approvals and questions, send prompts and stop it, for up to 12 hours. It still runs here, under this computer's policy. Lunos keeps one outgoing connection to Lunos Cloud (EU); no port is opened. /remote off ends it.",
+  "session.remote.on.confirm": "Turn on",
+  "session.remote.off.title": "Remote control is on",
+  "session.remote.off.body":
+    "This session can be followed and steered at {{url}}. Turn remote control off? It ends at once.",
+  "session.remote.off.confirm": "Turn off",
+  "toast.session.remote.on.title": "Remote control is on",
+  "toast.session.remote.on.copied": "Link copied: {{url}}",
+  "toast.session.remote.already": "Remote control is already on: {{url}}",
+  "toast.session.remote.off.title": "Remote control is off",
+  "toast.session.remote.onFailed.title": "Couldn't turn remote control on",
+  "toast.session.remote.offFailed.title": "Couldn't turn remote control off",
+  "toast.session.remote.noSession": "Start a session first; /remote makes that session remote.",
 }

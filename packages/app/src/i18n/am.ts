@@ -1350,4 +1350,21 @@ export const dict = {
   "feedback.sent": "እናመሰግናለን። አስተያየትዎ ለLunos ቡድን ደርሷል።",
   "feedback.failed": "አስተያየትዎ አልተላከም",
   "prompt.placeholder.accountDisabled": "የእርስዎ Lunos መለያ ተሰናክሏል፦ አዲስ ጥያቄዎችን መላክ አይቻልም",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "የርቀት መቆጣጠሪያ",
+  "command.session.remote.description": "ይህን ክፍለ ጊዜ ከ app.lunos.tech ይከታተሉ እና ይምሩ",
+  "session.remote.on.title": "የርቀት መቆጣጠሪያን ያብሩ?",
+  "session.remote.on.body":
+    "ወደ Lunos መለያዎ ገብተው ይህን ክፍለ ጊዜ እስከ 12 ሰዓት ድረስ በ app.lunos.tech ላይ መከታተል፣ ለፈቃዶቹ እና ለጥያቄዎቹ መልስ መስጠት፣ ጥያቄዎችን መላክ እና ማቆም ይችላሉ። አሁንም እዚህ፣ በዚህ ኮምፒውተር ፖሊሲ ስር ይሰራል። Lunos ወደ Lunos Cloud (EU) አንድ ወጪ ግንኙነት ብቻ ይይዛል፤ ምንም ፖርት አይከፈትም። /remote off ያበቃዋል።",
+  "session.remote.on.confirm": "አብራ",
+  "session.remote.off.title": "የርቀት መቆጣጠሪያ በርቷል",
+  "session.remote.off.body": "ይህ ክፍለ ጊዜ በ {{url}} ላይ ሊከታተል እና ሊመራ ይችላል። የርቀት መቆጣጠሪያን ያጥፉ? ወዲያውኑ ያበቃል።",
+  "session.remote.off.confirm": "አጥፋ",
+  "toast.session.remote.on.title": "የርቀት መቆጣጠሪያ በርቷል",
+  "toast.session.remote.on.copied": "አገናኝ ተቀድቷል፦ {{url}}",
+  "toast.session.remote.already": "የርቀት መቆጣጠሪያ አስቀድሞ በርቷል፦ {{url}}",
+  "toast.session.remote.off.title": "የርቀት መቆጣጠሪያ ጠፍቷል",
+  "toast.session.remote.onFailed.title": "የርቀት መቆጣጠሪያን ማብራት አልተቻለም",
+  "toast.session.remote.offFailed.title": "የርቀት መቆጣጠሪያን ማጥፋት አልተቻለም",
+  "toast.session.remote.noSession": "መጀመሪያ ክፍለ ጊዜ ይጀምሩ፤ /remote ያንን ክፍለ ጊዜ የርቀት ያደርገዋል።",
 }

@@ -22,6 +22,7 @@ import { useSessionLayout } from "@/pages/session/session-layout"
 import { useSessionArchive } from "@/pages/session/session-archive"
 import { createSessionOwnership } from "./session-ownership"
 import { useLocal } from "@/context/local"
+import { useRemoteControl } from "./use-remote-control"
 
 export type SessionCommandContext = {
   navigateMessageByOffset: (offset: number) => void
@@ -55,6 +56,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const { params, sessionKey, tabs, view } = useSessionLayout()
   const sessionOwnership = createSessionOwnership(sessionKey)
   const sessionArchive = useSessionArchive()
+  const remoteControl = useRemoteControl()
   const openDialog = async <T,>(load: () => Promise<T>, show: (value: T) => void) => {
     const owner = sessionOwnership.capture()
     const value = await load()
@@ -496,6 +498,18 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       slash: "fork",
       disabled: !params.id || visibleUserMessages().length === 0,
       onSelect: fork,
+    }),
+    // XCOD-338: follow and steer this session from app.lunos.tech (a phone, another computer).
+    sessionCommand({
+      id: "session.remote",
+      title: language.t("command.session.remote"),
+      description: language.t("command.session.remote.description"),
+      slash: "remote",
+      disabled: !params.id,
+      onSelect: () => {
+        const id = params.id
+        if (id) void remoteControl(id, "toggle")
+      },
     }),
     sessionCommand({
       id: "session.export",

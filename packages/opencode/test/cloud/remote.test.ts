@@ -93,6 +93,21 @@ function fakeApi() {
       return Response.json([
         { id: "que_1", sessionID: "ses_1", questions: [{ question: "Which?", options: [{ label: "A" }] }] },
       ])
+    // XCOD-338: the V2 session core's lists: `{ location, data }`, for the location the query names.
+    if (p === "/api/permission/request?location%5Bdirectory%5D=%2Fwork")
+      return Response.json({
+        location: { directory: "/work" },
+        data: [
+          { id: "per_v2", sessionID: "ses_1", action: "edit", resources: ["src/a.ts"] },
+          { id: "per_v2child", sessionID: "ses_child", action: "bash", resources: ["ls"] },
+          { id: "per_v2other", sessionID: "ses_other", action: "bash", resources: ["rm -rf /"] },
+        ],
+      })
+    if (p === "/api/question/request?location%5Bdirectory%5D=%2Fwork")
+      return Response.json({
+        location: { directory: "/work" },
+        data: [{ id: "que_v2", sessionID: "ses_1", questions: [{ question: "Which?", header: "Pick", options: [] }] }],
+      })
     if (p === "/session/ses_1") return Response.json({ id: "ses_1", title: "Fix the bug" })
     if (p.startsWith("/session/ses_1/message")) return Response.json([])
     return Response.json(true)
@@ -212,8 +227,8 @@ describe("CloudRemote bridge (XCOD-338)", () => {
     expect(r.status).toMatchObject({ on: true, link: "rl_1", url: "https://app.lunos.tech/remote/rl_1" })
     expect(relay.opened()).toEqual({ device: "dev_mac", session: "ses_1", title: "Fix the bug" })
     await until(() => relay.events.some((e) => e.type === "permission.asked"))
-    // Only this session's asks and its subagents' (once the subagent is known); never another session's.
-    expect(relay.events.filter((e) => e.type === "permission.asked").map((e) => e.data.id)).toEqual(["per_1"])
+    // Only this session's asks and its subagents' (once the subagent is known); never another session's. V1 and V2 alike.
+    expect(relay.events.filter((e) => e.type === "permission.asked").map((e) => e.data.id)).toEqual(["per_1", "per_v2"])
     expect(relay.events.find((e) => e.type === "question.asked")?.data.questions[0].question).toBe("Which?")
     // Every relay call after open carries the host secret.
     expect(relay.hosts.every((h) => h === "a".repeat(64))).toBe(true)
@@ -283,6 +298,79 @@ describe("CloudRemote bridge (XCOD-338)", () => {
     ])
     // The audit never holds the prompt text.
     expect(JSON.stringify(await auditLines())).not.toContain("add a test")
+  })
+
+  test("V2 session core: its asks are in the snapshot in V1's shape, and answers go to its own routes", async () => {
+    const r = await turnOn()
+    // The snapshot reads the V2 lists for this directory's location and keeps this session's asks only.
+    expect(relay.events.find((e) => e.type === "permission.asked" && e.data.id === "per_v2")?.data).toEqual({
+      id: "per_v2",
+      sessionID: "ses_1",
+      permission: "edit",
+      patterns: ["src/a.ts"],
+    })
+    expect(relay.events.some((e) => e.data?.id === "per_v2other")).toBe(false)
+    expect(relay.events.find((e) => e.type === "question.asked" && e.data.id === "que_v2")).toBeTruthy()
+
+    relay.send({ type: "permission", requestID: "per_v2other", reply: "always" })
+    relay.send({ type: "permission", requestID: "per_v2", reply: "reject", message: "not that file" })
+    relay.send({ type: "question", requestID: "que_v2", answers: [["A"]] })
+    relay.send({ type: "question", requestID: "que_v2", reject: true })
+    await until(() => relay.events.filter((e) => e.type === "command.result").length === 4)
+    const posts = r.api.calls.filter((c) => c.method === "POST")
+    expect(posts).toEqual([
+      {
+        method: "POST",
+        path: "/api/session/ses_1/permission/per_v2/reply",
+        body: JSON.stringify({ reply: "reject", message: "not that file" }),
+      },
+      { method: "POST", path: "/api/session/ses_1/question/que_v2/reply", body: JSON.stringify({ answers: [["A"]] }) },
+      // V2's reject takes no body.
+      { method: "POST", path: "/api/session/ses_1/question/que_v2/reject" },
+    ])
+    // Only V1 asks are marked for the V1 permission service's audit; V2's decision is audited here.
+    expect(r.marked).toEqual([])
+    expect(await auditLines()).toContainEqual(
+      expect.objectContaining({
+        event: "permission.decision",
+        session: "ses_1",
+        permission: "edit",
+        decision: "denied",
+        via: "remote",
+      }),
+    )
+
+    // A subagent's V2 ask is answered under the subagent's session, once it is known.
+    emit({
+      type: "session.created",
+      properties: { sessionID: "ses_child", info: { id: "ses_child", parentID: "ses_1", title: "explore" } },
+    })
+    relay.send({ type: "permission", requestID: "per_v2child", reply: "once" })
+    await until(() => r.api.calls.some((c) => c.path === "/api/session/ses_child/permission/per_v2child/reply"))
+  })
+
+  test("V2 session core: live asks and their settling reach the web in V1's shape", async () => {
+    await turnOn()
+    emit({
+      type: "permission.v2.asked",
+      properties: { id: "per_live", sessionID: "ses_1", action: "read", resources: [".env", "README.md"] },
+    })
+    emit({ type: "question.v2.asked", properties: { id: "que_live", sessionID: "ses_1", questions: [] } })
+    emit({
+      type: "permission.v2.asked",
+      properties: { id: "per_nope", sessionID: "ses_other", action: "read", resources: [] },
+    })
+    await until(() => relay.events.some((e) => e.data?.id === "que_live"))
+    expect(relay.events.find((e) => e.data?.id === "per_live")?.data).toEqual({
+      id: "per_live",
+      sessionID: "ses_1",
+      permission: "read",
+      patterns: ["[not synced: .env]", "README.md"],
+    })
+    expect(relay.events.some((e) => e.data?.id === "per_nope")).toBe(false)
+    emit({ type: "permission.v2.replied", properties: { sessionID: "ses_1", requestID: "per_live", reply: "once" } })
+    emit({ type: "question.v2.rejected", properties: { sessionID: "ses_1", requestID: "que_live" } })
+    await until(() => relay.events.filter((e) => e.type === "ask.settled").length === 2)
   })
 
   test("a command older than its TTL is dropped, never run late", async () => {
@@ -372,6 +460,20 @@ describe("CloudRemote bridge (XCOD-338)", () => {
     expect(await auditLines()).toContainEqual(
       expect.objectContaining({ event: "remote.off", session: "ses_1", reason: "off" }),
     )
+  })
+
+  test("off still sends what the session already did (a run's last answer), but runs no command after it began", async () => {
+    const r = await turnOn()
+    emit({
+      type: "message.part.updated",
+      properties: { part: { id: "prt_last", messageID: "msg_1", sessionID: "ses_1", type: "text", text: "done" } },
+    })
+    const off = CloudRemote.disable("ses_1")
+    relay.send({ type: "permission", requestID: "per_1", reply: "once" })
+    await off
+    expect(relay.events.find((e) => e.key === "part:prt_last")?.data).toMatchObject({ text: "done" })
+    await Bun.sleep(300)
+    expect(r.marked).toEqual([])
   })
 
   test("AC4: revoked on the web, or the session deleted, ends it here too", async () => {

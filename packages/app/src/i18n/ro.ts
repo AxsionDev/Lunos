@@ -1401,4 +1401,22 @@ export const dict = {
   "feedback.sent": "Mulțumim. Feedbackul tău a ajuns la echipa Lunos.",
   "feedback.failed": "Feedbackul tău nu a fost trimis",
   "prompt.placeholder.accountDisabled": "Contul tău Lunos este dezactivat: nu se pot trimite prompturi noi",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Control de la distanță",
+  "command.session.remote.description": "Urmărește și dirijează această sesiune din app.lunos.tech",
+  "session.remote.on.title": "Activezi controlul de la distanță?",
+  "session.remote.on.body":
+    "Tu (conectat la contul tău Lunos) vei putea apoi să urmărești această sesiune pe app.lunos.tech, să răspunzi la aprobările și întrebările ei, să trimiți prompturi și să o oprești, timp de până la 12 ore. Ea rulează în continuare aici, conform politicii acestui computer. Lunos menține o singură conexiune de ieșire către Lunos Cloud (EU); nu se deschide niciun port. /remote off îl încheie.",
+  "session.remote.on.confirm": "Activează",
+  "session.remote.off.title": "Controlul de la distanță este activ",
+  "session.remote.off.body":
+    "Această sesiune poate fi urmărită și dirijată la {{url}}. Dezactivezi controlul de la distanță? Se încheie imediat.",
+  "session.remote.off.confirm": "Dezactivează",
+  "toast.session.remote.on.title": "Controlul de la distanță este activ",
+  "toast.session.remote.on.copied": "Link copiat: {{url}}",
+  "toast.session.remote.already": "Controlul de la distanță este deja activ: {{url}}",
+  "toast.session.remote.off.title": "Controlul de la distanță este dezactivat",
+  "toast.session.remote.onFailed.title": "Nu s-a putut activa controlul de la distanță",
+  "toast.session.remote.offFailed.title": "Nu s-a putut dezactiva controlul de la distanță",
+  "toast.session.remote.noSession": "Pornește mai întâi o sesiune; /remote o face controlabilă de la distanță.",
 }

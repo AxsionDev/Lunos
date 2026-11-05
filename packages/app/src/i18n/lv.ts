@@ -1398,4 +1398,22 @@ export const dict = {
   "feedback.sent": "Paldies. Jūsu atsauksme nonāca pie Lunos komandas.",
   "feedback.failed": "Jūsu atsauksme netika nosūtīta",
   "prompt.placeholder.accountDisabled": "Jūsu Lunos konts ir atspējots: jaunus vaicājumus nevar nosūtīt",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Attālā vadība",
+  "command.session.remote.description": "Sekojiet šai sesijai un vadiet to no app.lunos.tech",
+  "session.remote.on.title": "Ieslēgt attālo vadību?",
+  "session.remote.on.body":
+    "Pēc pierakstīšanās savā Lunos kontā jūs līdz 12 stundām varēsiet sekot šai sesijai vietnē app.lunos.tech, atbildēt uz tās apstiprinājumu pieprasījumiem un jautājumiem, sūtīt uzvednes un to apturēt. Tā joprojām darbojas šeit, saskaņā ar šī datora politiku. Lunos uztur vienu izejošu savienojumu ar Lunos Cloud (EU); neviens ports netiek atvērts. /remote off to izbeidz.",
+  "session.remote.on.confirm": "Ieslēgt",
+  "session.remote.off.title": "Attālā vadība ir ieslēgta",
+  "session.remote.off.body":
+    "Šai sesijai var sekot un to vadīt vietnē {{url}}. Izslēgt attālo vadību? Tā beidzas nekavējoties.",
+  "session.remote.off.confirm": "Izslēgt",
+  "toast.session.remote.on.title": "Attālā vadība ir ieslēgta",
+  "toast.session.remote.on.copied": "Saite nokopēta: {{url}}",
+  "toast.session.remote.already": "Attālā vadība jau ir ieslēgta: {{url}}",
+  "toast.session.remote.off.title": "Attālā vadība ir izslēgta",
+  "toast.session.remote.onFailed.title": "Neizdevās ieslēgt attālo vadību",
+  "toast.session.remote.offFailed.title": "Neizdevās izslēgt attālo vadību",
+  "toast.session.remote.noSession": "Vispirms sāciet sesiju; /remote padara šo sesiju attāli vadāmu.",
 }

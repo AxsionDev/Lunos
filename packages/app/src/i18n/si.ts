@@ -1381,4 +1381,22 @@ export const dict: Record<string, string> = {
   "feedback.sent": "ස්තූතියි. ඔබේ ප්‍රතිචාරය Lunos කණ්ඩායමට ලැබුණා.",
   "feedback.failed": "ඔබේ ප්‍රතිචාරය යැවුණේ නැත",
   "prompt.placeholder.accountDisabled": "ඔබගේ Lunos ගිණුම අක්‍රිය කර ඇත: නව විමසුම් යැවිය නොහැක",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "දුරස්ථ පාලනය",
+  "command.session.remote.description": "app.lunos.tech වෙතින් මෙම සැසිය අනුගමනය කර මෙහෙයවන්න",
+  "session.remote.on.title": "දුරස්ථ පාලනය ක්‍රියාත්මක කරන්නද?",
+  "session.remote.on.body":
+    "ඔබගේ Lunos ගිණුමට පුරනය වී සිටියදී, ඔබට පැය 12ක් දක්වා app.lunos.tech හි මෙම සැසිය අනුගමනය කිරීමට, එහි අනුමැති සහ ප්‍රශ්නවලට පිළිතුරු දීමට, prompt යැවීමට සහ එය නැවැත්වීමට හැකිය. එය තවමත් මෙහි, මෙම පරිගණකයේ ප්‍රතිපත්තිය යටතේ ධාවනය වේ. Lunos, Lunos Cloud (EU) වෙත පිටතට යන සම්බන්ධතාවක් එකක් පමණක් පවත්වා ගනී; කිසිදු පෝට් එකක් විවෘත නොකෙරේ. /remote off එය අවසන් කරයි.",
+  "session.remote.on.confirm": "ක්‍රියාත්මක කරන්න",
+  "session.remote.off.title": "දුරස්ථ පාලනය ක්‍රියාත්මකයි",
+  "session.remote.off.body":
+    "මෙම සැසිය {{url}} හි අනුගමනය කර මෙහෙයවිය හැක. දුරස්ථ පාලනය අක්‍රිය කරන්නද? එය වහාම අවසන් වේ.",
+  "session.remote.off.confirm": "අක්‍රිය කරන්න",
+  "toast.session.remote.on.title": "දුරස්ථ පාලනය ක්‍රියාත්මකයි",
+  "toast.session.remote.on.copied": "සබැඳිය පිටපත් කළා: {{url}}",
+  "toast.session.remote.already": "දුරස්ථ පාලනය දැනටමත් ක්‍රියාත්මකයි: {{url}}",
+  "toast.session.remote.off.title": "දුරස්ථ පාලනය අක්‍රියයි",
+  "toast.session.remote.onFailed.title": "දුරස්ථ පාලනය ක්‍රියාත්මක කළ නොහැකි විය",
+  "toast.session.remote.offFailed.title": "දුරස්ථ පාලනය අක්‍රිය කළ නොහැකි විය",
+  "toast.session.remote.noSession": "පළමුව සැසියක් අරඹන්න; /remote එම සැසිය දුරස්ථව පාලනය කළ හැකි කරයි.",
 }

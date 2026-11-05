@@ -89,6 +89,9 @@ Options:
   -s, --session       session id to continue                                                [string]
       --fork          fork the session before continuing (requires --continue or --session)[boolean]
       --share         share the session                                                    [boolean]
+      --remote        follow and steer this run from app.lunos.tech (your phone or another computer)
+                      while it lasts; approvals wait for your answer there instead of being refused
+                                                                                           [boolean]
   -m, --model         model to use in the format of provider/model                          [string]
       --mode          mode to use                                                           [string]
       --format        format: default (formatted) or json (raw JSON events)

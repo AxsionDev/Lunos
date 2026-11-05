@@ -1408,4 +1408,22 @@ export const dict = {
   "feedback.sent": "Hvala. Vaše povratne informacije so prispele do ekipe Lunos.",
   "feedback.failed": "Vaše povratne informacije niso bile poslane",
   "prompt.placeholder.accountDisabled": "Vaš račun Lunos je onemogočen: novih pozivov ni mogoče poslati",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Oddaljeno upravljanje",
+  "command.session.remote.description": "Spremljajte in usmerjajte to sejo iz app.lunos.tech",
+  "session.remote.on.title": "Želite vklopiti oddaljeno upravljanje?",
+  "session.remote.on.body":
+    "Ko ste prijavljeni v svoj račun Lunos, lahko nato do 12 ur spremljate to sejo na app.lunos.tech, odgovarjate na njene prošnje za odobritev in vprašanja, pošiljate pozive in jo ustavite. Še vedno teče tukaj, v skladu s pravilnikom tega računalnika. Lunos vzdržuje eno samo odhodno povezavo z Lunos Cloud (EU); nobena vrata se ne odprejo. /remote off ga konča.",
+  "session.remote.on.confirm": "Vklopi",
+  "session.remote.off.title": "Oddaljeno upravljanje je vklopljeno",
+  "session.remote.off.body":
+    "To sejo je mogoče spremljati in usmerjati na {{url}}. Želite izklopiti oddaljeno upravljanje? Takoj se konča.",
+  "session.remote.off.confirm": "Izklopi",
+  "toast.session.remote.on.title": "Oddaljeno upravljanje je vklopljeno",
+  "toast.session.remote.on.copied": "Povezava kopirana: {{url}}",
+  "toast.session.remote.already": "Oddaljeno upravljanje je že vklopljeno: {{url}}",
+  "toast.session.remote.off.title": "Oddaljeno upravljanje je izklopljeno",
+  "toast.session.remote.onFailed.title": "Oddaljenega upravljanja ni bilo mogoče vklopiti",
+  "toast.session.remote.offFailed.title": "Oddaljenega upravljanja ni bilo mogoče izklopiti",
+  "toast.session.remote.noSession": "Najprej začnite sejo; /remote omogoči oddaljeno upravljanje te seje.",
 }

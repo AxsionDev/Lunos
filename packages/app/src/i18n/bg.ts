@@ -1400,4 +1400,22 @@ export const dict = {
   "feedback.sent": "Благодарим ви. Отзивът ви стигна до екипа на Lunos.",
   "feedback.failed": "Отзивът ви не беше изпратен",
   "prompt.placeholder.accountDisabled": "Вашият акаунт в Lunos е деактивиран: не могат да се изпращат нови заявки",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Дистанционно управление",
+  "command.session.remote.description": "Следете и управлявайте тази сесия от app.lunos.tech",
+  "session.remote.on.title": "Да се включи ли дистанционното управление?",
+  "session.remote.on.body":
+    "След като сте влезли в акаунта си в Lunos, ще можете до 12 часа да следите тази сесия на app.lunos.tech, да отговаряте на нейните одобрения и въпроси, да изпращате подкани и да я спрете. Тя продължава да работи тук, според политиката на този компютър. Lunos поддържа само една изходяща връзка към Lunos Cloud (EU); не се отваря порт. /remote off го прекратява.",
+  "session.remote.on.confirm": "Включване",
+  "session.remote.off.title": "Дистанционното управление е включено",
+  "session.remote.off.body":
+    "Тази сесия може да бъде следена и управлявана на {{url}}. Да се изключи ли дистанционното управление? Прекратява се веднага.",
+  "session.remote.off.confirm": "Изключване",
+  "toast.session.remote.on.title": "Дистанционното управление е включено",
+  "toast.session.remote.on.copied": "Връзката е копирана: {{url}}",
+  "toast.session.remote.already": "Дистанционното управление вече е включено: {{url}}",
+  "toast.session.remote.off.title": "Дистанционното управление е изключено",
+  "toast.session.remote.onFailed.title": "Неуспешно включване на дистанционното управление",
+  "toast.session.remote.offFailed.title": "Неуспешно изключване на дистанционното управление",
+  "toast.session.remote.noSession": "Първо стартирайте сесия; /remote прави тази сесия дистанционно управлявана.",
 }

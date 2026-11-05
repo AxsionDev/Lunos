@@ -1512,4 +1512,22 @@ export const dict = {
   "feedback.sent": "Дякуємо. Ваш відгук отримала команда Lunos.",
   "feedback.failed": "Ваш відгук не надіслано",
   "prompt.placeholder.accountDisabled": "Ваш обліковий запис Lunos вимкнено: нові запити надіслати не можна",
+  // XCOD-338: remote control from the desktop app.
+  "command.session.remote": "Віддалене керування",
+  "command.session.remote.description": "Стежте за цією сесією та керуйте нею з app.lunos.tech",
+  "session.remote.on.title": "Увімкнути віддалене керування?",
+  "session.remote.on.body":
+    "Увійшовши у свій обліковий запис Lunos, ви зможете до 12 годин стежити за цією сесією на app.lunos.tech, відповідати на її запитання й підтверджувати її дії, надсилати запити та зупиняти її. Вона й далі виконується тут, за політикою цього комп'ютера. Lunos підтримує одне вихідне з'єднання з Lunos Cloud (EU); жоден порт не відкривається. /remote off вимикає його.",
+  "session.remote.on.confirm": "Увімкнути",
+  "session.remote.off.title": "Віддалене керування увімкнено",
+  "session.remote.off.body":
+    "За цією сесією можна стежити й керувати нею на {{url}}. Вимкнути віддалене керування? Воно припиниться одразу.",
+  "session.remote.off.confirm": "Вимкнути",
+  "toast.session.remote.on.title": "Віддалене керування увімкнено",
+  "toast.session.remote.on.copied": "Посилання скопійовано: {{url}}",
+  "toast.session.remote.already": "Віддалене керування вже увімкнено: {{url}}",
+  "toast.session.remote.off.title": "Віддалене керування вимкнено",
+  "toast.session.remote.onFailed.title": "Не вдалося увімкнути віддалене керування",
+  "toast.session.remote.offFailed.title": "Не вдалося вимкнути віддалене керування",
+  "toast.session.remote.noSession": "Спершу почніть сесію; /remote вмикає для неї віддалене керування.",
 }
