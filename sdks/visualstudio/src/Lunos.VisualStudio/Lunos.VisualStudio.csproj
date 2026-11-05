@@ -1,8 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
   <!-- XCOD-333: the Lunos extension for Visual Studio 2022 (17.x), an in-process VSSDK AsyncPackage.
        In-process because it uses the VS diff viewer (IVsDifferenceService), the Error List and editor
        selections, which VisualStudio.Extensibility (out-of-process) doesn't cover yet. Windows only:
-       built by .github/workflows/visualstudio.yml. The logic lives in Lunos.Core, tested on any OS. -->
+       built by .github/workflows/ide-plugins.yml. The logic lives in Lunos.Core, tested on any OS. -->
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -38,4 +39,13 @@
     <Content Include="Resources\lunos.png" IncludeInVSIX="true" />
     <Content Include="Resources\LICENSE.txt" IncludeInVSIX="true" />
   </ItemGroup>
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <!-- Microsoft.VSSDK.BuildTools only sets VSToolsPath; it doesn't import the VSSDK targets. Legacy VSIX
+       projects import them by hand, and without this VSCT, the pkgdef and the .vsix container are all
+       silently skipped (the build "succeeds" with just the DLL). It must come after Sdk.targets. -->
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="Exists('$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets')" />
+  <!-- Fail loudly on Windows instead of building a DLL with no VSIX if the targets ever go missing again. -->
+  <Target Name="LunosRequireVsSdkTargets" BeforeTargets="Build" Condition="'$(OS)' == 'Windows_NT' And !Exists('$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets')">
+    <Error Text="Microsoft.VsSDK.targets not found under '$(VSToolsPath)\VSSDK'; restore Microsoft.VSSDK.BuildTools first." />
+  </Target>
 </Project>
