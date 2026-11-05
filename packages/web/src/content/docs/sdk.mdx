@@ -1,6 +1,6 @@
 ---
 title: SDK
-description: Type-safe JS client for opencode server.
+description: Type-safe JavaScript and Python clients for the Lunos server.
 ---
 
 import config from "../../../config.mjs"
@@ -10,6 +10,31 @@ The opencode JS/TS SDK provides a type-safe client for interacting with the serv
 Use it to build integrations and control opencode programmatically.
 
 [Learn more](/docs/server) about how the server works. For examples, check out the [projects](/docs/ecosystem#projects) built by the community.
+
+---
+
+## Python
+
+There is also a Python SDK, `lunos`, with the same API: it's generated from the same server spec. It needs Python 3.10 or later, on macOS, Linux or Windows.
+
+```bash
+pip install lunos
+```
+
+```python
+import lunos
+from lunos.events import PermissionRequest, TextDelta
+
+with lunos.Lunos.start() as client:  # runs `lunos serve` in the current directory
+    session = client.sessions.create(agent="build")
+    for event in session.prompt("Run the tests and tell me what fails"):
+        if isinstance(event, TextDelta):
+            print(event.text, end="", flush=True)
+        elif isinstance(event, PermissionRequest):
+            session.approve(event)
+```
+
+It also has an async client (`AsyncLunos`), custom tools written in Python (`@lunos.tool`), and headless runs with limits (`lunos.run(prompt, budget=, max_steps=, max_time=, sandbox=)`). The server applies your organisation's policy and data-residency rules, so the SDK gets the same refusals as the TUI. The [Python SDK README](https://github.com/AxsionDev/Lunos/tree/dev/packages/sdk/python#readme) documents all of it.
 
 ---
 
