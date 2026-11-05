@@ -1,5 +1,5 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { Effect, Layer, Context, Schema } from "effect"
+import { Effect, Layer, Context, Schema, Semaphore } from "effect"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Snapshot } from "@/snapshot"
@@ -63,6 +63,28 @@ function unquoteGitPath(input: string) {
   return Buffer.from(bytes).toString()
 }
 
+/** A user message the user sent: one with a text part that isn't synthetic. */
+export function isPrompt(message: SessionV1.WithParts) {
+  return (
+    message.info.role === "user" && message.parts.some((part) => part.type === "text" && !part.synthetic && !part.ignored)
+  )
+}
+
+/**
+ * The prompt that `messageID` belongs to and the messages of its turn: from that prompt up to the
+ * next one, synthetic user messages (background results, auto-continues) and their replies included.
+ */
+export function promptTurn(messages: SessionV1.WithParts[], messageID: MessageID) {
+  const index = messages.findIndex((m) => m.info.id === messageID)
+  if (index === -1) return
+  let start = index
+  while (start >= 0 && !isPrompt(messages[start]!)) start--
+  if (start < 0) return
+  let end = start + 1
+  while (end < messages.length && !isPrompt(messages[end]!)) end++
+  return { owner: messages[start]!, messages: messages.slice(start, end) }
+}
+
 export interface Interface {
   readonly summarize: (input: { sessionID: SessionID; messageID: MessageID }) => Effect.Effect<void>
   readonly diff: (input: { sessionID: SessionID; messageID?: MessageID }) => Effect.Effect<Snapshot.FileDiff[]>
@@ -99,7 +121,21 @@ const layer = Layer.effect(
       return []
     })
 
-    const summarize = Effect.fn("SessionSummary.summarize")(function* (input: {
+    // Summaries are forked per step and read the messages as they are then: one at a time per
+    // session, so an older view (an empty diff at the start of a turn) never lands after a newer one.
+    const locks = new Map<SessionID, Semaphore.Semaphore>()
+    const lock = (sessionID: SessionID) => {
+      const hit = locks.get(sessionID)
+      if (hit) return hit
+      const next = Semaphore.makeUnsafe(1)
+      locks.set(sessionID, next)
+      return next
+    }
+
+    const summarize = (input: { sessionID: SessionID; messageID: MessageID }) =>
+      lock(input.sessionID).withPermits(1)(summarizeNow(input))
+
+    const summarizeNow = Effect.fn("SessionSummary.summarize")(function* (input: {
       sessionID: SessionID
       messageID: MessageID
     }) {
@@ -124,6 +160,16 @@ const layer = Layer.effect(
       const msgDiffs = yield* computeDiff({ messages })
       target.info.summary = { ...target.info.summary, diffs: msgDiffs }
       yield* sessions.updateMessage(target.info)
+
+      // XCOD-333: a prompt's turn can go on through synthetic user messages: a background subagent's
+      // result (whose worktree merge lands between the main agent's steps, XCOD-332) or an
+      // auto-continue (XCOD-302). The prompt the user sent gets the diff of its whole turn, from its
+      // first step to the last one before the next prompt, which is what an IDE reviews at idle.
+      const turn = promptTurn(all, input.messageID)
+      if (!turn || turn.owner.info.id === target.info.id || turn.owner.info.role !== "user") return
+      const owner = turn.owner.info
+      owner.summary = { ...owner.summary, diffs: yield* computeDiff({ messages: turn.messages }) }
+      yield* sessions.updateMessage(owner)
     })
 
     const diff = Effect.fn("SessionSummary.diff")(function* (input: { sessionID: SessionID; messageID?: MessageID }) {

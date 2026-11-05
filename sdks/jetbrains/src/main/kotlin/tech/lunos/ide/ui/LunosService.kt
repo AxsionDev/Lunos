@@ -66,7 +66,8 @@ class LunosService(private val project: Project) : Disposable {
                 "The Lunos CLI isn't installed or isn't on your PATH. Install it with: ${LunosServer.INSTALL_COMMAND}, " +
                     "or set its path in Settings | Tools | Lunos.",
             )
-            val started = LunosServer.start(binary, root, "jetbrains")
+            // The login shell's environment, not the GUI one the IDE got from the Dock or Finder.
+            val started = LunosServer.start(binary, root, "jetbrains", env = env)
             server = started
             LunosClient(started.url, started.password, root.path)
         }
@@ -90,6 +91,7 @@ class LunosService(private val project: Project) : Disposable {
         next.seed(c.children(sessionID), c.status(), c.permissions())
         state = next
         pendingReview = emptyList()
+        fire(Change.SESSION)
         fire(Change.TRANSCRIPT)
         fire(Change.SUBAGENTS)
         fire(Change.PERMISSIONS)
@@ -139,12 +141,14 @@ class LunosService(private val project: Project) : Disposable {
         if (change == Change.PERMISSIONS && autoApprove) {
             current.permissions.keys.toList().forEach { id -> runCatching { connect().reply(id, "once") } }
         }
-        if (change == Change.IDLE) loadReview(current)
+        // Off the event thread: the retries below would hold up every event behind them.
+        if (change == Change.IDLE) ApplicationManager.getApplication().executeOnPooledThread { loadReview(current) }
         if (change != Change.NONE) fire(change)
     }
 
     private fun loadReview(current: SessionState) {
-        val message = current.lastUserMessage ?: return
+        // The prompt the user sent: its diff covers its whole turn, background subagents' merges included.
+        val message = synchronized(current) { current.promptMessage } ?: return
         // The diff is normally there at idle; a few retries cover a slow snapshot.
         var diffs = emptyList<FileDiff>()
         for (attempt in 0 until 5) {
@@ -153,8 +157,11 @@ class LunosService(private val project: Project) : Disposable {
             if (diffs.isNotEmpty() || disposed) break
             Thread.sleep(500)
         }
-        if (diffs.isEmpty()) return
+        // Not for a session that is no longer open, and not twice for the same changes (a turn with a
+        // background subagent goes idle more than once).
+        if (diffs.isEmpty() || state !== current || diffs == pendingReview) return
         pendingReview = diffs
+        fire(Change.STATUS)
         ApplicationManager.getApplication().invokeLater {
             NotificationGroupManager.getInstance().getNotificationGroup("Lunos")
                 .createNotification("Lunos changed ${diffs.size} file(s)", "Review the changes and accept or reject each hunk.", NotificationType.INFORMATION)

@@ -81,7 +81,7 @@ namespace Lunos.VisualStudio
             state.Seed(await client.ChildrenAsync(sessionId), await client.StatusAsync(), await client.PermissionsAsync());
             State = state;
             PendingReview = Array.Empty<FileDiff>();
-            await FireAsync(Change.Transcript, Change.Subagents, Change.Permissions);
+            await FireAsync(Change.Session, Change.Transcript, Change.Subagents, Change.Permissions);
         }
 
         public async Task<SessionInfo> NewSessionAsync(string? title = null)
@@ -141,26 +141,35 @@ namespace Lunos.VisualStudio
             lock (state) change = state.Handle(e);
             if (change == Change.Permissions && AutoApprove)
                 foreach (var request in state.Permissions) await ReplyAsync(request.Id, "once");
-            if (change == Change.Idle) await LoadReviewAsync(state);
+            if (change == Change.Idle) _ = Task.Run(() => LoadReviewAsync(state));
             if (change != Change.None) await FireAsync(change);
         }
 
         private async Task LoadReviewAsync(SessionState state)
         {
-            if (state.LastUserMessage == null) return;
+            // The prompt the user sent: its diff covers its whole turn, background subagents' merges included.
+            string? message;
+            lock (state) message = state.PromptMessage;
+            if (message == null) return;
             // The diff is normally there at idle; a few retries cover a slow snapshot.
             var diffs = new List<FileDiff>();
             for (var attempt = 0; attempt < 5 && diffs.Count == 0 && !_disposed.IsCancellationRequested; attempt++)
             {
                 if (attempt > 0) await Task.Delay(500);
-                diffs = (await (await ConnectAsync()).DiffAsync(state.SessionId, state.LastUserMessage)).Where(d => !string.IsNullOrEmpty(d.Patch)).ToList();
+                diffs = (await (await ConnectAsync()).DiffAsync(state.SessionId, message)).Where(d => !string.IsNullOrEmpty(d.Patch)).ToList();
             }
-            if (diffs.Count == 0) return;
+            // Not for a session that is no longer open, and not twice for the same changes (a turn with a
+            // background subagent goes idle more than once).
+            if (diffs.Count == 0 || State != state || SameDiffs(diffs, PendingReview)) return;
             PendingReview = diffs;
+            await FireAsync(Change.Status);
             await _package.JoinableTaskFactory.SwitchToMainThreadAsync();
             VsShellUtilities.ShowMessageBox(_package, $"Lunos changed {diffs.Count} file(s). Review them in the Lunos window (Review changes) to accept or reject each hunk.",
                 "Lunos", OLEMSGICON.OLEMSGICON_INFO, OLEMSGBUTTON.OLEMSGBUTTON_OK, OLEMSGDEFBUTTON.OLEMSGDEFBUTTON_FIRST);
         }
+
+        private static bool SameDiffs(IReadOnlyList<FileDiff> a, IReadOnlyList<FileDiff> b) =>
+            a.Count == b.Count && a.Zip(b, (x, y) => x.File == y.File && x.Patch == y.Patch).All(same => same);
 
         private async Task FireAsync(params Change[] changes)
         {

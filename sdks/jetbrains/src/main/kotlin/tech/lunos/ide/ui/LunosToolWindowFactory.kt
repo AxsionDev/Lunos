@@ -76,6 +76,8 @@ class LunosPanel(private val project: Project) : JPanel(BorderLayout()), Disposa
 
     init {
         sessions.renderer = renderer<SessionInfo>("No session") { it.title.ifBlank { it.id } }
+        // Never as wide as the longest title: the buttons beside it stay visible.
+        sessions.prototypeDisplayValue = SessionInfo("", "A session title of a reasonable length", null, 0)
         sessions.addActionListener {
             if (loading) return@addActionListener
             val selected = sessions.selectedItem as? SessionInfo ?: return@addActionListener
@@ -85,13 +87,24 @@ class LunosPanel(private val project: Project) : JPanel(BorderLayout()), Disposa
         auto.toolTipText = "Approval mode in this IDE: Manual asks for each request; Auto approves them once."
         auto.addActionListener { service.autoApprove = auto.isSelected; refreshIndicator() }
 
-        val top = JPanel(FlowLayout(FlowLayout.LEFT, 4, 2))
-        top.add(sessions)
-        top.add(button("New") { LunosService.onPooled(project) { service.newSession(); reloadSessions() } })
-        top.add(button("Refresh") { reloadSessions() })
-        top.add(button("Open in TUI") { OpenTui.open(project) })
-        top.add(auto)
-        top.add(indicator)
+        // The picker takes the room the buttons leave; in a FlowLayout a wide combo pushed them out of sight.
+        val picker = JPanel(BorderLayout(4, 0)).apply {
+            border = JBUI.Borders.empty(2, 4)
+            add(sessions, BorderLayout.CENTER)
+            add(JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply {
+                // The panel reloads and selects the new session on the SESSION change open() fires.
+                add(button("New") { LunosService.onPooled(project) { service.newSession() } })
+                add(button("Refresh") { reloadSessions() })
+                add(button("Open in TUI") { OpenTui.open(project) })
+            }, BorderLayout.EAST)
+        }
+        val top = JPanel(BorderLayout()).apply {
+            add(picker, BorderLayout.NORTH)
+            add(JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply {
+                add(auto)
+                add(indicator)
+            }, BorderLayout.SOUTH)
+        }
 
         val center = JBSplitter(true, 0.75f)
         center.firstComponent = JBScrollPane(transcript)
@@ -133,10 +146,7 @@ class LunosPanel(private val project: Project) : JPanel(BorderLayout()), Disposa
         val text = input.text.trim()
         if (text.isEmpty()) return
         input.text = ""
-        LunosService.onPooled(project) {
-            service.send(text, null, null)
-            reloadSessions()
-        }
+        LunosService.onPooled(project) { service.send(text, null, null) }
     }
 
     private fun reloadSessions() {
@@ -146,8 +156,12 @@ class LunosPanel(private val project: Project) : JPanel(BorderLayout()), Disposa
                 loading = true
                 val model = sessions.model as DefaultComboBoxModel<SessionInfo>
                 model.removeAllElements()
-                list.forEach(model::addElement)
-                model.selectedItem = list.firstOrNull { it.id == service.state?.sessionID }
+                // The open session, even when the list doesn't have it yet (just created, not yet saved).
+                val current = service.state?.sessionID
+                val shown = if (current == null || list.any { it.id == current }) list
+                else listOf(SessionInfo(current, "New session", null, Long.MAX_VALUE)) + list
+                shown.forEach(model::addElement)
+                model.selectedItem = shown.firstOrNull { it.id == current }
                 loading = false
             }
         }
@@ -156,10 +170,12 @@ class LunosPanel(private val project: Project) : JPanel(BorderLayout()), Disposa
     private fun refresh(change: Change) {
         val state = service.state
         when (change) {
+            Change.SESSION -> reloadSessions()
             Change.TRANSCRIPT -> transcript.text = state?.entries?.values?.joinToString("\n\n") {
                 when (it.role) {
                     "user" -> "You: ${it.text}"
                     "tool" -> "  [${it.text}]"
+                    "error" -> "Error: ${it.text}"
                     else -> "Lunos: ${it.text}"
                 }
             } ?: ""

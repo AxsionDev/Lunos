@@ -170,8 +170,33 @@ namespace Lunos.Core.Tests
 
             Assert.Equal(new[] { "user:Refactor", "assistant:Done." }, state.Entries.Select(e => e.Role + ":" + e.Text));
             Assert.Equal("mistral/devstral", state.Model);
-            Assert.Equal("msg_u", state.LastUserMessage);
+            Assert.Equal("msg_u", state.PromptMessage);
             Assert.Equal(Change.Idle, state.Handle(Event("session.status", "{\"sessionID\":\"ses_main\",\"status\":{\"type\":\"idle\"}}")));
+        }
+
+        [Fact]
+        public void TheReviewIsOfTheUsersPromptNotOfASyntheticUserMessageLaterInItsTurn()
+        {
+            var state = new SessionState("ses_main");
+            state.Handle(Event("message.updated", "{\"sessionID\":\"ses_main\",\"info\":{\"id\":\"msg_u\",\"sessionID\":\"ses_main\",\"role\":\"user\"}}"));
+            state.Handle(Event("message.part.updated", "{\"sessionID\":\"ses_main\",\"part\":{\"id\":\"prt_u\",\"sessionID\":\"ses_main\",\"messageID\":\"msg_u\",\"type\":\"text\",\"text\":\"Refactor\"}}"));
+            // Dynamic workflows: a background subagent's result comes back as a synthetic user message.
+            state.Handle(Event("message.updated", "{\"sessionID\":\"ses_main\",\"info\":{\"id\":\"msg_bg\",\"sessionID\":\"ses_main\",\"role\":\"user\"}}"));
+            state.Handle(Event("message.part.updated", "{\"sessionID\":\"ses_main\",\"part\":{\"id\":\"prt_bg\",\"sessionID\":\"ses_main\",\"messageID\":\"msg_bg\",\"type\":\"text\",\"text\":\"Background task completed\",\"synthetic\":true}}"));
+            Assert.Equal("msg_u", state.PromptMessage);
+        }
+
+        [Fact]
+        public void AModelErrorIsShownInTheTranscriptOnceAStopTheUserAskedForIsnt()
+        {
+            var state = new SessionState("ses_main");
+            Assert.Equal(Change.Transcript, state.Handle(Event("session.error", "{\"sessionID\":\"ses_main\",\"error\":{\"name\":\"APIError\",\"data\":{\"message\":\"The model is not supported when using Codex with a ChatGPT account.\",\"isRetryable\":false}}}")));
+            state.Handle(Event("message.updated", "{\"sessionID\":\"ses_main\",\"info\":{\"id\":\"msg_a\",\"sessionID\":\"ses_main\",\"role\":\"assistant\",\"providerID\":\"openai\",\"modelID\":\"gpt-5.5\",\"error\":{\"name\":\"APIError\",\"data\":{\"message\":\"The model is not supported when using Codex with a ChatGPT account.\",\"isRetryable\":false}}}}"));
+            state.Handle(Event("message.updated", "{\"sessionID\":\"ses_main\",\"info\":{\"id\":\"msg_a\",\"sessionID\":\"ses_main\",\"role\":\"assistant\",\"providerID\":\"openai\",\"modelID\":\"gpt-5.5\",\"error\":{\"name\":\"APIError\",\"data\":{\"message\":\"The model is not supported when using Codex with a ChatGPT account.\",\"isRetryable\":false}}}}"));
+            Assert.Equal(new[] { "error:The model is not supported when using Codex with a ChatGPT account." }, state.Entries.Select(e => e.Role + ":" + e.Text));
+            Assert.Equal(Change.None, state.Handle(Event("session.error", "{\"sessionID\":\"ses_other\",\"error\":{\"name\":\"APIError\",\"data\":{\"message\":\"The model is not supported when using Codex with a ChatGPT account.\",\"isRetryable\":false}}}")));
+            Assert.Equal(Change.None, state.Handle(Event("session.error", "{\"sessionID\":\"ses_main\",\"error\":{\"name\":\"MessageAbortedError\",\"data\":{\"message\":\"aborted\"}}}")));
+            Assert.Single(state.Entries);
         }
     }
 

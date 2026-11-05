@@ -18,15 +18,18 @@ class LunosServer private constructor(val process: Process, val url: String, val
     companion object {
         const val INSTALL_COMMAND = "npm i -g lunos-ai@latest --allow-scripts=lunos-ai"
 
+        /**
+         * [env] is laid over the IDE's own environment: in JetBrains, the login shell's environment
+         * (EnvironmentUtil), so tools the agent runs are found when the IDE was started from the Dock
+         * or Finder, whose PATH has no /opt/homebrew/bin or ~/.dotnet.
+         */
         fun start(binary: String, directory: File, caller: String, timeoutSeconds: Long = 30, env: Map<String, String> = emptyMap()): LunosServer {
             val password = randomPassword()
             val port = ServerSocket(0).use { it.localPort }
             val builder = ProcessBuilder(command(binary, listOf("serve", "--hostname", "127.0.0.1", "--port", port.toString())))
                 .directory(directory)
                 .redirectErrorStream(true)
-            builder.environment()["OPENCODE_SERVER_PASSWORD"] = password
-            builder.environment()["OPENCODE_CALLER"] = caller
-            builder.environment().putAll(env)
+            environment(builder.environment(), env, password, caller)
             val process = builder.start()
             val reader = process.inputStream.bufferedReader()
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
@@ -41,6 +44,18 @@ class LunosServer private constructor(val process: Process, val url: String, val
             }
             process.destroyForcibly()
             throw IllegalStateException("Lunos didn't start:\n${output.toString().take(2000)}")
+        }
+
+        /**
+         * The server's environment: [env] over [base], then the password and caller, which nothing in
+         * [env] overrides (a shell that exports OPENCODE_SERVER_PASSWORD for `lunos attach` must not
+         * replace the random password, or every request would get 401).
+         */
+        fun environment(base: MutableMap<String, String>, env: Map<String, String>, password: String, caller: String): MutableMap<String, String> {
+            base.putAll(env)
+            base["OPENCODE_SERVER_PASSWORD"] = password
+            base["OPENCODE_CALLER"] = caller
+            return base
         }
 
         /** "opencode server listening on http://127.0.0.1:4096" → the URL. */
