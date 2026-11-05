@@ -98,6 +98,14 @@ async function pending(path: "/permission" | "/question", sessionID: string, dir
   return list.filter((item) => item.sessionID === sessionID && typeof item.id === "string") as { id: string }[]
 }
 
+/** XCOD-338: the V2 session core's pending asks of a session; none when the route doesn't answer. */
+async function pendingV2(kind: "permission" | "question", sessionID: string, directory: string) {
+  const response = await inner(`/api/session/${sessionID}/${kind}`, directory).catch(() => undefined)
+  if (!response?.ok) return []
+  const body = (await response.json().catch(() => undefined)) as { data?: Array<{ id?: string }> } | undefined
+  return (Array.isArray(body?.data) ? body.data : []).filter((item) => typeof item.id === "string") as { id: string }[]
+}
+
 /**
  * XCOD-265: rejects the session's pending approvals and questions first, so no tool is left waiting
  * on an answer that can't come, then aborts the turn (background subagents stop with it). Aborting
@@ -119,6 +127,21 @@ async function stopIn(sessionID: string, directory: string, reason: string) {
   for (const question of await pending("/question", sessionID, directory))
     await settled(
       await inner(`/question/${question.id}/reject`, directory, { method: "POST", body: "null" }),
+      "its pending question",
+    )
+  // XCOD-338: the V2 session core's asks wait in their own lists, under the session's routes.
+  const [permissionV2] = await pendingV2("permission", sessionID, directory)
+  if (permissionV2)
+    await settled(
+      await inner(`/api/session/${sessionID}/permission/${permissionV2.id}/reply`, directory, {
+        method: "POST",
+        body: JSON.stringify({ reply: "reject", message: reason }),
+      }),
+      "its pending approval",
+    )
+  for (const question of await pendingV2("question", sessionID, directory))
+    await settled(
+      await inner(`/api/session/${sessionID}/question/${question.id}/reject`, directory, { method: "POST" }),
       "its pending question",
     )
   return inner(`/session/${sessionID}/abort`, directory, { method: "POST" })
