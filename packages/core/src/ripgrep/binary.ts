@@ -85,8 +85,21 @@ export namespace RipgrepBinary {
         )
         if (!(yield* fs.isFile(extracted))) throw new Error(`ripgrep archive did not contain executable: ${extracted}`)
 
-        yield* fs.copyFile(extracted, target)
-        if (process.platform !== "win32") yield* fs.chmod(target, 0o755)
+        // Several processes can install at once (turbo runs packages' tests in parallel): copy next to
+        // the target under this install's own name, then rename it into place, so no process ever runs
+        // a half-copied rg. If another process got there first (Windows won't replace an exe in use),
+        // use its copy.
+        const staged = `${target}.${path.basename(dir)}`
+        yield* fs.copyFile(extracted, staged)
+        if (process.platform !== "win32") yield* fs.chmod(staged, 0o755)
+        yield* fs.rename(staged, target).pipe(
+          Effect.catch((error) =>
+            Effect.gen(function* () {
+              yield* fs.remove(staged, { force: true }).pipe(Effect.ignore)
+              if (!(yield* fs.isFile(target))) return yield* Effect.fail(error)
+            }),
+          ),
+        )
       }, Effect.scoped)
 
       return Service.of({
@@ -105,10 +118,15 @@ export namespace RipgrepBinary {
             if (Offline.enabled()) throw new Offline.DisabledError("Downloading ripgrep (install `rg` instead)")
             const filename = `ripgrep-${VERSION}-${config.platform}.${config.extension}`
             const url = `https://github.com/BurntSushi/ripgrep/releases/download/${VERSION}/${filename}`
-            const archive = path.join(Global.Path.bin, filename)
-
             yield* Effect.logInfo("downloading ripgrep", { url })
             yield* fs.ensureDir(Global.Path.bin).pipe(Effect.orDie)
+            // This install's own directory: a shared archive path let one process overwrite or delete
+            // the archive while another was still extracting it (Expand-Archive failing on Windows CI).
+            const download = yield* fs.makeTempDirectoryScoped({
+              directory: Global.Path.bin,
+              prefix: "ripgrep-download-",
+            })
+            const archive = path.join(download, filename)
             const bytes = yield* HttpClientRequest.get(url).pipe(
               http.execute,
               Effect.flatMap((response) => response.arrayBuffer),
@@ -118,9 +136,8 @@ export namespace RipgrepBinary {
 
             yield* fs.writeWithDirs(archive, new Uint8Array(bytes))
             yield* extract(archive, config, target)
-            yield* fs.remove(archive, { force: true }).pipe(Effect.ignore)
             return target
-          }),
+          }).pipe(Effect.scoped),
         ),
       })
     }),

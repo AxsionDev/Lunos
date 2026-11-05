@@ -180,7 +180,11 @@ test("labels", () => {
 })
 
 test("the Memory templates page shows each Docker template's compose file as generated", async () => {
-  const page = await Bun.file(new URL("../../../docs/memory-templates.md", import.meta.url)).text()
+  // A Windows checkout has the page with CRLF line endings (core.autocrlf); the compose file is LF.
+  const page = (await Bun.file(new URL("../../../docs/memory-templates.md", import.meta.url)).text()).replaceAll(
+    "\r\n",
+    "\n",
+  )
   for (const name of ["neo4j-docker", "postgres-docker"]) {
     const item = MemoryStorage.BUILTIN.find((entry) => entry.name === name)!
     const files = MemoryStorage.files(item, { password: "<generated>", project: `lunos-memory-${name}` })

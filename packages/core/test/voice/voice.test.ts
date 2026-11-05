@@ -94,16 +94,21 @@ describe("VoiceWhisper", () => {
     expect(VoiceWhisper.clean("[BLANK_AUDIO]")).toBe("")
   })
 
-  test("find prefers the pre-installed whisper-cli in <data>/voice/bin, then the PATH", async () => {
-    await using data = await tmpdir()
-    await using bin = await tmpdir()
-    const onPath = await fakeWhisper(bin.path)
-    expect(VoiceWhisper.find({ data: data.path, env: { PATH: bin.path }, platform: "linux" })).toBe(onPath)
-    await fs.mkdir(path.join(data.path, "voice", "bin"), { recursive: true })
-    const bundled = await fakeWhisper(path.join(data.path, "voice", "bin"))
-    expect(VoiceWhisper.find({ data: data.path, env: { PATH: bin.path }, platform: "linux" })).toBe(bundled)
-    expect(VoiceWhisper.find({ data: bin.path + "-none", env: { PATH: "" }, platform: "linux" })).toBeUndefined()
-  })
+  // POSIX only, like the two below: `platform: "linux"` splits PATH on ":", which a Windows temp
+  // path (C:\...) breaks.
+  test.skipIf(process.platform === "win32")(
+    "find prefers the pre-installed whisper-cli in <data>/voice/bin, then the PATH",
+    async () => {
+      await using data = await tmpdir()
+      await using bin = await tmpdir()
+      const onPath = await fakeWhisper(bin.path)
+      expect(VoiceWhisper.find({ data: data.path, env: { PATH: bin.path }, platform: "linux" })).toBe(onPath)
+      await fs.mkdir(path.join(data.path, "voice", "bin"), { recursive: true })
+      const bundled = await fakeWhisper(path.join(data.path, "voice", "bin"))
+      expect(VoiceWhisper.find({ data: data.path, env: { PATH: bin.path }, platform: "linux" })).toBe(bundled)
+      expect(VoiceWhisper.find({ data: bin.path + "-none", env: { PATH: "" }, platform: "linux" })).toBeUndefined()
+    },
+  )
 
   test.skipIf(process.platform === "win32")("transcribes from memory without writing audio to disk", async () => {
     await using bin = await tmpdir()
@@ -206,43 +211,47 @@ describe("VoiceRecorder", () => {
     expect(() => VoiceRecorder.start({ platform: "darwin", env: { PATH: "" } })).toThrow("brew install ffmpeg")
   })
 
-  test("keeps samples in memory, across odd chunk boundaries, and reports levels", async () => {
-    await using bin = await tmpdir()
-    const ffmpeg = path.join(bin.path, "ffmpeg")
-    await Bun.write(ffmpeg, "#!/bin/sh\n")
-    await fs.chmod(ffmpeg, 0o755)
-    const emitter = new EventEmitter()
-    const killed: string[] = []
-    const child = Object.assign(emitter, {
-      stdout: new PassThrough(),
-      stderr: new PassThrough(),
-      kill(signal: string) {
-        killed.push(signal)
-        setTimeout(() => emitter.emit("close", 0), 5)
-        return true
-      },
-    })
-    const spawned: string[][] = []
-    const spawn = ((cmd: string, args: string[]) => {
-      spawned.push([cmd, ...args])
-      return child
-    }) as unknown as typeof import("child_process").spawn
-    const levels: number[] = []
-    const recording = VoiceRecorder.start({
-      platform: "darwin",
-      env: { PATH: bin.path },
-      spawn,
-      onLevel: (level) => levels.push(level),
-    })
-    const bytes = new Uint8Array(new Int16Array([1000, -1000, 2000]).buffer)
-    child.stdout.emit("data", Buffer.from(bytes.subarray(0, 3)))
-    child.stdout.emit("data", Buffer.from(bytes.subarray(3)))
-    const pcm = await recording.stop()
-    expect([...pcm]).toEqual([1000, -1000, 2000])
-    expect(levels.length).toBe(2)
-    expect(killed).toEqual(["SIGINT"])
-    expect(spawned[0]?.[0]).toBe("ffmpeg")
-  })
+  // POSIX only: `platform: "darwin"` splits PATH on ":", which a Windows temp path (C:\...) breaks.
+  test.skipIf(process.platform === "win32")(
+    "keeps samples in memory, across odd chunk boundaries, and reports levels",
+    async () => {
+      await using bin = await tmpdir()
+      const ffmpeg = path.join(bin.path, "ffmpeg")
+      await Bun.write(ffmpeg, "#!/bin/sh\n")
+      await fs.chmod(ffmpeg, 0o755)
+      const emitter = new EventEmitter()
+      const killed: string[] = []
+      const child = Object.assign(emitter, {
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        kill(signal: string) {
+          killed.push(signal)
+          setTimeout(() => emitter.emit("close", 0), 5)
+          return true
+        },
+      })
+      const spawned: string[][] = []
+      const spawn = ((cmd: string, args: string[]) => {
+        spawned.push([cmd, ...args])
+        return child
+      }) as unknown as typeof import("child_process").spawn
+      const levels: number[] = []
+      const recording = VoiceRecorder.start({
+        platform: "darwin",
+        env: { PATH: bin.path },
+        spawn,
+        onLevel: (level) => levels.push(level),
+      })
+      const bytes = new Uint8Array(new Int16Array([1000, -1000, 2000]).buffer)
+      child.stdout.emit("data", Buffer.from(bytes.subarray(0, 3)))
+      child.stdout.emit("data", Buffer.from(bytes.subarray(3)))
+      const pcm = await recording.stop()
+      expect([...pcm]).toEqual([1000, -1000, 2000])
+      expect(levels.length).toBe(2)
+      expect(killed).toEqual(["SIGINT"])
+      expect(spawned[0]?.[0]).toBe("ffmpeg")
+    },
+  )
 })
 
 describe("VoicePtt", () => {
@@ -394,7 +403,8 @@ describe("VoiceDictation", () => {
     expect(dictation.status.phase).toBe("idle")
   })
 
-  test("no network request is made while recording or transcribing", async () => {
+  // POSIX only, like "transcribes from memory": the stand-in whisper-cli is a #!/bin/sh script.
+  test.skipIf(process.platform === "win32")("no network request is made while recording or transcribing", async () => {
     const original = globalThis.fetch
     const requests: string[] = []
     globalThis.fetch = (async (url: string | URL | Request) => {
