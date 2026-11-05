@@ -43,7 +43,19 @@ async function connect() {
 
 async function attach(tabId) {
   if (attached.has(tabId)) return
-  await chrome.debugger.attach({ tabId }, "1.3")
+  try {
+    await chrome.debugger.attach({ tabId }, "1.3")
+  } catch (error) {
+    // Chrome stops this service worker when it's idle, but the debugger it attached stays on the
+    // tab, so the restarted worker finds "another debugger" there: its own. Take it off and attach
+    // afresh. If it's someone else's, detaching fails and the original error stands.
+    const detached = await chrome.debugger.detach({ tabId }).then(
+      () => true,
+      () => false,
+    )
+    if (!detached) throw error
+    await chrome.debugger.attach({ tabId }, "1.3")
+  }
   attached.add(tabId)
 }
 
