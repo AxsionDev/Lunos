@@ -56,7 +56,23 @@ export namespace RipgrepBinary {
       ) {
         const dir = yield* fs.makeTempDirectoryScoped({ directory: Global.Path.bin, prefix: "ripgrep-" })
 
-        if (config.extension === "zip") {
+        // Windows 10 and later ship bsdtar, which reads zips, as System32\tar.exe. Not the `tar` on
+        // PATH: Git for Windows' GNU tar can't. PowerShell's Expand-Archive is the fallback; it can
+        // take longer than half a minute on a busy machine (CI runners).
+        const systemTar = process.env.SystemRoot ? path.join(process.env.SystemRoot, "System32", "tar.exe") : undefined
+        const zipTar =
+          config.extension === "zip" && systemTar && (yield* fs.isFile(systemTar).pipe(Effect.orDie))
+            ? systemTar
+            : undefined
+        if (zipTar) {
+          const result = yield* run(zipTar, ["-xf", archive, "-C", dir])
+          if (result.code !== 0)
+            throw new Error(
+              result.stderr.trim() || result.stdout.trim() || `ripgrep extraction failed with code ${result.code}`,
+            )
+        }
+
+        if (config.extension === "zip" && !zipTar) {
           const shell = (yield* Effect.sync(() => which("powershell.exe") ?? which("pwsh.exe"))) ?? "powershell.exe"
           const result = yield* run(shell, [
             "-NoProfile",
