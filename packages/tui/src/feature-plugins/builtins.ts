@@ -7,6 +7,7 @@ import SidebarFiles from "./sidebar/files"
 import SidebarFooter from "./sidebar/footer"
 import SidebarLsp from "./sidebar/lsp"
 import SidebarMcp from "./sidebar/mcp"
+import SidebarRemote from "./sidebar/remote"
 import SidebarSubagents from "./sidebar/subagents"
 import SidebarTodo from "./sidebar/todo"
 import DiffViewer from "./system/diff-viewer"
@@ -27,6 +28,7 @@ export function createBuiltinPlugins(options: { experimentalEventSystem: boolean
     HomeTips,
     SidebarContext,
     SidebarSubagents,
+    SidebarRemote,
     SidebarMcp,
     SidebarLsp,
     SidebarTodo,

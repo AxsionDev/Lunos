@@ -6,6 +6,8 @@ Follow and steer a session that runs on your computer from app.lunos.tech, on yo
 
 In the TUI, run `/remote on` in the session (or pick **Remote control** in the command palette; `/remote` alone toggles). Lunos asks you to confirm, then shows the link (`https://app.lunos.tech/remote/<link>`) and copies it. Open it signed in to the same Lunos account. `/remote off` ends it at once.
 
+The session sidebar shows **Remote** too. While it's off, clicking "turn on" does the same as `/remote`, so it asks first. While it's on, it shows the link and the time left, and clicking it turns remote control off. The row updates within a few seconds when the session is ended from app.lunos.tech, or when its 12 hours run out.
+
 It is **off by default**, per session. It also ends:
 
 - when you tap **End remote** on the web page (one tap revokes the link);
@@ -15,6 +17,10 @@ It is **off by default**, per session. It also ends:
 - when you revoke the device, or switch its sync off, in app.lunos.tech, Devices.
 
 A command sent from the web waits at most 60 seconds to be picked up; an approval you tap while the computer is asleep is dropped, never run hours later.
+
+## Notifications on your phone
+
+On app.lunos.tech › Remote, **Notify me on this device** turns on a notification for when a remote session waits for an approval or a question. Tap the notification to open that session. The notification says only that a session is waiting, and which one. It is delivered encrypted through your browser's push service (Google, Apple, Mozilla or Microsoft), so that service can't read it. On an iPhone or iPad, add app.lunos.tech to the Home Screen first. Turn it off on the same page.
 
 ## Who can control it
 
@@ -50,7 +56,5 @@ On Lunos Cloud: `remote.opened`, `remote.command` (kind only) and `remote.ended`
 
 ## Not yet
 
-- Web push notifications when the session waits for you (optional in XCOD-338).
-- A sidebar button: `/remote` and the command palette (**Remote control**) only.
 - The desktop app and `lunos run` have no `/remote` yet; the HTTP route (`POST /experimental/session/:id/remote`) is there for them.
 - Sessions on the V2 session core: their approvals aren't forwarded yet (the TUI's own approvals are V1).
