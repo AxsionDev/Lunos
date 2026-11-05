@@ -218,7 +218,9 @@ export async function prepare(options: Options = {}) {
   if (options.managed) await fs.writeFile(path.join(dirs.managed, "managed.json"), JSON.stringify(options.managed))
   // The browser: a fake `open` / `xdg-open` that writes down the link instead of opening it.
   const opened = path.join(home, "opened.txt")
-  for (const name of ["open", "xdg-open"]) {
+  // On Linux the `open` package runs its own bundled xdg-open, not the one on PATH; on a runner with
+  // no desktop that falls back to $BROWSER, set to the same stand-in below.
+  for (const name of ["open", "xdg-open", "browser"]) {
     const file = path.join(dirs.bin, name)
     await fs.writeFile(file, `#!/bin/sh\necho "$@" >> "${opened}"\n`)
     await fs.chmod(file, 0o755)
@@ -257,6 +259,7 @@ export async function prepare(options: Options = {}) {
       },
     }),
     NO_PROXY: "127.0.0.1,localhost,.invalid",
+    BROWSER: path.join(dirs.bin, "browser"),
     // The pty child inherits this process's environment underneath `env` (bun-pty spawns it without
     // clearing it), so a CI runner's CI=true would exempt every start from the Welcome screen and
     // change what the TUI asks. A test of the CI exemption sets it itself.

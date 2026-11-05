@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test
 import fs from "fs/promises"
 import path from "path"
 import * as Pty from "./fixtures/tui-pty"
+import { SandboxFailure } from "../../src/sandbox/error"
 
 // XCOD-281: the sandbox starts behind the TUI, in the real TUI (from source) in a pty at 120x45,
 // isolated (throwaway HOME/XDG, the stand-in keychain). Docker is a fake `docker` on the pty's PATH
@@ -39,6 +40,8 @@ afterEach(async () => {
 })
 
 const STOPPED = "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?"
+// "Docker Desktop isn't running" on macOS and Windows; on Linux, start the docker service (XCOD-279).
+const STOPPED_FIX = SandboxFailure.diagnose(STOPPED)!
 
 /** A home whose `docker` is stopped, answering after `delay` seconds. */
 async function home(config: Record<string, unknown>, delay = 2) {
@@ -133,7 +136,8 @@ describe.skipIf(process.platform === "win32")("the sandbox starts in the backgro
       await run.waitFor("Waiting for sandbox… your prompt is sent once it's ready")
       // It fails: Lunos starts again without it, with the prompt back, and asks before sending it.
       const screen = await run.waitFor("Lunos is running WITHOUT the sandbox.", 30_000)
-      expect(screen).toContain("⚠ The sandbox couldn't start: Docker Desktop isn't")
+      // The fix's first 20 characters: what fits on the toast's first line.
+      expect(screen).toContain(`⚠ The sandbox couldn't start: ${STOPPED_FIX.slice(0, 20)}`)
       expect(screen).not.toContain("Unexpected error")
       for (const action of ["[Open log]", "[Retry]", "[Settings]"]) expect(screen).toContain(action)
       await run.waitFor("Send the queued prompt to the host (no sandbox)?")
@@ -268,7 +272,7 @@ describe.skipIf(process.platform === "win32")("`lunos run` with the sandbox fail
       const before = asked
       const loose = await Pty.exec(["run", "--sandbox", "hello"], options)
       expect(loose.stdout + loose.stderr).toMatch(
-        /sandbox failed, running without it: Docker Desktop isn't running.*log: /,
+        new RegExp(`sandbox failed, running without it: ${STOPPED_FIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*log: `),
       )
       // It went on, here: the project instance loaded and the model was asked.
       expect(asked).toBeGreaterThan(before)
