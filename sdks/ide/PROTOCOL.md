@@ -54,7 +54,7 @@ Every request carries two headers:
 | Stop                                  | `POST /session/:id/abort`                                                                                                              |
 | Pending approvals                     | `GET /permission` returns `PermissionRequest[]`                                                                                        |
 | Answer an approval                    | `POST /permission/:requestID/reply` with `{ reply: "once" \| "always" \| "reject", message? }`                                         |
-| A prompt's file changes               | `GET /session/:id/diff?messageID=<prompt message id>` returns `[{ file, patch, status, additions, deletions }]` for the prompt's turn   |
+| A prompt's file changes               | `GET /session/:id/diff?messageID=<prompt message id>` returns `[{ file, patch, status, additions, deletions }]` for the prompt's turn  |
 | Events                                | `GET /event` streams Server-Sent Events                                                                                                |
 | Open the TUI on the session           | `lunos attach <url> --dir <root> --session <id>`, with `OPENCODE_SERVER_PASSWORD` set in its environment and never on the command line |
 

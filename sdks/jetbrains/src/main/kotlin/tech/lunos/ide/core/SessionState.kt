@@ -35,6 +35,12 @@ class SessionState(val sessionID: String) {
     private val roles = HashMap<String, String>()
     private var errors = 0
 
+    /**
+     * Whether a subagent is still working (a background one goes on after the main agent is idle).
+     * The review waits for the idle that follows, so it isn't offered for half of the changes.
+     */
+    fun subagentsBusy() = subagents.values.any { it.status != "idle" }
+
     /** This session and its subagents, at any depth. */
     fun tracks(id: String?) = id != null && (id == sessionID || subagents.containsKey(id))
 

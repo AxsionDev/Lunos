@@ -11,7 +11,7 @@ const msg = (id: string, role: "user" | "assistant", parts: { synthetic?: boolea
     parts: parts.map((part) => ({ type: part.type ?? "text", text: "x", synthetic: part.synthetic })),
   }) as unknown as SessionV1.WithParts
 
-const ids = (list: SessionV1.WithParts[]) => list.map((m) => m.info.id)
+const ids = (list: SessionV1.WithParts[]) => list.map((m): string => m.info.id)
 
 describe("SessionSummary.promptTurn", () => {
   // An IDE prompt: the user's text plus the synthetic text the file part was read into.
@@ -30,13 +30,13 @@ describe("SessionSummary.promptTurn", () => {
 
   test("a synthetic user message belongs to the prompt before it, whose turn runs to the next prompt", () => {
     const turn = SessionSummary.promptTurn(messages, "u3" as MessageID)!
-    expect(turn.owner.info.id).toBe("u1")
+    expect(turn.owner.info.id as string).toBe("u1")
     expect(ids(turn.messages)).toEqual(["u1", "a1", "u2", "a2", "u3", "a3"])
   })
 
   test("a prompt owns its own turn", () => {
     const turn = SessionSummary.promptTurn(messages, "u4" as MessageID)!
-    expect(turn.owner.info.id).toBe("u4")
+    expect(turn.owner.info.id as string).toBe("u4")
     expect(ids(turn.messages)).toEqual(["u4", "a4"])
   })
 

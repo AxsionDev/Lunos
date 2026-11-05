@@ -66,7 +66,8 @@ function unquoteGitPath(input: string) {
 /** A user message the user sent: one with a text part that isn't synthetic. */
 export function isPrompt(message: SessionV1.WithParts) {
   return (
-    message.info.role === "user" && message.parts.some((part) => part.type === "text" && !part.synthetic && !part.ignored)
+    message.info.role === "user" &&
+    message.parts.some((part) => part.type === "text" && !part.synthetic && !part.ignored)
   )
 }
 

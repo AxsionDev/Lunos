@@ -149,7 +149,7 @@ namespace Lunos.VisualStudio
         {
             // The prompt the user sent: its diff covers its whole turn, background subagents' merges included.
             string? message;
-            lock (state) message = state.PromptMessage;
+            lock (state) message = state.SubagentsBusy() ? null : state.PromptMessage;
             if (message == null) return;
             // The diff is normally there at idle; a few retries cover a slow snapshot.
             var diffs = new List<FileDiff>();

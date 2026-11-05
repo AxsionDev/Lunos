@@ -148,7 +148,7 @@ class LunosService(private val project: Project) : Disposable {
 
     private fun loadReview(current: SessionState) {
         // The prompt the user sent: its diff covers its whole turn, background subagents' merges included.
-        val message = synchronized(current) { current.promptMessage } ?: return
+        val message = synchronized(current) { current.promptMessage.takeUnless { current.subagentsBusy() } } ?: return
         // The diff is normally there at idle; a few retries cover a slow snapshot.
         var diffs = emptyList<FileDiff>()
         for (attempt in 0 until 5) {

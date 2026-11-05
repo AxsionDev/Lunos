@@ -238,7 +238,10 @@ describe("IDE protocol (XCOD-333)", () => {
             parts: [{ type: "text", text: prompt }],
           }),
         })
-        type Message = { info: { id: string; role: string }; parts: { type: string; text?: string; synthetic?: boolean }[] }
+        type Message = {
+          info: { id: string; role: string }
+          parts: { type: string; text?: string; synthetic?: boolean }[]
+        }
         const messages = () => json<Message[]>(directory, `/session/${id}/message`).pipe(Effect.map((r) => r.body))
         const idle = () =>
           json<Record<string, { type: string }>>(directory, "/session/status").pipe(
@@ -256,7 +259,9 @@ describe("IDE protocol (XCOD-333)", () => {
         release()
         yield* pollWithTimeout(
           Effect.gen(function* () {
-            return (yield* idle()) && said(yield* messages(), "Done: Add and Mul are expression-bodied.") ? true : undefined
+            return (yield* idle()) && said(yield* messages(), "Done: Add and Mul are expression-bodied.")
+              ? true
+              : undefined
           }),
           "the background result never came back to the main agent",
           "30 seconds",

@@ -75,6 +75,12 @@ namespace Lunos.Core
         public IReadOnlyList<Subagent> Subagents => _subagentOrder.Select(id => _subagents[id]).ToList();
         public IReadOnlyList<PermissionRequest> Permissions => _permissionOrder.Select(id => _permissions[id]).ToList();
 
+        /// <summary>
+        /// Whether a subagent is still working (a background one goes on after the main agent is idle).
+        /// The review waits for the idle that follows, so it isn't offered for half of the changes.
+        /// </summary>
+        public bool SubagentsBusy() => _subagents.Values.Any(s => s.Status != "idle");
+
         /// <summary>This session and its subagents, at any depth.</summary>
         public bool Tracks(string? id) => id != null && (id == SessionId || _subagents.ContainsKey(id));
 

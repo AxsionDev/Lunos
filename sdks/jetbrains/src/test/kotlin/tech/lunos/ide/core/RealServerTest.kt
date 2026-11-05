@@ -72,4 +72,25 @@ class RealServerTest {
         assertEquals(listOf(child.id), state.subagents.keys.toList())
         reader.interrupt()
     }
+
+    @Test
+    fun `a prompt the server can't run shows its error in the panel`() {
+        val s = server!!
+        val client = LunosClient(s.url, s.password, project.path)
+        val session = client.createSession("No provider")
+        val state = SessionState(session.id)
+        val reader = Thread {
+            runCatching { client.events { event -> synchronized(state) { state.handle(event) }; true } }
+        }.apply { isDaemon = true; start() }
+        Thread.sleep(500)
+        // This server has no provider set up (a fresh XDG home): the prompt fails with an error.
+        client.prompt(session.id, PromptContext.parts("Hello", null, project, null, emptyList()))
+        val deadline = System.currentTimeMillis() + 30_000
+        while (System.currentTimeMillis() < deadline && synchronized(state) { state.entries.values.none { it.role == "error" } })
+            Thread.sleep(100)
+        val errors = synchronized(state) { state.entries.values.filter { it.role == "error" } }
+        assertEquals(1, errors.size)
+        assertTrue(errors.single().text, errors.single().text.isNotBlank() && errors.single().text != "Unknown error")
+        reader.interrupt()
+    }
 }
