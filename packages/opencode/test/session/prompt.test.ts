@@ -1102,6 +1102,8 @@ noLLMServer.instance("prompt tools replace previous prompt tool rules", () =>
     expect(reloaded.permission).toEqual([{ permission: "read", pattern: "*", action: "allow" }])
     expect(Permission.evaluate("bash", "anything", reloaded.permission ?? []).action).toBe("ask")
   }),
+  // A provider to pick the session's model from: Lunos has no keyless built-in one (upstream's `opencode`).
+  { config: cfg },
 )
 
 it.instance(

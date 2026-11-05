@@ -61,8 +61,11 @@ describe("SubagentModel.resolve (XCOD-82)", () => {
     expect(() =>
       SubagentModel.checkResidency(out, { policy: { allow: ["eu"] }, audit: false, auditPath: undefined }),
     ).toThrow(/agent\.qa\.model → anthropic\/claude-haiku-4-5 denied by residency policy/)
+    // An EU-hosted parent passes. Scaleway is EU at its default endpoint; Mistral is EU only at
+    // api.eu.mistral.ai, which a pre-flight check without a baseURL doesn't see (XCOD-194).
+    const eu = { ...base, parent: { providerID: "scaleway", modelID: "mistral-small-3.2-24b-instruct-2506" } }
     expect(() =>
-      SubagentModel.checkResidency(SubagentModel.resolve(base), {
+      SubagentModel.checkResidency(SubagentModel.resolve(eu), {
         policy: { allow: ["eu"] },
         audit: false,
         auditPath: undefined,
@@ -71,9 +74,14 @@ describe("SubagentModel.resolve (XCOD-82)", () => {
   })
 
   test("the dynamic allow list offered to the model excludes residency-denied entries", () => {
-    const config = { subagent: { dynamic: { enabled: true, allow: ["mistral/codestral-latest", "openai/gpt-x"] } } }
+    const config = {
+      subagent: {
+        dynamic: { enabled: true, allow: ["scaleway/devstral-small-2505", "mistral/codestral-latest", "openai/gpt-x"] },
+      },
+    }
+    // Mistral at its default api.mistral.ai is global, not EU (XCOD-194).
     expect(SubagentModel.allowed(config, { policy: { allow: ["eu"] }, audit: false, auditPath: undefined })).toEqual([
-      "mistral/codestral-latest",
+      "scaleway/devstral-small-2505",
     ])
     expect(SubagentModel.allowed({})).toEqual([])
   })
