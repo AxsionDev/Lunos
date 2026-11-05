@@ -201,7 +201,10 @@ async function probe(name: Runtime["name"]): Promise<Runtime | Unusable> {
     SandboxFailure.wrap("detect", error),
   )
   if (info instanceof SandboxError) return { name, stage: "running", error: info }
-  if (info.code !== 0) {
+  const [answer = "", os = ""] = info.stdout.trim().split("|")
+  // Docker CLIs before 29 exit 0 when the daemon can't be reached: the template prints empty and the
+  // error goes to stderr. No server version is an engine that isn't running, as with a non-zero exit.
+  if (info.code !== 0 || !answer.trim()) {
     const output = info.stderr.trim() || info.stdout.trim()
     const first = output
       .split(/\r?\n/)
@@ -224,7 +227,6 @@ async function probe(name: Runtime["name"]): Promise<Runtime | Unusable> {
       }),
     }
   }
-  const [answer, os = ""] = info.stdout.trim().split("|")
   if (os && os.trim().toLowerCase() !== "linux")
     return {
       name,

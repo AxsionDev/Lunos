@@ -23,6 +23,8 @@ import { SandboxDisabled } from "../../src/sandbox/disabled"
 import { tmpdir } from "../fixture/fixture"
 import { noPodman } from "../fixture/no-podman"
 
+const STOPPED_LINUX =
+  "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?"
 const STOPPED =
   'error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.47/info": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.'
 
@@ -30,13 +32,13 @@ const STOPPED =
  * A fake `docker` on a PATH holding nothing else that matters. `mode` picks its answers: Docker
  * Desktop stopped, Windows containers, a denied pull, or everything working.
  */
-async function fakeDocker(mode: "stopped" | "windows" | "denied" | "ok") {
+async function fakeDocker(mode: "stopped" | "stopped-exit-0" | "windows" | "denied" | "ok") {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-fake-docker-"))
   const script = `#!/bin/sh
 case "$1" in
   --version) echo "Docker version 27.3.1, build ce12230"; exit 0 ;;
   info)
-    ${mode === "stopped" ? `echo '${STOPPED}' >&2; exit 1` : `echo "27.3.1|${mode === "windows" ? "windows" : "linux"}"; exit 0`} ;;
+    ${mode === "stopped" ? `echo '${STOPPED}' >&2; exit 1` : mode === "stopped-exit-0" ? `echo '|'; echo '${STOPPED_LINUX}' >&2; exit 0` : `echo "27.3.1|${mode === "windows" ? "windows" : "linux"}"; exit 0`} ;;
   image) ${mode === "ok" ? 'echo "sha256:feed|[]"; exit 0' : 'echo "Error: No such image" >&2; exit 1'} ;;
   manifest) echo "unauthorized: authentication required" >&2; exit 1 ;;
   pull) echo "Error response from daemon: denied: requested access to the resource is denied" >&2; exit 1 ;;
@@ -212,6 +214,18 @@ describe.skipIf(posixOnly)("finding Docker", () => {
     expect(FormatError(error)).not.toContain("Unexpected error")
   })
 
+  // Docker CLIs before 29 (GitHub's ubuntu runners) print the empty template and exit 0 when the
+  // daemon can't be reached: still not running, not a Docker with no version that fails at the pull.
+  test("a stopped daemon is caught when docker info exits 0 with no server version", async () => {
+    usePath(await fakeDocker("stopped-exit-0"))
+    const error = await SandboxDocker.available().catch((error) => error)
+    expect(error).toBeInstanceOf(SandboxError)
+    expect(error.message).toContain("Sandboxed runs need Docker or Podman")
+    expect(error.message).toContain(
+      "docker is installed but its engine isn't running: Cannot connect to the Docker daemon",
+    )
+  })
+
   test("Windows-containers mode is caught at detection, not at the pull", async () => {
     usePath(await fakeDocker("windows"))
     const error = await SandboxDocker.available().catch((error) => error)
@@ -277,7 +291,8 @@ describe.skipIf(posixOnly)("preflight and doctor", () => {
     expect(printed).toContain("FAIL  container engine running:")
     expect(printed).toContain("fix: ")
     const refusal = await SandboxPreflight.refusal(project.path)
-    expect(refusal).toStartWith("Docker Desktop isn't running — start it and try again.")
+    // The fix names Docker Desktop where it's what runs Docker (macOS, Windows); on Linux, the service.
+    expect(refusal).toStartWith(SandboxFailure.diagnose(STOPPED)!)
     expect(refusal).not.toContain("pipe")
     expect(refusal).toContain("lunos sandbox doctor")
   })
