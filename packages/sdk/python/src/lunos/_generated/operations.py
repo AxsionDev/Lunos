@@ -128,6 +128,16 @@ class AsyncExperimentalSessionAPI:
         data = await self._t.request('POST', "/experimental/session/{sessionID}/takeover".format(sessionID=session_id), params={"directory": directory, "workspace": workspace}, json=body, timeout=timeout, raw=False)
         return validate("SessionTakeoverResult", data)
 
+    async def remote(self, session_id: str, *, directory: Any = None, workspace: Any = None, timeout: float | None = None) -> models.SessionRemoteStatus:
+        """Whether a session can be controlled from app.lunos.tech (``GET /experimental/session/{sessionID}/remote``, ``experimental.session.remote``)."""
+        data = await self._t.request('GET', "/experimental/session/{sessionID}/remote".format(sessionID=session_id), params={"directory": directory, "workspace": workspace}, json=None, timeout=timeout, raw=False)
+        return validate("SessionRemoteStatus", data)
+
+    async def remote_set(self, session_id: str, body: dict[str, Any], *, directory: Any = None, workspace: Any = None, timeout: float | None = None) -> models.SessionRemoteStatus:
+        """Turn remote control of a session on or off (``POST /experimental/session/{sessionID}/remote``, ``experimental.session.remoteSet``)."""
+        data = await self._t.request('POST', "/experimental/session/{sessionID}/remote".format(sessionID=session_id), params={"directory": directory, "workspace": workspace}, json=body, timeout=timeout, raw=False)
+        return validate("SessionRemoteStatus", data)
+
     async def queued(self, session_id: str, *, directory: Any = None, workspace: Any = None, timeout: float | None = None) -> models.SessionQueued:
         """Prompts held for a session (``GET /experimental/session/{sessionID}/queued``, ``experimental.session.queued``)."""
         data = await self._t.request('GET', "/experimental/session/{sessionID}/queued".format(sessionID=session_id), params={"directory": directory, "workspace": workspace}, json=None, timeout=timeout, raw=False)
@@ -2064,6 +2074,16 @@ class SyncExperimentalSessionAPI:
         """Take over a session whose Lunos stopped (``POST /experimental/session/{sessionID}/takeover``, ``experimental.session.takeover``)."""
         data = self._t.request('POST', "/experimental/session/{sessionID}/takeover".format(sessionID=session_id), params={"directory": directory, "workspace": workspace}, json=body, timeout=timeout, raw=False)
         return validate("SessionTakeoverResult", data)
+
+    def remote(self, session_id: str, *, directory: Any = None, workspace: Any = None, timeout: float | None = None) -> models.SessionRemoteStatus:
+        """Whether a session can be controlled from app.lunos.tech (``GET /experimental/session/{sessionID}/remote``, ``experimental.session.remote``)."""
+        data = self._t.request('GET', "/experimental/session/{sessionID}/remote".format(sessionID=session_id), params={"directory": directory, "workspace": workspace}, json=None, timeout=timeout, raw=False)
+        return validate("SessionRemoteStatus", data)
+
+    def remote_set(self, session_id: str, body: dict[str, Any], *, directory: Any = None, workspace: Any = None, timeout: float | None = None) -> models.SessionRemoteStatus:
+        """Turn remote control of a session on or off (``POST /experimental/session/{sessionID}/remote``, ``experimental.session.remoteSet``)."""
+        data = self._t.request('POST', "/experimental/session/{sessionID}/remote".format(sessionID=session_id), params={"directory": directory, "workspace": workspace}, json=body, timeout=timeout, raw=False)
+        return validate("SessionRemoteStatus", data)
 
     def queued(self, session_id: str, *, directory: Any = None, workspace: Any = None, timeout: float | None = None) -> models.SessionQueued:
         """Prompts held for a session (``GET /experimental/session/{sessionID}/queued``, ``experimental.session.queued``)."""

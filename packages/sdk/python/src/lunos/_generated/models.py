@@ -4259,6 +4259,16 @@ class SessionTakeoverResult(BaseModel):
     position: Annotated[int | None, Field(ge=0)] = None
 
 
+class SessionRemoteStatus(BaseModel):
+    model_config = ConfigDict(
+        extra='allow',
+    )
+    on: bool
+    link: str | None = None
+    url: str | None = None
+    expiresAt: Annotated[int | None, Field(ge=0)] = None
+
+
 class SessionQueued(BaseModel):
     model_config = ConfigDict(
         extra='allow',
@@ -11998,6 +12008,7 @@ class Config(BaseModel):
     cloud: CloudConfig | None = None
     auth: AuthConfig | None = None
     sync: SyncConfig | None = None
+    remote_control: bool | None = None
     subagent: SubagentConfig | None = None
     verify: VerifyConfig | None = None
     dev_cycle: DevCycleConfig | None = None
