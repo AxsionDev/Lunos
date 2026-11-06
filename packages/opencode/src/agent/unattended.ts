@@ -72,6 +72,8 @@ export async function run(input: {
 }): Promise<Report> {
   const now = input.now ?? Date.now
   const start = now()
+  // One deadline for both sides: the child aborts its session at it, and this process's timer.
+  const deadline = start + input.limits.time * 1000
   const args = [
     ...input.command.base,
     "run",
@@ -92,7 +94,7 @@ export async function run(input: {
       ...input.env,
       [RunBudget.STEPS]: String(input.limits.steps),
       [RunBudget.COST]: String(input.limits.cost),
-      [RunBudget.DEADLINE]: String(start + input.limits.time * 1000),
+      [RunBudget.DEADLINE]: String(deadline),
     },
     stdio: ["ignore", "pipe", "pipe"],
   })
@@ -121,7 +123,7 @@ export async function run(input: {
       killTimer = setTimeout(() => child.kill("SIGKILL"), input.grace ?? 10_000)
     }, windDown)
   }
-  const timer = setTimeout(() => stop("time"), input.limits.time * 1000)
+  const timer = setTimeout(() => stop("time"), Math.max(0, deadline - now()))
 
   let buffer = ""
   child.stdout.on("data", (chunk: Buffer) => {
@@ -165,6 +167,9 @@ export async function run(input: {
     child.on("exit", (code) => resolve(code))
   })
   clearTimeout(timer)
+  // The child stops itself at the deadline and can exit before this process's timer runs: that
+  // run still ended on its time limit, not by completing.
+  if (!reason && exitCode === 0 && now() >= deadline) reason = "time"
   if (windDownTimer) clearTimeout(windDownTimer)
   if (killTimer) clearTimeout(killTimer)
 

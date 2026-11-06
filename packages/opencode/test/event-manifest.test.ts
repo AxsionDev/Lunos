@@ -9,7 +9,10 @@ describe("public event manifest", () => {
     expect(EventManifest.Definitions).toBe(SchemaEventManifest.Definitions)
     expect(EventManifest.Latest).toBe(SchemaEventManifest.Latest)
     expect(EventManifest.Durable).toBe(SchemaEventManifest.Durable)
-    expect(EventManifest.Latest.size).toBe(89)
+    // 91: session.live.updated (XCOD-234) and installation.upgrade-progress (XCOD-247) are public.
+    expect(EventManifest.Latest.size).toBe(91)
+    expect(EventManifest.Latest.has("session.live.updated")).toBe(true)
+    expect(EventManifest.Latest.has("installation.upgrade-progress")).toBe(true)
     expect(EventManifest.Latest.get("session.next.step.ended")).toBe(SessionEvent.Step.Ended)
     expect(EventManifest.Latest.get("todo.updated")).toBe(Todo.Event.Updated)
     expect(EventManifest.Latest.has("ide.installed")).toBe(false)

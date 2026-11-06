@@ -16,6 +16,7 @@ import { SandboxPreflight } from "../../src/sandbox/preflight"
 import { checkLines } from "../../src/cli/cmd/sandbox"
 import { handedBack } from "../../src/agent/unattended"
 import { tmpdir } from "../fixture/fixture"
+import { noPodman } from "../fixture/no-podman"
 
 // The fake docker is a shell script: not on a Windows runner.
 const posixOnly = process.platform === "win32"
@@ -70,6 +71,7 @@ beforeEach(() => {
     PATH: process.env.PATH,
     GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL,
     GIT_TEST_ASSUME_DIFFERENT_OWNER: process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER,
+    GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM,
     FAKE_STATE: process.env.FAKE_STATE,
     FAKE_PORT: process.env.FAKE_PORT,
   }
@@ -123,6 +125,8 @@ describe("where a sandbox starts from", () => {
     await using tmp = await tmpdir({ git: true })
     await Bun.write(path.join(tmp.path, "a.txt"), "a\n")
     process.env.GIT_TEST_ASSUME_DIFFERENT_OWNER = "1"
+    // GitHub's runner images set safe.directory=* in the system gitconfig, which trusts every owner.
+    process.env.GIT_CONFIG_NOSYSTEM = "1"
     const error = await rejection(SandboxGit.repo(tmp.path))
     expect(error.reason).toContain("belongs to another user")
     expect(error.fix).toContain("git config --global --add safe.directory")
@@ -369,6 +373,7 @@ exit 0
 `
   await Bun.write(path.join(dir, "docker"), script)
   await fs.chmod(path.join(dir, "docker"), 0o755)
+  await noPodman(dir)
   return dir
 }
 

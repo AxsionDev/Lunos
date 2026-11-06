@@ -183,7 +183,8 @@ describe("a failing sandboxed run (the reported case: Docker not running)", () =
       expect(path.dirname(file)).toBe(result.logDir)
       expect(path.basename(file)).toMatch(new RegExp(`^lunos-\\d{4}-\\d{2}-\\d{2}-\\d{4}-${id}\\.log$`))
       const log = await fs.readFile(file, "utf8")
-      expect(log).toMatch(/\$ docker info --format \S+ {2}→ exit 1/)
+      // Exit 1, or 0 from a Docker CLI before 29 (no server version: still not running).
+      expect(log).toMatch(/\$ docker info --format \S+ {2}→ exit [01]/)
       expect(log).toContain("stderr:")
       expect(log).toContain("nonexistent-lunos-test.sock")
       expect(log).toMatch(/at available \(.*sandbox\/docker\.ts/)
@@ -223,7 +224,8 @@ describe("a failing sandboxed run (the reported case: Docker not running)", () =
       expect(doctor).toMatch(/FAIL {2}\S/)
       expect(doctor).toContain("nonexistent-lunos-test.sock")
       expect(doctor).toContain("command: docker info")
-      expect(doctor).toContain("exit code: 1")
+      // 1, or 0 from a Docker CLI before 29 that printed no server version (still not running).
+      expect(doctor).toMatch(/exit code: [01]\b/)
       expect(Bun.spawnSync(["unzip", "-p", zip, "system.txt"]).stdout.toString()).toContain("docker version")
       const contents = Bun.spawnSync(["unzip", "-p", zip]).stdout.toString()
       for (const seed of Object.values(SEEDS)) expect(contents).not.toContain(seed)

@@ -14,6 +14,7 @@ import { SandboxDocker } from "../../src/sandbox/docker"
 import { runSandboxed, sandboxOff, sandboxTui, startsSandboxed, strictArg, wanted } from "../../src/cli/cmd/sandbox"
 import { relaunchFor } from "../../src/cli/cmd/tui"
 import { tmpdir } from "../fixture/fixture"
+import { noPodman } from "../fixture/no-podman"
 
 const STOPPED = "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?"
 
@@ -29,6 +30,7 @@ exit 1
 `
   await Bun.write(path.join(dir, "docker"), script)
   await fs.chmod(path.join(dir, "docker"), 0o755)
+  await noPodman(dir)
   return dir
 }
 

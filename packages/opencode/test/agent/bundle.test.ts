@@ -385,7 +385,8 @@ describe("AgentImport", () => {
     const eu = await AgentBundle.read(
       await AgentBundle.write({
         name: "eu",
-        agent: agent({ prompt: "p", model: "mistral/mistral-large-latest" }),
+        // Scaleway: EU at its default endpoint. Mistral is EU only at api.eu.mistral.ai (XCOD-194).
+        agent: agent({ prompt: "p", model: "scaleway/mistral-small-3.2-24b-instruct-2506" }),
         mcp: {},
         skills: {},
       }),
