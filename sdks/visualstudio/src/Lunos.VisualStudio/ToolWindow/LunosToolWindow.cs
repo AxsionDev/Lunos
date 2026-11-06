@@ -122,8 +122,13 @@ namespace Lunos.VisualStudio.ToolWindow
             var list = await Lunos.SessionsAsync();
             await _package.JoinableTaskFactory.SwitchToMainThreadAsync();
             _loading = true;
-            _sessions.ItemsSource = list;
-            _sessions.SelectedItem = list.FirstOrDefault(s => s.Id == Lunos.State?.SessionId);
+            // The open session, even when the list doesn't have it yet (just created, not yet saved).
+            var current = Lunos.State?.SessionId;
+            var shown = current == null || list.Any(s => s.Id == current)
+                ? list
+                : new[] { new SessionInfo(current, "New session", null, long.MaxValue) }.Concat(list).ToList();
+            _sessions.ItemsSource = shown;
+            _sessions.SelectedItem = shown.FirstOrDefault(s => s.Id == current);
             _loading = false;
         }
 
@@ -132,9 +137,12 @@ namespace Lunos.VisualStudio.ToolWindow
             var state = Lunos.State;
             switch (change)
             {
+                case Change.Session:
+                    Run(ReloadSessionsAsync);
+                    break;
                 case Change.Transcript:
                     _transcript.Text = state == null ? "" : string.Join("\n\n", state.Entries.Select(e =>
-                        e.Role == "user" ? "You: " + e.Text : e.Role == "tool" ? "  [" + e.Text + "]" : "Lunos: " + e.Text));
+                        e.Role == "user" ? "You: " + e.Text : e.Role == "tool" ? "  [" + e.Text + "]" : e.Role == "error" ? "Error: " + e.Text : "Lunos: " + e.Text));
                     _transcript.ScrollToEnd();
                     break;
                 case Change.Subagents:

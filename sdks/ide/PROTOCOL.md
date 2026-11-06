@@ -23,6 +23,12 @@ lunos serve --hostname 127.0.0.1 --port <free port>
 - **Environment:**
   - `OPENCODE_SERVER_PASSWORD` is a fresh random 48-hex-character password.
   - `OPENCODE_CALLER` is `jetbrains` or `visualstudio`.
+  - Everything else is the user's environment. JetBrains uses the login shell's environment
+    (`EnvironmentUtil.getEnvironmentMap()`), because an IDE started from the macOS Dock or Finder has a
+    GUI `PATH` without `/opt/homebrew/bin` or `~/.dotnet`, and the agent then can't find `dotnet` and
+    other tools. The password and caller above are set last, so a shell that exports
+    `OPENCODE_SERVER_PASSWORD` doesn't replace them. Visual Studio on Windows needs no such step:
+    GUI apps get the user's full `PATH`.
 - **Ready:** the server is up when it prints `opencode server listening on http://127.0.0.1:<port>`.
 
 To use a server that is already running instead, set `LUNOS_SERVER_URL`, and set
@@ -48,7 +54,7 @@ Every request carries two headers:
 | Stop                                  | `POST /session/:id/abort`                                                                                                              |
 | Pending approvals                     | `GET /permission` returns `PermissionRequest[]`                                                                                        |
 | Answer an approval                    | `POST /permission/:requestID/reply` with `{ reply: "once" \| "always" \| "reject", message? }`                                         |
-| A prompt's file changes               | `GET /session/:id/diff?messageID=<user message id>` returns `[{ file, patch, status, additions, deletions }]`                          |
+| A prompt's file changes               | `GET /session/:id/diff?messageID=<prompt message id>` returns `[{ file, patch, status, additions, deletions }]` for the prompt's turn  |
 | Events                                | `GET /event` streams Server-Sent Events                                                                                                |
 | Open the TUI on the session           | `lunos attach <url> --dir <root> --session <id>`, with `OPENCODE_SERVER_PASSWORD` set in its environment and never on the command line |
 
@@ -84,9 +90,15 @@ use these:
 - **`session.status`:** `{ sessionID, status: { type } }`. When the session goes from busy to idle,
   the prompt is finished and its diff is ready for review.
 - **`message.updated`:** `info.role`, plus `info.providerID` and `info.modelID` for the model
-  indicator. The last user message's id is the `messageID` for the diff.
+  indicator. An assistant message with `info.error` failed; the panel shows the error.
+- **`session.error`:** `{ sessionID, error: { name, data: { message } } }`, for example a model the
+  account doesn't support. The panel shows `data.message` in the chat, once (the same failure also
+  arrives on the assistant message). `MessageAbortedError` is a stop the user asked for and isn't
+  shown.
 - **`message.part.updated`:** text parts (skip `synthetic`) and tool parts (`tool`, `state.status`,
   `state.title`). A tool part whose session is a subagent's becomes that subagent's current activity.
+  The user message that has a text part that isn't `synthetic` is the **prompt**: its id is the
+  `messageID` for the diff.
 - **`permission.asked` / `permission.replied`:** a request appears, and it disappears once anyone
   answers it, whether in the IDE or in a TUI attached to the same server.
 
@@ -99,6 +111,22 @@ Always, and Reject. Auto-approve is the IDE's version of the TUI's Auto mode (XC
 The TUI sees live approvals only when it is attached to the plugin's server, which is what "Open in
 TUI" does. A separate `lunos` started in a terminal runs its own server: it lists the IDE's sessions
 through the shared database, but not their live events.
+
+### A prompt's turn
+
+With Dynamic workflows on, a prompt's work doesn't end with the main agent's first reply:
+
+- a writing subagent edits its own git worktree (XCOD-332), and its changes are merged into the
+  project when it finishes;
+- a background subagent's result comes back as a synthetic user message, which starts another
+  turn of the main agent;
+- an auto-continue (XCOD-302) is a synthetic user message too.
+
+So the last user message isn't necessarily the user's, and the session can go idle more than once
+for one prompt. The server records the diff of the prompt's whole turn on the prompt message. The
+turn runs from the prompt's first step to the last step before the next prompt, so it includes each
+merge. The diff is written before the session goes idle. The plugins fetch it at each idle and offer
+the review when it is non-empty and differs from the one already offered.
 
 ## Hunks: accepting or rejecting an edit piece by piece
 

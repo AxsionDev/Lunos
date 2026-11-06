@@ -49,12 +49,54 @@ class SessionStateTest {
 
         assertEquals(listOf("user" to "Refactor", "assistant" to "Done."), state.entries.values.map { it.role to it.text })
         assertEquals("mistral/devstral", state.model)
-        assertEquals("msg_u", state.lastUserMessage)
+        assertEquals("msg_u", state.promptMessage)
         assertEquals(Change.IDLE, state.handle(event("session.status", """{"sessionID":"ses_main","status":{"type":"idle"}}""")))
+    }
+
+    @Test
+    fun `the review is of the user's prompt, not of a synthetic user message later in its turn`() {
+        val state = SessionState("ses_main")
+        state.handle(event("message.updated", """{"sessionID":"ses_main","info":{"id":"msg_u","sessionID":"ses_main","role":"user"}}"""))
+        state.handle(event("message.part.updated", """{"sessionID":"ses_main","part":{"id":"prt_u","sessionID":"ses_main","messageID":"msg_u","type":"text","text":"Refactor"}}"""))
+        // The file part's contents, read into the prompt by the server.
+        state.handle(event("message.part.updated", """{"sessionID":"ses_main","part":{"id":"prt_f","sessionID":"ses_main","messageID":"msg_u","type":"text","text":"Calc.cs ...","synthetic":true}}"""))
+        // Dynamic workflows: a background subagent's result comes back as a synthetic user message.
+        state.handle(event("message.updated", """{"sessionID":"ses_main","info":{"id":"msg_bg","sessionID":"ses_main","role":"user"}}"""))
+        state.handle(event("message.part.updated", """{"sessionID":"ses_main","part":{"id":"prt_bg","sessionID":"ses_main","messageID":"msg_bg","type":"text","text":"Background task completed","synthetic":true}}"""))
+        assertEquals("msg_u", state.promptMessage)
+    }
+
+    @Test
+    fun `a model error is shown in the transcript once, a stop the user asked for isn't`() {
+        val state = SessionState("ses_main")
+        val error = """{"name":"APIError","data":{"message":"The model is not supported when using Codex with a ChatGPT account.","isRetryable":false}}"""
+        assertEquals(Change.TRANSCRIPT, state.handle(event("session.error", """{"sessionID":"ses_main","error":$error}""")))
+        // The same failure on the assistant message, and the message updated again: no duplicates.
+        state.handle(event("message.updated", """{"sessionID":"ses_main","info":{"id":"msg_a","sessionID":"ses_main","role":"assistant","providerID":"openai","modelID":"gpt-5.5","error":$error}}"""))
+        state.handle(event("message.updated", """{"sessionID":"ses_main","info":{"id":"msg_a","sessionID":"ses_main","role":"assistant","providerID":"openai","modelID":"gpt-5.5","error":$error}}"""))
+        assertEquals(listOf("error" to "The model is not supported when using Codex with a ChatGPT account."), state.entries.values.map { it.role to it.text })
+        // Another session's error, and an abort: not shown.
+        assertEquals(Change.NONE, state.handle(event("session.error", """{"sessionID":"ses_other","error":$error}""")))
+        assertEquals(Change.NONE, state.handle(event("session.error", """{"sessionID":"ses_main","error":{"name":"MessageAbortedError","data":{"message":"aborted"}}}""")))
+        assertEquals(1, state.entries.size)
     }
 }
 
 class LunosServerTest {
+    @Test
+    fun `the shell environment reaches the server, but never its password or caller`() {
+        val env = LunosServer.environment(
+            mutableMapOf("PATH" to "/usr/bin:/bin", "HOME" to "/Users/me"),
+            mapOf("PATH" to "/opt/homebrew/bin:/Users/me/.dotnet:/usr/bin:/bin", "OPENCODE_SERVER_PASSWORD" to "from-shell", "OPENCODE_CALLER" to "shell"),
+            "random",
+            "jetbrains",
+        )
+        assertEquals("/opt/homebrew/bin:/Users/me/.dotnet:/usr/bin:/bin", env["PATH"])
+        assertEquals("/Users/me", env["HOME"])
+        assertEquals("random", env["OPENCODE_SERVER_PASSWORD"])
+        assertEquals("jetbrains", env["OPENCODE_CALLER"])
+    }
+
     @Test
     fun `binary from the setting, else PATH, never opencode`() {
         val files = setOf("/opt/lunos/bin/lunos", "/usr/bin/opencode", "C:\\npm\\lunos.cmd")

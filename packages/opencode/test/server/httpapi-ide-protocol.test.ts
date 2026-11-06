@@ -191,6 +191,113 @@ describe("IDE protocol (XCOD-333)", () => {
     60_000,
   )
 
+  it.live(
+    "with Dynamic workflows on, a background subagent's worktree merge is in the diff of the user's prompt",
+    () =>
+      Effect.gen(function* () {
+        // As in the live Rider run: the subagent edits its own git worktree (XCOD-332) in the
+        // background, its merge lands after the main agent's first turn, and the result comes back
+        // as a synthetic user message. The IDE fetches the diff of the prompt the user sent.
+        const llm = yield* TestLLMServer
+        const directory = yield* tmpdirScoped({
+          git: true,
+          config: { ...testProviderConfig(llm.url), workflows: { dynamic: true }, permission: { "*": "allow" } },
+        })
+        const file = path.join(directory, "Calc.cs")
+        yield* Effect.promise(async () => {
+          await fs.writeFile(file, before)
+          // Worktree isolation needs a commit to branch from.
+          const git = (...args: string[]) => Bun.spawn(["git", ...args], { cwd: directory }).exited
+          await git("add", "-A")
+          await git("commit", "-m", "start")
+        })
+        const prompt = "Refactor Calc."
+        const main = (hit: { body: Record<string, unknown> }) => JSON.stringify(hit.body).includes(prompt)
+        const sub = (hit: { body: Record<string, unknown> }) => !main(hit)
+        let release!: () => void
+        const firstTurn = new Promise<void>((done) => (release = done))
+        yield* llm.toolMatch(main, "task", {
+          description: "refactor Calc",
+          prompt: "Make Add and Mul expression-bodied in Calc.cs.",
+          subagent_type: "general",
+          background: true,
+        })
+        yield* llm.textMatch(main, "Working on it in the background.")
+        yield* llm.textMatch(main, "Done: Add and Mul are expression-bodied.")
+        // The subagent writes only once the main agent's first turn is over.
+        yield* llm.pushMatch(sub, reply().wait(firstTurn).tool("write", { filePath: file, content: after }))
+        yield* llm.textMatch(sub, "Refactored Calc.cs.")
+
+        const session = yield* json<{ id: string }>(directory, "/session", { method: "POST", body: "{}" })
+        const id = session.body.id
+        yield* json(directory, `/session/${id}/prompt_async`, {
+          method: "POST",
+          body: JSON.stringify({
+            agent: "build",
+            model: { providerID: "test", modelID: "test-model" },
+            parts: [{ type: "text", text: prompt }],
+          }),
+        })
+        type Message = {
+          info: { id: string; role: string }
+          parts: { type: string; text?: string; synthetic?: boolean }[]
+        }
+        const messages = () => json<Message[]>(directory, `/session/${id}/message`).pipe(Effect.map((r) => r.body))
+        const idle = () =>
+          json<Record<string, { type: string }>>(directory, "/session/status").pipe(
+            Effect.map((r) => (r.body[id]?.type ?? "idle") === "idle"),
+          )
+        const said = (list: Message[], text: string) =>
+          list.some((m) => m.info.role === "assistant" && m.parts.some((p) => p.type === "text" && p.text === text))
+        yield* pollWithTimeout(
+          Effect.gen(function* () {
+            return (yield* idle()) && said(yield* messages(), "Working on it in the background.") ? true : undefined
+          }),
+          "the main agent's first turn never finished",
+          "30 seconds",
+        )
+        release()
+        yield* pollWithTimeout(
+          Effect.gen(function* () {
+            return (yield* idle()) && said(yield* messages(), "Done: Add and Mul are expression-bodied.")
+              ? true
+              : undefined
+          }),
+          "the background result never came back to the main agent",
+          "30 seconds",
+        )
+
+        const children = (yield* json<{ id: string }[]>(directory, `/session/${id}/children`)).body
+        expect(children).toHaveLength(1)
+        const child = (yield* json<{ metadata?: { isolation?: { state?: string; directory?: string } } }>(
+          directory,
+          `/session/${children[0].id}`,
+        )).body
+        // The edit was made in the subagent's own worktree and merged into the project.
+        expect(child.metadata?.isolation?.state).toBe("merged")
+        expect(child.metadata?.isolation?.directory).toContain(path.join("worktree", "subagents"))
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe(after)
+
+        const list = yield* messages()
+        const users = list.filter((m) => m.info.role === "user")
+        // The background result is a second, synthetic user message: not the one the user sent.
+        expect(users.length).toBeGreaterThan(1)
+        const sent = users.find((m) => m.parts.some((p) => p.type === "text" && !p.synthetic && p.text === prompt))!
+        // One fetch right when the session is idle, as the plugins do: the whole turn's diff, merge included.
+        const diff = (yield* json<{ file?: string; patch?: string }[]>(
+          directory,
+          `/session/${id}/diff?messageID=${sent.info.id}`,
+        )).body
+        expect(diff.map((item) => item.file)).toEqual(["Calc.cs"])
+        expect(diff[0].patch).toBe(
+          formatPatch(
+            structuredPatch("Calc.cs", "Calc.cs", before, after, "", "", { context: Number.MAX_SAFE_INTEGER }),
+          ),
+        )
+      }).pipe(Effect.provide(TestLLMServer.layer), Effect.provide(AppNodeBuilder.build(CrossSpawnSpawner.node))),
+    90_000,
+  )
+
   it.live("subagent sessions are listed under their parent for the IDE panel", () =>
     Effect.gen(function* () {
       const directory = yield* tmpdirScoped({ git: true })

@@ -1959,7 +1959,16 @@ const layer = Layer.effect(
         lastAssistant(input.sessionID),
         // XCOD-288: background commands this turn started and didn't keep stop with it, however
         // it ends (finished, failed or interrupted).
-        runLoop(input.sessionID).pipe(Effect.ensuring(Effect.promise(() => BackgroundShell.endTurn(input.sessionID)))),
+        runLoop(input.sessionID).pipe(
+          // XCOD-333: the diff of the turn is written before the session goes idle, so an IDE that
+          // fetches it at idle finds it (the per-step summaries are forked and may still be running).
+          Effect.tap((last) =>
+            last.info.role === "assistant"
+              ? summary.summarize({ sessionID: input.sessionID, messageID: last.info.parentID }).pipe(Effect.ignore)
+              : Effect.void,
+          ),
+          Effect.ensuring(Effect.promise(() => BackgroundShell.endTurn(input.sessionID))),
+        ),
       )
     })
 
