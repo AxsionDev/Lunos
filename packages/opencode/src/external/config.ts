@@ -109,7 +109,10 @@ function home() {
 
 /** `~/…` for paths under the home directory. */
 export function short(file: string, dir = home()) {
-  return dir && (file === dir || file.startsWith(dir + path.sep)) ? "~" + file.slice(dir.length) : file
+  // "~/…" with "/" on Windows too, as the tools' docs and the other labels here write it.
+  return dir && (file === dir || file.startsWith(dir + path.sep))
+    ? "~" + file.slice(dir.length).replaceAll(path.sep, "/")
+    : file
 }
 
 const exists = (file: string | undefined) => (file && existsSync(file) ? file : undefined)

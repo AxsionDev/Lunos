@@ -53,15 +53,34 @@ if (process.argv.includes("--help")) {
 // XCOD-285 §4: 0.160.1's recorded replies to config/read and an ephemeral thread/start
 // (test/fixtures/external/codex-0.160.1/config-view.json), <codex_home> and <project> being $CODEX_HOME
 // and the working directory. FAKE_CODEX_OLD=1 doesn't know config/read, as an older app server.
-const configView = JSON.parse(
-  readFileSync(
-    path.join(import.meta.dir, "..", "..", "fixtures", "external", "codex-0.160.1", "config-view.json"),
-    "utf8",
-  )
-    // Escaped for the JSON text they go into: a Windows path's backslashes aren't valid JSON escapes.
-    .replaceAll("<codex_home>", JSON.stringify(process.env.CODEX_HOME ?? "").slice(1, -1))
-    .replaceAll("<project>", JSON.stringify(process.cwd()).slice(1, -1)),
-).replies
+// Codex/Claude Code on Windows report native paths; the replies were recorded on macOS, so after the
+// placeholders are filled in, a path under them is normalised to this platform's separators.
+function native<T>(value: T, roots: string[]): T {
+  if (process.platform !== "win32") return value
+  const walk = (item: any): any =>
+    typeof item === "string"
+      ? roots.some((root) => root && item.startsWith(root))
+        ? path.normalize(item)
+        : item
+      : Array.isArray(item)
+        ? item.map(walk)
+        : item && typeof item === "object"
+          ? Object.fromEntries(Object.entries(item).map(([key, inner]) => [key, walk(inner)]))
+          : item
+  return walk(value)
+}
+const configView = native(
+  JSON.parse(
+    readFileSync(
+      path.join(import.meta.dir, "..", "..", "fixtures", "external", "codex-0.160.1", "config-view.json"),
+      "utf8",
+    )
+      // Escaped for the JSON text they go into: a Windows path's backslashes aren't valid JSON escapes.
+      .replaceAll("<codex_home>", JSON.stringify(process.env.CODEX_HOME ?? "").slice(1, -1))
+      .replaceAll("<project>", JSON.stringify(process.cwd()).slice(1, -1)),
+  ).replies,
+  [process.env.CODEX_HOME ?? "", process.cwd()],
+)
 // XCOD-294: FAKE_CODEX_AUTH=<file> is a Codex whose sign-in is that file. Without it, `login status` says
 // "Not logged in" on stderr and exits 1, as 0.160.1 does in a fresh HOME; `login` makes up a token, writes it
 // there and prints it on the terminal it was given.

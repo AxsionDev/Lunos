@@ -35,10 +35,18 @@ async function recorder(args: string[], env: Record<string, string>) {
 async function tripwire() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lunos-tripwire-"))
   const marker = path.join(dir, "ran")
+  // On Windows a tool on PATH is found by its extension (PATHEXT): npm installs them as .cmd shims.
+  const bin = (tool: string) => path.join(dir, process.platform === "win32" ? `${tool}.cmd` : tool)
   for (const tool of ["claude", "codex"]) {
-    await fs.writeFile(path.join(dir, tool), `#!/bin/sh\necho "${tool} $*" >> "${marker}"\n`, { mode: 0o755 })
+    await fs.writeFile(
+      bin(tool),
+      process.platform === "win32"
+        ? `@echo ${tool} %*>> "${marker}"\r\n`
+        : `#!/bin/sh\necho "${tool} $*" >> "${marker}"\n`,
+      { mode: 0o755 },
+    )
   }
-  return { dir, marker, PATH: `${dir}${path.delimiter}${process.env.PATH ?? ""}` }
+  return { dir, marker, bin, PATH: `${dir}${path.delimiter}${process.env.PATH ?? ""}` }
 }
 
 describe("external-fixture recorder guards (XCOD-270)", () => {
@@ -81,8 +89,11 @@ describe("external-fixture recorder guards (XCOD-270)", () => {
       expect(run.code).toBe(0)
       expect(existsSync(wire.marker)).toBe(false)
       expect(run.stdout).not.toContain(FAKE_KEY)
-      expect(run.stdout).toContain(`${path.join(wire.dir, "claude")} -p --input-format stream-json`)
-      expect(run.stdout).toContain(`${path.join(wire.dir, "codex")} login --with-api-key   (stdin: the value of $K)`)
+      // Windows' lookup returns the extension as PATHEXT spells it (".CMD"), so the path is compared
+      // without regard to case there.
+      const fold = (text: string) => (process.platform === "win32" ? text.toLowerCase() : text)
+      expect(fold(run.stdout)).toContain(fold(`${wire.bin("claude")} -p --input-format stream-json`))
+      expect(fold(run.stdout)).toContain(fold(`${wire.bin("codex")} login --with-api-key   (stdin: the value of $K)`))
       expect(run.stdout).toContain("ANTHROPIC_API_KEY=<value of $K>")
       expect(run.stdout).toContain("HOME=<scratch>/home")
       for (const scenario of SCENARIOS) expect(run.stdout).toContain(`[${scenario.name} 1/`)
@@ -149,12 +160,17 @@ describe("external-fixture recorder and replay, on the fakes (XCOD-270)", () => 
         // Host and tool lines are compared each in order: the two directions may interleave differently.
         const by = (entries: any[], from: string) => entries.filter((entry) => entry.from === from)
         for (const file of readdirSync(dir).filter((name) => name.endsWith(".jsonl")))
-          for (const from of ["argv", "host", "tool", "exit"])
+          for (const from of ["argv", "host", "tool", "exit"]) {
+            const expected = by(lines(path.join(dir, file)), from)
+            // A tool the recorder stops with SIGTERM: Windows has no signals, kill() terminates the tap
+            // before it can write the exit, so there's nothing to compare.
+            if (process.platform === "win32" && from === "exit" && expected.some((entry) => entry.signal)) continue
             expect({ file, from, lines: by(lines(path.join(fresh, file)), from) }).toEqual({
               file,
               from,
-              lines: by(lines(path.join(dir, file)), from),
+              lines: expected,
             })
+          }
       } finally {
         await fs.rm(out, { recursive: true, force: true })
       }

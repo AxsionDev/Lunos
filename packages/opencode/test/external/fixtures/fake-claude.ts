@@ -131,15 +131,35 @@ const nextLine = () =>
 // control requests with 2.1.304's recorded replies (test/fixtures/external/claude-2.1.304/config-view.json),
 // <home> and <project> being $HOME and the working directory. A release without them
 // (FAKE_CLAUDE_CONFIG=none) answers them with the error 2.1.304 gives an unknown request.
+// Codex/Claude Code on Windows report native paths; the replies were recorded on macOS, so after the
+// placeholders are filled in, a path under them is normalised to this platform's separators.
+function native<T>(value: T, roots: string[]): T {
+  if (process.platform !== "win32") return value
+  const walk = (item: any): any =>
+    typeof item === "string"
+      ? roots.some((root) => root && item.startsWith(root))
+        ? path.normalize(item)
+        : item
+      : Array.isArray(item)
+        ? item.map(walk)
+        : item && typeof item === "object"
+          ? Object.fromEntries(Object.entries(item).map(([key, inner]) => [key, walk(inner)]))
+          : item
+  return walk(value)
+}
 if (process.argv.includes("--no-session-persistence")) {
-  const recorded = JSON.parse(
-    readFileSync(
-      path.join(import.meta.dir, "..", "..", "fixtures", "external", "claude-2.1.304", "config-view.json"),
-      "utf8",
-    )
-      .replaceAll("<home>", process.env.HOME ?? "")
-      .replaceAll("<project>", process.cwd()),
-  ).replies
+  const recorded = native(
+    JSON.parse(
+      readFileSync(
+        path.join(import.meta.dir, "..", "..", "fixtures", "external", "claude-2.1.304", "config-view.json"),
+        "utf8",
+      )
+        // JSON-escaped, as fake-codex.ts does: a Windows path's backslashes aren't valid JSON escapes.
+        .replaceAll("<home>", JSON.stringify(process.env.HOME ?? "").slice(1, -1))
+        .replaceAll("<project>", JSON.stringify(process.cwd()).slice(1, -1)),
+    ).replies,
+    [process.env.HOME ?? "", process.cwd()],
+  )
   input.on("close", () => process.exit(0))
   for (;;) {
     const message = JSON.parse(await nextLine())

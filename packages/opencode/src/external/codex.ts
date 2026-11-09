@@ -329,6 +329,9 @@ export function start(options: Options): Running {
   })
   let stderr = ""
   child.stderr?.on("data", (chunk) => (stderr += chunk))
+  // A write racing the process's exit (a stop, a crash) fails with EPIPE on the stream; without a
+  // listener that's an uncaught error that takes the server down. The exit is reported on its own.
+  child.stdin?.on("error", () => undefined)
   const write = (message: unknown) => {
     if (child.stdin && !child.stdin.destroyed) child.stdin.write(JSON.stringify(message) + "\n")
   }

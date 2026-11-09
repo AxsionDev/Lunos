@@ -15,8 +15,26 @@ const FAKE_CODEX = path.join(import.meta.dir, "fixtures", "fake-codex.ts")
 
 function recorded(tool: "claude-2.1.304" | "codex-0.160.1", vars: Record<string, string>) {
   let text = readFileSync(path.join(FIXTURES, tool, "config-view.json"), "utf8")
-  for (const [key, value] of Object.entries(vars)) text = text.replaceAll(key, value)
-  return JSON.parse(text).replies
+  // JSON-escaped: a Windows path's backslashes aren't valid JSON escapes.
+  for (const [key, value] of Object.entries(vars)) text = text.replaceAll(key, JSON.stringify(value).slice(1, -1))
+  return native(JSON.parse(text).replies, Object.values(vars))
+}
+
+// Codex/Claude Code on Windows report native paths; the replies were recorded on macOS, so after the
+// placeholders are filled in, a path under them is normalised to this platform's separators.
+function native<T>(value: T, roots: string[]): T {
+  if (process.platform !== "win32") return value
+  const walk = (item: any): any =>
+    typeof item === "string"
+      ? roots.some((root) => root && item.startsWith(root))
+        ? path.normalize(item)
+        : item
+      : Array.isArray(item)
+        ? item.map(walk)
+        : item && typeof item === "object"
+          ? Object.fromEntries(Object.entries(item).map(([key, inner]) => [key, walk(inner)]))
+          : item
+  return walk(value)
 }
 
 async function dirs() {
@@ -299,7 +317,7 @@ describe("the tool's own command for a change", () => {
     ).toEqual({
       argv: ["mcp", "add", "-s", "user", "docs", "--", "npx", "-y", "docs-mcp"],
       command: "claude mcp add -s user docs -- npx -y docs-mcp",
-      file: "/home/me/.claude.json",
+      file: path.join("/home/me", ".claude.json"),
     })
     expect(
       ExternalConfig.plan(
@@ -310,12 +328,12 @@ describe("the tool's own command for a change", () => {
     ).toEqual({
       argv: ["mcp", "add", "-s", "project", "--transport", "http", "web", "https://mcp.example.com/mcp"],
       command: "claude mcp add -s project --transport http web https://mcp.example.com/mcp",
-      file: "/work/.mcp.json",
+      file: path.join("/work", ".mcp.json"),
     })
     expect(ExternalConfig.plan("claude", { action: "mcp.remove", name: "docs", scope: "local" }, context)).toEqual({
       argv: ["mcp", "remove", "docs", "-s", "local"],
       command: "claude mcp remove docs -s local",
-      file: "/home/me/.claude.json",
+      file: path.join("/home/me", ".claude.json"),
     })
   })
 
