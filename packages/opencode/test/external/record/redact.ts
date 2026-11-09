@@ -47,6 +47,13 @@ export function compile(context: Context) {
   const string = (input: string) => {
     let output = input
     for (const [from, to] of literal) output = output.split(from).join(to)
+    // What follows a placeholder is written with "/" (also when JSON-escaped), so a recording made on
+    // Windows is the same as one made on macOS or Linux.
+    if (process.platform === "win32")
+      output = output.replace(
+        /(<(?:home|project|scratch|repo|user-home)>)((?:\\{1,2}[\w.@~+-]+)+)/g,
+        (_, at, rest) => at + rest.replace(/\\{1,2}/g, "/"),
+      )
     for (const [pattern, to] of PATTERNS) output = output.replace(pattern, to)
     if (user) output = output.replace(new RegExp(`\\b${user.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g"), "<user>")
     return output
