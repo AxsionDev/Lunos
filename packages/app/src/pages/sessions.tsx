@@ -57,6 +57,7 @@ import {
   type SectionView,
 } from "./sessions/monitor-model"
 import { useOpenSession } from "./sessions/open-session"
+import { Keyed } from "@/utils/keyed"
 
 // Events after which the overview is re-read. Everything else is noise for this page.
 const REFRESH_ON = new Set([
@@ -169,7 +170,11 @@ export function SessionsPage() {
         setHere(projects.data.current.id)
       }
       if (result.data && archived === archivedView()) {
-        setData({ groups: result.data.groups, sessions: result.data.sessions, loaded: true })
+        // Keyed by id, so a reload updates the rows in place instead of rebuilding them (and an open
+        // rename field, focus or a click in flight with them).
+        setData("groups", reconcile(result.data.groups, { key: "id" }))
+        setData("sessions", reconcile(result.data.sessions, { key: "id" }))
+        setData("loaded", true)
         setNow(Date.now())
         setError(undefined)
         if (!archived) void loadAsks(result.data.sessions.filter((item) => item.state === "waiting"))
@@ -935,6 +940,7 @@ export function SessionsPage() {
 
   const SessionRow = (props: { item: SessionOverviewItem; child?: boolean }) => {
     const item = () => props.item
+    let nameField: HTMLInputElement | undefined
     const external = () => item().id.startsWith("external:")
     const renameButton = () => (
       <button
@@ -1003,7 +1009,10 @@ export function SessionsPage() {
                 aria-label={language.t("sessions.session.name")}
                 maxLength={80}
                 value={ui.draft}
-                ref={(el) => queueMicrotask(() => el.focus())}
+                ref={(el) => {
+                  nameField = el
+                  queueMicrotask(() => el.focus())
+                }}
                 onInput={(event) => setUi("draft", event.currentTarget.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void sessionActions.rename(item())
@@ -1222,7 +1231,14 @@ export function SessionsPage() {
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
           {/* Focus stays in the name field it opens, not back on the row. */}
-          <ContextMenu.Content onCloseAutoFocus={(event: Event) => event.preventDefault()}>
+          <ContextMenu.Content
+            onCloseAutoFocus={(event: Event) => {
+              event.preventDefault()
+              // Rename from the menu: the field mounted while the menu still held focus, so it gets
+              // focus now that the menu has let go of it.
+              if (ui.renamingSession === item().id) nameField?.focus()
+            }}
+          >
             <ContextMenu.Item onSelect={() => sessionActions.startRename(item())}>
               <ContextMenu.ItemLabel>{language.t("common.rename")}</ContextMenu.ItemLabel>
             </ContextMenu.Item>
@@ -1234,14 +1250,16 @@ export function SessionsPage() {
 
   const Rows = (props: { rows: Row[] }) => (
     <ul class="flex flex-col">
-      <For each={props.rows}>
+      <Keyed each={props.rows} by={(row) => row.item.id}>
         {(row) => (
           <>
-            <SessionRow item={row.item} />
-            <For each={row.children}>{(child) => <SessionRow item={child} child />}</For>
+            <SessionRow item={row().item} />
+            <Keyed each={row().children} by={(child) => child.id}>
+              {(child) => <SessionRow item={child()} child />}
+            </Keyed>
           </>
         )}
-      </For>
+      </Keyed>
     </ul>
   )
 
@@ -1495,7 +1513,9 @@ export function SessionsPage() {
         </header>
         <Show when={props.view.open}>
           <ul class="flex flex-col">
-            <For each={rows()}>{(row: RailRow) => <SessionRow item={row.item} child={row.depth === 1} />}</For>
+            <Keyed each={rows()} by={(row: RailRow) => row.item.id}>
+              {(row) => <SessionRow item={row().item} child={row().depth === 1} />}
+            </Keyed>
           </ul>
         </Show>
       </section>
@@ -1677,7 +1697,9 @@ export function SessionsPage() {
           fallback={
             <>
               <Show when={statusRail().rows.length > 0}>
-                <For each={sectionViews().views}>{(view) => <StatusSection view={view} />}</For>
+                <Keyed each={sectionViews().views} by={(view) => view.section}>
+                  {(view) => <StatusSection view={view()} />}
+                </Keyed>
               </Show>
               <Show when={data.loaded && statusRail().rows.length === 0}>
                 <p class="text-14-regular text-v2-text-text-weak">{language.t("sessions.empty")}</p>
@@ -1703,9 +1725,15 @@ export function SessionsPage() {
         >
           <Show
             when={byProject()}
-            fallback={<For each={sections()}>{(section) => <SectionView section={section} />}</For>}
+            fallback={
+              <Keyed each={sections()} by={(section) => section.group?.id ?? UNGROUPED}>
+                {(section) => <SectionView section={section()} />}
+              </Keyed>
+            }
           >
-            <For each={projectViews()}>{(section) => <ProjectSectionView section={section} />}</For>
+            <Keyed each={projectViews()} by={(section) => section.id}>
+              {(section) => <ProjectSectionView section={section()} />}
+            </Keyed>
           </Show>
           <Show
             when={

@@ -96,6 +96,20 @@ async function open(page: Page) {
 const rowOf = (page: Page, id: string) => page.locator(`[data-session-id="${id}"]`)
 const nameField = (page: Page, id: string) => rowOf(page, id).getByRole("textbox", { name: "Session name" })
 
+// Every reconnect of the event stream (and every session event) reloads the list. The rows must
+// survive it: rebuilding them dropped an open rename field and clicks in flight (flaky on Windows CI).
+test("a reload of the list keeps each row's element, and an open rename field with it", async ({ page }) => {
+  await open(page)
+  const row = rowOf(page, "external:cc1")
+  await row.evaluate((el) => ((el as HTMLElement).dataset.probe = "kept"))
+  await row.getByRole("button", { name: "Rename", exact: true }).click()
+  await expect(nameField(page, "external:cc1")).toBeFocused()
+  // The mock's event stream ends at once, so the client reconnects and reloads: wait for two.
+  for (const _ of [1, 2]) await page.waitForResponse((res) => res.url().includes("/experimental/session-overview"))
+  await expect(row).toHaveAttribute("data-probe", "kept")
+  await expect(nameField(page, "external:cc1")).toBeFocused()
+})
+
 test("a Claude Code row has Rename: its Lunos name is saved through its own route", async ({ page }) => {
   const state = await open(page)
   // Prefilled with the current name.

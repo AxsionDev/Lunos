@@ -279,6 +279,19 @@ export async function files(file: string) {
 // Cross-process: the TUI server, `lunos run` and a second TUI may all append at once. The lock
 // records its owner and is broken when stale, so a crashed process can't wedge auditing.
 const LOCK_STALE_MS = 10_000
+
+/**
+ * What a failed exclusive create of the lock file means. EEXIST: another process holds it. On
+ * Windows, a lock file the holder is deleting ("delete pending") refuses opens with EPERM/EACCES
+ * for a moment: that is contention too, but only until the deadline, so a log directory that is
+ * really unwritable is still reported instead of retried for ever.
+ */
+export function lockBusy(code: string | undefined, platform: NodeJS.Platform, pastDeadline: boolean) {
+  if (code === "EEXIST") return "held" as const
+  if (platform === "win32" && (code === "EPERM" || code === "EACCES") && !pastDeadline) return "releasing" as const
+  return undefined
+}
+
 function withLock<T>(file: string, fn: () => T): T {
   const lock = file + ".lock"
   const deadline = Date.now() + 5_000
@@ -289,7 +302,12 @@ function withLock<T>(file: string, fn: () => T): T {
       closeSync(fd)
       break
     } catch (err: any) {
-      if (err?.code !== "EEXIST") throw err
+      const busy = lockBusy(err?.code, process.platform, Date.now() > deadline)
+      if (!busy) throw err
+      if (busy === "releasing") {
+        Bun.sleepSync(5)
+        continue
+      }
       try {
         if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) unlinkSync(lock)
       } catch {}
