@@ -348,12 +348,16 @@ const layer = Layer.effect(
             if (proc.log.length > LOG_LINES) proc.log.splice(0, proc.log.length - LOG_LINES)
           })
           let exit: number | null | undefined
-          const exited = new Promise<never>((_, reject) =>
+          const exited = new Promise<never>((_, reject) => {
             handle.process.once("exit", (code) => {
               exit = code
               reject(new Error(`exited with code ${code}`))
-            }),
-          )
+            })
+            // On Windows cross-spawn runs a command it can't resolve through cmd.exe and turns its
+            // "exit 1" into an ENOENT "error" event instead of "exit": without this, a missing
+            // command waited out the whole initialise timeout.
+            handle.process.once("error", reject)
+          })
           exited.catch(() => {})
           // No pid: the command didn't start (ENOENT, EACCES). Its error arrives on the next tick;
           // talking to it before then would write into a dead pipe.
