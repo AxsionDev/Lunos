@@ -20,7 +20,8 @@ beforeAll(async () => {
 })
 afterAll(async () => {
   await proxy.close()
-  for (const home of homes) await fs.rm(home, { recursive: true, force: true })
+  // Windows can hold a just-exited process's folder for a moment (EBUSY): retried.
+  for (const home of homes) await fs.rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 afterEach(async () => {
   await run?.stop()
@@ -153,6 +154,7 @@ describe.skipIf(!["1", "true"].includes(process.env.LUNOS_STARTUP_BUDGET ?? "") 
 async function sessionMessages(data: string) {
   const { Database } = await import("bun:sqlite")
   const until = Date.now() + 10_000
+  let last = ""
   while (Date.now() < until) {
     const name = (await fs.readdir(path.join(data, "opencode")).catch(() => [] as string[])).find((item) =>
       /^opencode.*\.db$/.test(item),
@@ -167,18 +169,19 @@ async function sessionMessages(data: string) {
             .all()
             .map((row) => String((row as { data: string }).data))
             .join("\n")
-        } catch {
+        } catch (error) {
+          last = `${file}: ${error}`
           return ""
         } finally {
           db.close()
         }
       },
-      () => "",
+      () => ((last = `no database in ${path.join(data, "opencode")}`), ""),
     )
     if (found) return found
     await Bun.sleep(200)
   }
-  return ""
+  return `(nothing read: ${last})`
 }
 
 /** A project-local server plugin whose init takes `ms`: the server answers nothing until it's done. */
