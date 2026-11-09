@@ -174,20 +174,23 @@ async function switchSession(page: Page, sessionID: string, title: string) {
 
 /** Samples the dock every frame for `duration` ms; with `untilPresent`, stops at the first frame it's in. */
 function sampleDock(page: Page, duration: number, options: { untilPresent?: boolean } = {}) {
-  return page.evaluate(async ({ duration, untilPresent }) => {
-    const samples: { present: boolean; height: number; opacity: number }[] = []
-    const start = performance.now()
-    while (performance.now() - start < duration && !(untilPresent && samples.at(-1)?.present)) {
-      const dock = document.querySelector<HTMLElement>('[data-component="session-todo-dock"]')
-      const clip = dock?.parentElement?.parentElement
-      const label = dock?.querySelector<HTMLElement>('[data-action="session-todo-toggle"] span[aria-label]')
-      samples.push({
-        present: !!dock,
-        height: clip?.getBoundingClientRect().height ?? 0,
-        opacity: label ? Number.parseFloat(getComputedStyle(label).opacity) : 0,
-      })
-      await new Promise(requestAnimationFrame)
-    }
-    return samples
-  }, { duration, untilPresent: options.untilPresent ?? false })
+  return page.evaluate(
+    async ({ duration, untilPresent }) => {
+      const samples: { present: boolean; height: number; opacity: number }[] = []
+      const start = performance.now()
+      while (performance.now() - start < duration && !(untilPresent && samples.at(-1)?.present)) {
+        const dock = document.querySelector<HTMLElement>('[data-component="session-todo-dock"]')
+        const clip = dock?.parentElement?.parentElement
+        const label = dock?.querySelector<HTMLElement>('[data-action="session-todo-toggle"] span[aria-label]')
+        samples.push({
+          present: !!dock,
+          height: clip?.getBoundingClientRect().height ?? 0,
+          opacity: label ? Number.parseFloat(getComputedStyle(label).opacity) : 0,
+        })
+        await new Promise(requestAnimationFrame)
+      }
+      return samples
+    },
+    { duration, untilPresent: options.untilPresent ?? false },
+  )
 }
