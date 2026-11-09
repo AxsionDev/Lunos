@@ -15,7 +15,8 @@ import * as Pty from "./fixtures/tui-pty"
 const TIMEOUT = 120_000
 const homes: string[] = []
 afterAll(async () => {
-  for (const home of homes) await fs.rm(home, { recursive: true, force: true })
+  // Windows can hold a just-exited process's folder for a moment (EBUSY): retried.
+  for (const home of homes) await fs.rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 /** Runs `lunos` from source without a terminal, in a throwaway HOME (the pty fixture's isolation). */

@@ -23,7 +23,8 @@ afterEach(async () => {
   run = undefined
 })
 afterAll(async () => {
-  for (const home of homes) await fs.rm(home, { recursive: true, force: true })
+  // Windows can hold a just-exited process's folder for a moment (EBUSY): retried.
+  for (const home of homes) await fs.rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 /** A home whose project is a repository with one commit, docker on PATH, and the sandbox on. */
