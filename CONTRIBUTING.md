@@ -220,7 +220,8 @@ compiled build (`bun run --cwd packages/opencode script/build.ts --single`), not
 source, module loading is mostly transpiling.
 
 CI holds the start path down with a budget test, and keeps its traces as the `startup-trace`
-artifact. To run it locally:
+artifact. Locally the budget is 150 ms; CI's shared runners are 2-5x slower, so CI runs it at 450 ms
+(`LUNOS_STARTUP_BUDGET_MS`) to catch large regressions. To run it locally:
 
 ```bash
 cd packages/opencode && LUNOS_STARTUP_BUDGET=1 bun test test/cli/startup-pty.test.ts -t budget

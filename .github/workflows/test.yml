@@ -80,6 +80,11 @@ jobs:
         run: bun test test/cli/startup-pty.test.ts -t "budget"
         env:
           LUNOS_STARTUP_BUDGET: "1"
+          # The budget is 150 ms on a developer machine (an M-series Mac measures 75-81 ms). A shared
+          # ubuntu-latest runner is 2-5x slower on the same code: 157-395 ms across dev runs from
+          # 21 Oct to 6 Nov 2026, never under 150, so the step was red on every run. Here it guards
+          # against a large regression; the 150 ms rule itself is checked with `lunos debug startup`.
+          LUNOS_STARTUP_BUDGET_MS: "450"
           LUNOS_STARTUP_TRACE_DIR: ${{ runner.temp }}/startup-trace
 
       - name: Upload start-up trace
