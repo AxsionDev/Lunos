@@ -9,6 +9,7 @@ import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { useServerSync } from "@/context/server-sync"
 import { showToast } from "@/utils/toast"
+import { voiceButtonShown } from "./voice-shown"
 
 // XCOD-336: the desktop prompt's mic button. Hold it to talk and let go to transcribe, or click once
 // to start and again to stop; Esc cancels. The microphone is read with Web Audio into memory, and
@@ -23,8 +24,7 @@ export function PromptVoiceButton(props: { insert: (text: string) => void; submi
   const language = useLanguage()
   const config = createMemo(() => serverSync().data.config.voice)
   const voice = platform.voice
-  // An organisation turns voice off with `voice.enabled: false` (lockable): no button at all.
-  const shown = createMemo(() => !!voice && config()?.enabled !== false)
+  const shown = createMemo(() => voiceButtonShown({ local: !!voice, config: config() }))
   const [store, setStore] = createStore({
     phase: "idle" as VoiceDictation.Phase,
     levels: [] as number[],

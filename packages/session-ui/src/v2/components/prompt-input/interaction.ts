@@ -403,6 +403,14 @@ export function createPromptInputV2Controller(input: {
     onCursor(cursor: number) {
       draft.setCursor(cursor)
     },
+    /** Inserts text at the cursor, as typing would (dictated text, XCOD-336). */
+    insertText(text: string) {
+      if (!text) return
+      cleared = undefined
+      // Straight into the draft (the editor follows it), not through input.changed: dictated text
+      // must not open the @ or ! popovers.
+      draft.addText(text)
+    },
     openCommands() {
       dispatch({ type: "commands.open" })
     },

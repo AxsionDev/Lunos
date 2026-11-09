@@ -41,6 +41,8 @@ export type PromptInputV2Props = {
   borderUnderlay?: boolean
   class?: string
   modelControl?: JSX.Element
+  /** Drawn just left of Send (the desktop app's mic button, XCOD-336). */
+  trailingControl?: JSX.Element
   variantControlVisible?: boolean
   attachKeybind?: string[]
   attachShortcut?: string
@@ -254,6 +256,11 @@ export function PromptInputV2(props: PromptInputV2Props) {
               )}
             </Show>
           </div>
+          <Show when={props.trailingControl}>
+            <div class="flex items-center" data-slot="prompt-trailing" style={buttons()}>
+              {props.trailingControl}
+            </div>
+          </Show>
           <PromptInputV2SubmitButton
             mode={state.mode}
             stopping={view.submit.stopping()}
