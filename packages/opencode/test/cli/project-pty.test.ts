@@ -114,7 +114,7 @@ describe("/projects", () => {
       await run.type("axsion-api")
       await Bun.sleep(200)
       run.press(KEY.enter)
-      await run.waitFor("Remove ~/axsion-api from Axsion web?")
+      await run.waitFor(/Remove ~[\\/]axsion-api from Axsion web\?/)
       run.press(KEY.enter)
       await run.waitFor("Projects › Axsion web")
       await settle(1)
