@@ -93,7 +93,14 @@ describe("XCOD-332 tools of a session bound to a worktree", () => {
           yield* isolated(
             "bash",
             sessionID,
-            { command: `echo ran > ${path.join(dir, "c.txt")} && pwd > where.txt`, description: "write" },
+            {
+              // On Windows the shell tool prefers PowerShell, whose `pwd` prints a table.
+              command:
+                process.platform === "win32"
+                  ? `echo ran > ${path.join(dir, "c.txt")} && (Get-Location).Path > where.txt`
+                  : `echo ran > ${path.join(dir, "c.txt")} && pwd > where.txt`,
+              description: "write",
+            },
             (args) => shell.execute(args as never, ctx),
           )
           // Not a worktree tool: the instance is the user's.
@@ -104,7 +111,10 @@ describe("XCOD-332 tools of a session bound to a worktree", () => {
 
       expect(yield* Effect.promise(() => Bun.file(path.join(wt, "b.txt")).text())).toBe("new\n")
       expect(yield* Effect.promise(() => Bun.file(path.join(wt, "a.txt")).text())).toBe("two\n")
-      expect(yield* Effect.promise(() => Bun.file(path.join(wt, "c.txt")).text())).toBe("ran\n")
+      // PowerShell's redirection writes CRLF.
+      expect((yield* Effect.promise(() => Bun.file(path.join(wt, "c.txt")).text())).replace(/\r\n/g, "\n")).toBe(
+        "ran\n",
+      )
       expect((yield* Effect.promise(() => Bun.file(path.join(wt, "where.txt")).text())).trim()).toBe(
         yield* Effect.promise(() => fs.realpath(wt)),
       )
