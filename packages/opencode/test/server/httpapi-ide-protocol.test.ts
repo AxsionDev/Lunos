@@ -143,6 +143,9 @@ describe("IDE protocol (XCOD-333)", () => {
           git: true,
           config: { ...testProviderConfig(llm.url), workflows: { dynamic: true }, permission: { "*": "allow" } },
         })
+        // The subagent's worktree as written: a global core.autocrlf=true (the GitHub Windows image)
+        // would merge Calc.cs back with CRLF. isolation.test.ts covers that case.
+        Bun.spawnSync(["git", "config", "core.autocrlf", "false"], { cwd: directory })
         const file = path.join(directory, "Calc.cs")
         yield* Effect.promise(() => fs.writeFile(file, before))
         // Main agent: dispatches a subagent. Subagent: writes and reports. Main agent: hands back.
@@ -203,6 +206,9 @@ describe("IDE protocol (XCOD-333)", () => {
           git: true,
           config: { ...testProviderConfig(llm.url), workflows: { dynamic: true }, permission: { "*": "allow" } },
         })
+        // The subagent's worktree as written: a global core.autocrlf=true (the GitHub Windows image)
+        // would merge Calc.cs back with CRLF. isolation.test.ts covers that case.
+        Bun.spawnSync(["git", "config", "core.autocrlf", "false"], { cwd: directory })
         const file = path.join(directory, "Calc.cs")
         yield* Effect.promise(async () => {
           await fs.writeFile(file, before)

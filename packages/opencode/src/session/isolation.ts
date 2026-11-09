@@ -314,7 +314,7 @@ export async function merge(
     attempts.map(async (item) => {
       const target = path.join(handle.root, item.versions.path)
       await fs.mkdir(path.dirname(target), { recursive: true })
-      await Bun.write(target, item.resolved!)
+      await Bun.write(target, await checkout(handle.root, item.versions.path, item.resolved!))
     }),
   )
 
@@ -323,6 +323,16 @@ export async function merge(
   const lockConflict = conflicted.some((file) => LOCKFILES.includes(path.basename(file)))
   const regenerated = (manifests || lockConflict) && opts.regenerate ? await opts.regenerate(handle.root) : undefined
   return { state: "merged", resolved: conflicted, ...changes, ...(regenerated ? { regenerated } : {}) }
+}
+
+/**
+ * `content` (repository form, as `git show` and `merge-file` give it) the way a checkout would write
+ * it to `file`: with core.autocrlf=true or an `eol` attribute that's CRLF, so a resolved file keeps
+ * the line endings of the files `git apply` wrote next to it.
+ */
+async function checkout(root: string, file: string, content: string) {
+  const blob = (await must(["hash-object", "-w", "--no-filters", "--stdin"], { cwd: root, stdin: content })).trim()
+  return must(["cat-file", "--filters", `--path=${file}`, blob], { cwd: root })
 }
 
 /**

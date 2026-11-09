@@ -60,6 +60,9 @@ describe("XCOD-332 tools of a session bound to a worktree", () => {
   it.live("write, edit and shell run in the worktree; the user's tree stays as it was", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped({ git: true })
+      // Line endings as written: a global core.autocrlf=true (the GitHub Windows image, Git for
+      // Windows' default) checks worktrees out as CRLF. isolation.test.ts covers that case.
+      yield* Effect.promise(() => SubagentIsolation.git(["config", "core.autocrlf", "false"], { cwd: dir }))
       yield* Effect.promise(() => Bun.write(path.join(dir, "a.txt"), "one\n"))
       yield* Effect.promise(() => SubagentIsolation.git(["add", "-A"], { cwd: dir }))
       yield* Effect.promise(() => SubagentIsolation.git(["commit", "-qm", "a"], { cwd: dir }))
