@@ -17,6 +17,7 @@ import { createPersistedPromptInputHistory } from "@/components/prompt-input/his
 import { promptDesignPlaceholder, promptPlaceholder } from "@/components/prompt-input/placeholder"
 import { useAccount } from "@/context/account"
 import { createPromptSubmit } from "@/components/prompt-input/submit"
+import { PromptVoiceButton } from "@/components/prompt-input/voice"
 import { useSessionTakeover } from "@/components/prompt-input/takeover"
 import { useRemoteControl } from "@/pages/session/use-remote-control"
 import { selectionFromLines, type SelectedLineRange, useFile } from "@/context/file"
@@ -92,6 +93,18 @@ export function PromptInputV2Composer(props: PromptInputV2ComposerProps) {
         variantControlVisible={!props.controller.model.loading}
         attachKeybind={command.keybindParts("file.attach")}
         attachShortcut={command.keybind("file.attach")}
+        trailingControl={
+          // XCOD-336: desktop only (PromptVoiceButton draws nothing without platform.voice); the
+          // transcript goes into the prompt for editing, after a space if needed.
+          <PromptVoiceButton
+            disabled={props.controller.state.mode !== "normal"}
+            insert={(text) => {
+              const before = props.controller.value()
+              props.controller.insertText((before && !/\s$/.test(before) ? " " : "") + text)
+            }}
+            submit={props.controller.submit}
+          />
+        }
         modelControl={
           <PromptInputV2ModelControl
             loading={props.controller.model.loading}
