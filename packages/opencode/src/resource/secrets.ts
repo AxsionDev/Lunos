@@ -38,13 +38,16 @@ export const NEVER = [
 /** Folders never walked into: credentials, VCS internals and dependencies. */
 export const SKIP_DIRS = new Set([".git", ".ssh", ".aws", ".gnupg", ".kube", ".docker", "node_modules"])
 
-const globs = NEVER.map((glob) => new Bun.Glob(glob.toLowerCase()))
+// Built on first use, not at import: the desktop app's server runs in Node (script/build-node.ts),
+// where Bun is undefined and a module-level Bun call stops the whole server from loading.
+let globs: InstanceType<typeof Bun.Glob>[] | undefined
 
 /** Whether a file must be skipped by name. Case-insensitive, like session sync. */
 export function secretPath(file: string) {
   const parts = file.replaceAll("\\", "/").split("/")
   if (parts.slice(0, -1).some((part) => SKIP_DIRS.has(part))) return true
   const name = path.posix.basename(parts.join("/")).toLowerCase()
+  globs ??= NEVER.map((glob) => new Bun.Glob(glob.toLowerCase()))
   return globs.some((glob) => glob.match(name))
 }
 
