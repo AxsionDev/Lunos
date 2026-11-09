@@ -929,7 +929,8 @@ export function SessionsPage() {
 
   const money = (value: number) => formatMoney(value, language.intl())
   const ago = (time: number) => {
-    const seconds = Math.round((time - Date.now()) / 1000)
+    // now(), not Date.now(): rows aren't rebuilt on a reload, so the label must track the clock itself.
+    const seconds = Math.round((time - now()) / 1000)
     const format = new Intl.RelativeTimeFormat(language.intl(), { numeric: "auto" })
     const abs = Math.abs(seconds)
     if (abs < 60) return format.format(seconds, "second")
