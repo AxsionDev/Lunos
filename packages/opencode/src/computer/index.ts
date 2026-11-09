@@ -2,6 +2,7 @@ export * as Computer from "."
 
 import { Control } from "@/control"
 import { SandboxConfig } from "@/sandbox/config"
+import { ConfigBrowser } from "@opencode-ai/core/config/browser"
 import { ConfigComputer } from "@opencode-ai/core/config/computer"
 import { Desktop } from "./desktop"
 
@@ -28,6 +29,7 @@ let override: Desktop.Desktop | undefined
 export function use(desktop: Desktop.Desktop | undefined) {
   override = desktop
   end()
+  endBrowserKey()
 }
 
 export function get(): Promise<Desktop.Desktop> {
@@ -81,6 +83,7 @@ let watch: Watch | undefined
 
 Control.onStop((kind) => {
   if (kind === "computer") end()
+  if (kind === "browser") endBrowserKey()
 })
 
 /** Control is active: start (or extend) the watcher. */
@@ -141,6 +144,60 @@ export function end() {
   if (!current) return
   clearInterval(current.timer)
   current.indicator?.close()
+}
+
+// ---------------------------------------------------------------------------------------------
+// XCOD-327: the browser's stop key, anywhere on the computer
+//
+// In the controlled page the stop key is caught by the page itself, which only works while that
+// page has focus. While browser control is active, the key is also polled OS-wide, as for computer
+// control, so it works from any app. No indicator (the browser draws its own) and no pause on mouse
+// movement (using the mouse in the browser is expected). Where there's no desktop backend (Linux,
+// inside a sandbox) this does nothing and the in-page key is what there is.
+
+type KeyWatch = { desktop: Desktop.Desktop; key: string; timer: ReturnType<typeof setInterval>; deadline: number }
+let keyWatch: KeyWatch | undefined
+
+/**
+ * Browser control is active: poll its stop key (`browser.stop_key`) anywhere on the computer until a
+ * minute without an action. Resolves false where the key can't be polled.
+ */
+export async function watchBrowserKey(stopKey: string | undefined) {
+  if (SandboxConfig.inside()) return false
+  const desktop = await get().catch(() => undefined)
+  if (!desktop) return false
+  const key = stopKey || ConfigBrowser.DEFAULT_STOP_KEY
+  const deadline = Date.now() + IDLE_MS
+  if (keyWatch?.desktop === desktop && keyWatch.key === key) {
+    keyWatch.deadline = deadline
+    return true
+  }
+  endBrowserKey()
+  const stop = Desktop.parse(key)
+  const created: KeyWatch = {
+    desktop,
+    key,
+    deadline,
+    timer: setInterval(() => {
+      if (keyWatch !== created) return
+      if (desktop.held(stop)) return void Control.stopAll("stop key")
+      if (Date.now() > created.deadline) endBrowserKey()
+    }, TICK_MS),
+  }
+  created.timer.unref?.()
+  keyWatch = created
+  return true
+}
+
+function endBrowserKey() {
+  const current = keyWatch
+  keyWatch = undefined
+  if (current) clearInterval(current.timer)
+}
+
+/** Whether the browser's OS-wide stop key is being polled (tests). */
+export function watchingBrowserKey() {
+  return keyWatch !== undefined
 }
 
 /** Whether the watcher is running (tests). */

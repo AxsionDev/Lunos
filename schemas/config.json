@@ -816,7 +816,7 @@
         },
         "stop_key": {
           "type": "string",
-          "description": "The key that stops browser control at once, pressed in the controlled browser (default \"ctrl+alt+escape\")"
+          "description": "The key that stops browser control at once: in the controlled browser, and on macOS and Windows from any app while the agent drives the browser (default \"ctrl+alt+escape\")"
         },
         "headless": {
           "type": "boolean",
