@@ -42,6 +42,10 @@ export function get(): Promise<Desktop.Desktop> {
 }
 
 async function load(): Promise<Desktop.Desktop> {
+  // The desktop app's built-in server runs in Node (script/build-node.ts), where bun:ffi is a
+  // stand-in: computer control needs the Lunos CLI there.
+  if (typeof Bun === "undefined")
+    throw new UnsupportedError("Computer control isn't available in the desktop app's built-in server; run it from the Lunos CLI.")
   if (process.platform === "darwin") {
     const { MacDesktop } = await import("./macos")
     return new MacDesktop()
