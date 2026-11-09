@@ -50,7 +50,12 @@ export class Screen {
     else this.row = Math.min(this.rows - 1, this.row + 1)
   }
   private put(char: string) {
-    if (this.col >= this.cols) return
+    // Auto-wrap, as a terminal does once a row is full (deferred: only when the next character
+    // comes). ConPTY relies on it: it writes whole rows back to back without a line break.
+    if (this.col >= this.cols) {
+      this.col = 0
+      this.lineFeed()
+    }
     if (this.row >= 0 && this.row < this.rows) this.cells[this.row]![this.col] = char
     this.col++
   }
