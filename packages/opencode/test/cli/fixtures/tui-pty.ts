@@ -344,6 +344,9 @@ export async function prepare(options: Options = {}) {
     // clearing it), so a CI runner's CI=true would exempt every start from the Welcome screen and
     // change what the TUI asks. A test of the CI exemption sets it itself.
     CI: "",
+    // Likewise the test preload's OPENCODE_DB=:memory: (test/preload.ts): the TUI keeps its
+    // sessions in its own database file, as a user's does.
+    OPENCODE_DB: "",
     ...options.env,
   }
   if (process.platform === "win32")
