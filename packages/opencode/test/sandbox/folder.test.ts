@@ -118,7 +118,8 @@ describe("where a sandbox starts from", () => {
     expect(found.source).toBe("git")
     const repo = await SandboxGit.repo(tmp.path)
     expect(repo.source).toBe("git")
-    expect(repo.gitDir).toBe(await fs.realpath(path.join(tmp.path, ".git")))
+    // git reports forward slashes on Windows ("C:/…/.git"); compare as paths.
+    expect(path.resolve(repo.gitDir)).toBe(await fs.realpath(path.join(tmp.path, ".git")))
   })
 
   test("a repository git refuses (dubious ownership) stays an error with the safe.directory fix, never a folder", async () => {
@@ -291,7 +292,8 @@ describe("lunos sandbox apply", () => {
     const previous = (await SandboxGit.branchHead(repo.gitDir, branch))!
     // The workspace as the reopened sandbox has it: the first result.
     await using seed = await tmpdir()
-    await $`git --git-dir ${repo.gitDir} archive ${previous} | tar -x -f - -C ${seed.path}`.quiet()
+    // In the folder, not `-C`: Git for Windows' GNU tar reads "C:\\…" as a remote host.
+    await $`git --git-dir ${repo.gitDir} archive ${previous} | tar -x -f -`.cwd(seed.path).quiet()
     await Bun.write(path.join(seed.path, "a.txt"), "agent a 2\n")
     await Bun.write(path.join(seed.path, "b.txt"), "agent b\n")
     const tree = await SandboxGit.tree({

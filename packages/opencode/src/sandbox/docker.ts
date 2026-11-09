@@ -432,12 +432,12 @@ export async function createVolume(id: string) {
 export async function seed(
   id: string,
   imageID: string,
-  tar: string[],
+  tar: { argv: string[]; cwd: string },
   tarEnv?: Record<string, string>,
   identity: Identity = DEFAULT_IDENTITY,
 ) {
   await SandboxExec.pipe(
-    tar,
+    tar.argv,
     [
       bin(),
       "run",
@@ -465,7 +465,7 @@ export async function seed(
       "-c",
       `mkdir -p ${WORKSPACE} ${HOME} && tar -x -o -f - -C ${WORKSPACE} && chown -R ${identity.user} ${ROOT}`,
     ],
-    { from: { env: tarEnv } },
+    { from: { env: tarEnv, cwd: tar.cwd } },
   )
 }
 
@@ -482,7 +482,8 @@ export async function seedPolicy(
   identity: Identity = DEFAULT_IDENTITY,
 ) {
   await SandboxExec.pipe(
-    ["tar", "-c", "-f", "-", "-C", dir, "."],
+    // Run in `dir` rather than `-C dir`: Git for Windows' GNU tar reads "C:\\…" as a remote host.
+    ["tar", "-c", "-f", "-", "."],
     [
       bin(),
       "run",
@@ -510,7 +511,7 @@ export async function seedPolicy(
       "-c",
       `tar -x -o -f - -C ${POLICY_DIR} && chown -R 0:0 ${POLICY_DIR} && chmod -R go-w,a+rX ${POLICY_DIR}`,
     ],
-    { from: { env: tarEnv } },
+    { from: { env: tarEnv, cwd: dir } },
   )
 }
 
@@ -715,7 +716,10 @@ export async function readFile(id: string, file: string) {
 
 /** Stream the workspace out of the container (running or stopped) and extract it into `into`. */
 export async function copyOut(id: string, into: string) {
-  await SandboxExec.pipe([bin(), "cp", `${containerName(id)}:${WORKSPACE}`, "-"], ["tar", "-x", "-f", "-", "-C", into])
+  // Extract in `into` rather than `-C into`: Git for Windows' GNU tar reads "C:\\…" as a remote host.
+  await SandboxExec.pipe([bin(), "cp", `${containerName(id)}:${WORKSPACE}`, "-"], ["tar", "-x", "-f", "-"], {
+    to: { cwd: into },
+  })
 }
 
 export type Listed = { id: string; name: string; state: string; status: string; project?: string; created: string }

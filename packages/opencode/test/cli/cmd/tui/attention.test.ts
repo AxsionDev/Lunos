@@ -488,7 +488,9 @@ describe("createTuiAttention", () => {
 // XCOD-311: sounds chosen by bundled ID, "none", volume 0, and the settings' preview. The fake audio
 // engine stands in for the player, so nothing is heard.
 describe("createTuiAttention sound choices", () => {
-  const file = (id: string) => expect.stringMatching(new RegExp(`/ui/src/assets/audio/${id}\\.mp3$`))
+  // Either separator: on Windows the bundled sounds are under D:\a\…\ui\src\assets\audio.
+  const file = (id: string) =>
+    expect.stringMatching(new RegExp(`[\\\\/]ui[\\\\/]src[\\\\/]assets[\\\\/]audio[\\\\/]${id}\\.mp3$`))
 
   test("plays the chosen bundled sound per event: approval alert-04, finished yup-02", async () => {
     const renderer = new FakeRenderer()

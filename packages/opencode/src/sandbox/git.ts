@@ -393,9 +393,12 @@ export async function seed(input: Repo & { into: string; branch: string }) {
   }
 }
 
-/** Tar command for a directory's contents, without macOS resource forks or extended attributes. */
+/**
+ * Tar command for a directory's contents, without macOS resource forks or extended attributes. Run
+ * in `cwd` rather than with `-C directory`: Git for Windows' GNU tar reads "C:\\…" as a remote host.
+ */
 export function tar(directory: string) {
-  return ["tar", "--no-xattrs", "-c", "-f", "-", "-C", directory, "."]
+  return { argv: ["tar", "--no-xattrs", "-c", "-f", "-", "."], cwd: directory }
 }
 export const TAR_ENV = { COPYFILE_DISABLE: "1" }
 

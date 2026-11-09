@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import fs from "node:fs/promises"
+import path from "node:path"
 import { ProjectGroup } from "../../src/project/group"
 
 afterEach(async () => {
   await fs.rm(ProjectGroup.file(), { force: true })
 })
+
+// Folders are stored resolved: on Windows "/work/a" is "D:\\work\\a".
+const abs = (...folders: string[]) => folders.map((folder) => path.resolve(folder))
 
 const repo = { id: "prj_web", worktree: "/work/axsion-web", name: "axsion-web" }
 
@@ -14,7 +18,7 @@ describe("ProjectGroup (XCOD-298)", () => {
     expect(await ProjectGroup.resolve("/work/axsion-web/src", repo)).toMatchObject({
       id: "prj_web",
       name: "axsion-web",
-      folders: ["/work/axsion-web"],
+      folders: abs("/work/axsion-web"),
       implicit: true,
     })
     expect(await ProjectGroup.resolve("/work/axsion-web/src")).toBeUndefined()
@@ -24,7 +28,7 @@ describe("ProjectGroup (XCOD-298)", () => {
     const global = { id: "global", worktree: "/" }
     const a = await ProjectGroup.resolve("/tmp/a", global)
     const b = await ProjectGroup.resolve("/tmp/b", global)
-    expect(a?.folders).toEqual(["/tmp/a"])
+    expect(a?.folders).toEqual(abs("/tmp/a"))
     expect(a?.id).not.toBe(b?.id)
   })
 
@@ -44,8 +48,8 @@ describe("ProjectGroup (XCOD-298)", () => {
   test("rename, add, remove and archive; archived projects no longer claim their folders", async () => {
     const group = await ProjectGroup.create({ name: "A", folders: ["/work/a"] })
     expect((await ProjectGroup.rename(group.id, "B")).name).toBe("B")
-    expect((await ProjectGroup.add(group.id, ["/work/b", "/work/a"])).folders).toEqual(["/work/a", "/work/b"])
-    expect((await ProjectGroup.remove(group.id, ["/work/a"])).folders).toEqual(["/work/b"])
+    expect((await ProjectGroup.add(group.id, ["/work/b", "/work/a"])).folders).toEqual(abs("/work/a", "/work/b"))
+    expect((await ProjectGroup.remove(group.id, ["/work/a"])).folders).toEqual(abs("/work/b"))
     await expect(ProjectGroup.remove(group.id, ["/work/zzz"])).rejects.toBeInstanceOf(ProjectGroup.InvalidError)
 
     const archived = await ProjectGroup.archive(group.id)
