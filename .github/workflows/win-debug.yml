@@ -19,7 +19,7 @@ jobs:
       matrix:
         include:
           - group: "batch2"
-            files: "test/cli/startup-pty.test.ts test/cli/failure-log.test.ts"
+            files: "test/cli/startup-pty.test.ts"
     runs-on: windows-2025
     timeout-minutes: 60
     defaults:
