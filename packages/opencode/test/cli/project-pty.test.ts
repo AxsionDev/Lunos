@@ -106,7 +106,8 @@ describe("/projects", () => {
         while ((await stored()).groups[0].folders.length !== count && Date.now() < until) await Bun.sleep(100)
       }
       await settle(2)
-      await run.waitFor(/Folders[\s\S]*~\/axsion-api[\s\S]*Add a folder…/)
+      // Shown with the platform's separator: ~\axsion-api on Windows.
+      await run.waitFor(/Folders[\s\S]*~[\\/]axsion-api[\s\S]*Add a folder…/)
       expect((await stored()).groups[0].folders).toEqual([here, path.join(run.home, "axsion-api")])
 
       // Enter on a folder removes it, after asking.

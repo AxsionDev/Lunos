@@ -118,9 +118,13 @@ describe("Welcome screen (XCOD-273)", () => {
       expect(device).toContain("Or scan this with your phone")
       expect(device).toMatch(/\d+:\d\d left/)
       expect(device).toContain("Opened the sign-in page in your browser.")
-      const until = Date.now() + 5_000
-      while (!(await tui!.opened()) && Date.now() < until) await Bun.sleep(100)
-      expect(await tui!.opened()).toContain(`${idp!.origin}/activate?user_code=WXYZ-2345`)
+      // On Windows the `open` package starts the browser with PowerShell's Start-Process, not a
+      // command on PATH, so the stand-in browser can't write the link down there.
+      if (process.platform !== "win32") {
+        const until = Date.now() + 5_000
+        while (!(await tui!.opened()) && Date.now() < until) await Bun.sleep(100)
+        expect(await tui!.opened()).toContain(`${idp!.origin}/activate?user_code=WXYZ-2345`)
+      }
       // XCOD-275: the plan is back in the sign-in line, from GET /v1/account.
       expect(await tui!.waitFor("Signed in as pat@lunos.test · Plan: Free")).toContain(
         "Session kept in the test keychain.",
