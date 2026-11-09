@@ -89,8 +89,11 @@ describe("external-fixture recorder guards (XCOD-270)", () => {
       expect(run.code).toBe(0)
       expect(existsSync(wire.marker)).toBe(false)
       expect(run.stdout).not.toContain(FAKE_KEY)
-      expect(run.stdout).toContain(`${wire.bin("claude")} -p --input-format stream-json`)
-      expect(run.stdout).toContain(`${wire.bin("codex")} login --with-api-key   (stdin: the value of $K)`)
+      // Windows' lookup returns the extension as PATHEXT spells it (".CMD"), so the path is compared
+      // without regard to case there.
+      const fold = (text: string) => (process.platform === "win32" ? text.toLowerCase() : text)
+      expect(fold(run.stdout)).toContain(fold(`${wire.bin("claude")} -p --input-format stream-json`))
+      expect(fold(run.stdout)).toContain(fold(`${wire.bin("codex")} login --with-api-key   (stdin: the value of $K)`))
       expect(run.stdout).toContain("ANTHROPIC_API_KEY=<value of $K>")
       expect(run.stdout).toContain("HOME=<scratch>/home")
       for (const scenario of SCENARIOS) expect(run.stdout).toContain(`[${scenario.name} 1/`)
@@ -157,12 +160,17 @@ describe("external-fixture recorder and replay, on the fakes (XCOD-270)", () => 
         // Host and tool lines are compared each in order: the two directions may interleave differently.
         const by = (entries: any[], from: string) => entries.filter((entry) => entry.from === from)
         for (const file of readdirSync(dir).filter((name) => name.endsWith(".jsonl")))
-          for (const from of ["argv", "host", "tool", "exit"])
+          for (const from of ["argv", "host", "tool", "exit"]) {
+            const expected = by(lines(path.join(dir, file)), from)
+            // A tool the recorder stops with SIGTERM: Windows has no signals, kill() terminates the tap
+            // before it can write the exit, so there's nothing to compare.
+            if (process.platform === "win32" && from === "exit" && expected.some((entry) => entry.signal)) continue
             expect({ file, from, lines: by(lines(path.join(fresh, file)), from) }).toEqual({
               file,
               from,
-              lines: by(lines(path.join(dir, file)), from),
+              lines: expected,
             })
+          }
       } finally {
         await fs.rm(out, { recursive: true, force: true })
       }
