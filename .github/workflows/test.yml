@@ -64,8 +64,9 @@ jobs:
             turbo-${{ runner.os }}-
 
       - name: Run unit tests
-        # 45, not 20: with --continue every package runs, and Windows needs about 25 minutes.
-        timeout-minutes: 45
+        # With --continue every package runs. Measured on dev, Nov 2026: Linux about 32 minutes (opencode
+        # alone, 5800 tests); Windows hadn't finished opencode after 45, so it was cut off every run.
+        timeout-minutes: ${{ matrix.settings.name == 'windows' && 90 || 60 }}
         # --continue: without it turbo stops at the first failing package, which hides failures in
         # later packages from the upstream-sync baseline comparison (XCOD-118).
         run: GITHUB_ACTIONS=false bun turbo test --continue

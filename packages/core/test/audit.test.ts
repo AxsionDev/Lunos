@@ -95,6 +95,16 @@ describe("Audit writer (XCOD-103)", () => {
     expect((await readdir(path.dirname(file))).filter((name) => name.endsWith(".lock"))).toEqual([])
   })
 
+  // On Windows, opening a lock file another process is deleting fails with EPERM; that lost a line.
+  test("a lock file being deleted on Windows is waited for, but a real permission error is not retried for ever", () => {
+    expect(Audit.lockBusy("EEXIST", "linux", false)).toBe("held")
+    expect(Audit.lockBusy("EPERM", "win32", false)).toBe("releasing")
+    expect(Audit.lockBusy("EACCES", "win32", false)).toBe("releasing")
+    expect(Audit.lockBusy("EPERM", "win32", true)).toBeUndefined()
+    expect(Audit.lockBusy("EPERM", "linux", false)).toBeUndefined()
+    expect(Audit.lockBusy("ENOENT", "win32", false)).toBeUndefined()
+  })
+
   test("the last line is read from the end, whatever the file size or line length", async () => {
     const file = await tmp()
     const long = "x".repeat(200 * 1024)

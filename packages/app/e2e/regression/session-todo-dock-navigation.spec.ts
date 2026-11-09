@@ -86,7 +86,9 @@ test("animates todo lifecycle without replaying it across session tabs", async (
   await switchSession(page, otherID, otherTitle)
   await expect(dock).toHaveCount(0)
 
-  const returningOpen = sampleDock(page, 700)
+  // Until the dock shows (or 5 s): a switch can take over a second on a loaded CI runner, and a
+  // fixed window then closed before the dock was drawn (no samples at all).
+  const returningOpen = sampleDock(page, 5_000, { untilPresent: true })
   await switchSession(page, sourceID, sourceTitle)
   const openSamples = (await returningOpen).filter((sample) => sample.present)
   expect(openSamples.length).toBeGreaterThan(0)
@@ -104,7 +106,7 @@ test("animates todo lifecycle without replaying it across session tabs", async (
   events.push(todoEvent(sourceID, []))
 
   await switchSession(page, otherID, otherTitle)
-  const returningEmpty = sampleDock(page, 700)
+  const returningEmpty = sampleDock(page, 2_000)
   await switchSession(page, sourceID, sourceTitle)
   await expect(dock).toHaveCount(0)
   expect((await returningEmpty).every((sample) => !sample.present)).toBe(true)
@@ -170,11 +172,12 @@ async function switchSession(page: Page, sessionID: string, title: string) {
   await expectSessionTitle(page, title)
 }
 
-function sampleDock(page: Page, duration: number) {
-  return page.evaluate(async (duration) => {
+/** Samples the dock every frame for `duration` ms; with `untilPresent`, stops at the first frame it's in. */
+function sampleDock(page: Page, duration: number, options: { untilPresent?: boolean } = {}) {
+  return page.evaluate(async ({ duration, untilPresent }) => {
     const samples: { present: boolean; height: number; opacity: number }[] = []
     const start = performance.now()
-    while (performance.now() - start < duration) {
+    while (performance.now() - start < duration && !(untilPresent && samples.at(-1)?.present)) {
       const dock = document.querySelector<HTMLElement>('[data-component="session-todo-dock"]')
       const clip = dock?.parentElement?.parentElement
       const label = dock?.querySelector<HTMLElement>('[data-action="session-todo-toggle"] span[aria-label]')
@@ -186,5 +189,5 @@ function sampleDock(page: Page, duration: number) {
       await new Promise(requestAnimationFrame)
     }
     return samples
-  }, duration)
+  }, { duration, untilPresent: options.untilPresent ?? false })
 }
