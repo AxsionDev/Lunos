@@ -139,7 +139,8 @@ describe("client.start", () => {
   test("the install id is generated once and kept", async () => {
     const first = await CloudClientStart.installID()
     expect(await CloudClientStart.installID()).toBe(first)
-    expect((await fs.stat(CloudClientStart.idFile())).mode & 0o777).toBe(0o600)
+    // Windows has no POSIX permission bits (stat reports 0o666 whatever chmod was asked for).
+    if (process.platform !== "win32") expect((await fs.stat(CloudClientStart.idFile())).mode & 0o777).toBe(0o600)
     await fs.writeFile(CloudClientStart.idFile(), "not-an-id")
     const replaced = await CloudClientStart.installID()
     expect(replaced).not.toBe(first)

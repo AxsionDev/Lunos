@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url"
 import { afterAll, describe, expect, test } from "bun:test"
 import fs from "fs/promises"
 import os from "os"
@@ -68,10 +69,11 @@ describe("FormatUnknownError", () => {
 describe("the footer", () => {
   test("an OSC 8 file:// link where the terminal supports it, else the plain path", () => {
     const file = "/tmp/log dir/lunos-2026-10-20-1412-a3f9.log"
+    // On Windows a rooted path is on the current drive: file:///D:/tmp/….
+    const drive = process.platform === "win32" ? pathToFileURL("/").pathname.slice(1, 4) : ""
+    const url = `file:///${drive}tmp/log%20dir/lunos-2026-10-20-1412-a3f9.log`
     expect(Failure.link(file, false)).toBe(file)
-    expect(Failure.link(file, true)).toBe(
-      `\x1b]8;;file:///tmp/log%20dir/lunos-2026-10-20-1412-a3f9.log\x1b\\${file}\x1b]8;;\x1b\\`,
-    )
+    expect(Failure.link(file, true)).toBe(`\x1b]8;;${url}\x1b\\${file}\x1b]8;;\x1b\\`)
     expect(Failure.lines({ id: "a3f9", file }, "The sandbox couldn't start", false)).toEqual([
       "✗ The sandbox couldn't start",
       `  Full log: ${file}`,
@@ -187,7 +189,7 @@ describe("a failing sandboxed run (the reported case: Docker not running)", () =
       expect(log).toMatch(/\$ docker info --format \S+ {2}→ exit [01]/)
       expect(log).toContain("stderr:")
       expect(log).toContain("nonexistent-lunos-test.sock")
-      expect(log).toMatch(/at available \(.*sandbox\/docker\.ts/)
+      expect(log).toMatch(/at available \(.*sandbox[\\/]docker\.ts/)
       expect(log).toContain("--- docker version")
       expect(log).toContain("=== result: failed (exit 1)")
       for (const seed of Object.values(SEEDS)) expect(log).not.toContain(seed)
@@ -250,7 +252,7 @@ describe("unexpected errors in a plain command", () => {
         const log = await fs.readFile(file, "utf8")
         expect(log).toContain(`=== FAILURE in an unhandled ${kind === "exception" ? "exception" : "promise rejection"}`)
         expect(log).toContain("caused by:\nError: the cause")
-        expect(log).toMatch(/at .*debug\/index\.ts/)
+        expect(log).toMatch(/at .*debug[\\/]index\.ts/)
       },
       TIMEOUT,
     )

@@ -275,19 +275,16 @@ export class WindowsDesktop implements Desktop.Desktop {
   }
 
   indicator(input: { stopKey: string; onStop: () => void }) {
-    const proc = Bun.spawn(
-      ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "-"],
-      {
-        stdin: new Blob([INDICATOR]),
-        stdout: "pipe",
-        stderr: "ignore",
-        env: {
-          ...process.env,
-          LUNOS_PARENT: String(process.pid),
-          LUNOS_LABEL: `Lunos is controlling your computer · ${input.stopKey.replace(/escape$/i, "esc")} or`,
-        },
+    const proc = Bun.spawn(powershellArgv(INDICATOR), {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "ignore",
+      env: {
+        ...process.env,
+        LUNOS_PARENT: String(process.pid),
+        LUNOS_LABEL: `Lunos is controlling your computer · ${input.stopKey.replace(/escape$/i, "esc")} or`,
       },
-    )
+    })
     this.indicatorPid = proc.pid
     const closed = { value: false }
     void (async () => {
@@ -366,16 +363,31 @@ function keyPress(code: number) {
 }
 
 /** Runs a script with `powershell.exe`, the script on stdin, and parses the JSON it prints. */
+/**
+ * powershell.exe running `script`. Passed as -EncodedCommand (UTF-16LE, base64), not on stdin with
+ * `-Command -`: there stdin is read like an interactive console, so a multi-line statement only runs
+ * once a blank line follows, and one still open at the end of input is dropped without an error.
+ * Every script here is multi-line, so each one printed nothing and exited 0 (XCOD-339 on Windows).
+ */
+export function powershellArgv(script: string) {
+  return [
+    "powershell.exe",
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-EncodedCommand",
+    Buffer.from(script, "utf16le").toString("base64"),
+  ]
+}
+
 export async function powershell<T = unknown>(script: string, env: Record<string, string> = {}, input?: string) {
-  const proc = Bun.spawn(
-    ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "-"],
-    {
-      stdin: new Blob([PRELUDE, script]),
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...process.env, ...env, ...(input === undefined ? {} : { LUNOS_INPUT: input }) },
-    },
-  )
+  const proc = Bun.spawn(powershellArgv(PRELUDE + script), {
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, ...env, ...(input === undefined ? {} : { LUNOS_INPUT: input }) },
+  })
   const [out, err, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),

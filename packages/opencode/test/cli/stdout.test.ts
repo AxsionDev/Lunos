@@ -31,8 +31,14 @@ describe("writeStdout", () => {
     expect(bytes).toBe(SIZE)
   }, 30_000)
 
-  test("control: an unawaited process.stdout.write loses output past the pipe buffer", async () => {
-    const bytes = await throughSlowPipe(`process.stdout.write("x".repeat(${SIZE}))\nprocess.exit(0)\n`)
-    expect(bytes).toBeLessThan(SIZE)
-  }, 30_000)
+  // The control shows the POSIX pipe-buffer loss writeStdout exists for; Windows pipes don't drop
+  // the tail this way, so there's nothing to show there (the test above still runs everywhere).
+  test.skipIf(process.platform === "win32")(
+    "control: an unawaited process.stdout.write loses output past the pipe buffer",
+    async () => {
+      const bytes = await throughSlowPipe(`process.stdout.write("x".repeat(${SIZE}))\nprocess.exit(0)\n`)
+      expect(bytes).toBeLessThan(SIZE)
+    },
+    30_000,
+  )
 })

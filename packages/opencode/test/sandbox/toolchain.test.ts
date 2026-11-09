@@ -22,7 +22,8 @@ describe("XCOD-344: the project's toolchain in the sandbox image", () => {
     expect(SandboxToolchain.needed(project.path)).toEqual([])
   })
 
-  test("the probe prints only what isn't on PATH", async () => {
+  // The probe runs inside the sandbox's Linux image, under /bin/sh; there is no /bin/sh on Windows.
+  test.skipIf(process.platform === "win32")("the probe prints only what isn't on PATH", async () => {
     const result = Bun.spawnSync(["/bin/sh", "-c", SandboxToolchain.probe(["sh", "no-such-tool-xcod344"])])
     expect(result.exitCode).toBe(0)
     expect(result.stdout.toString().trim()).toBe("no-such-tool-xcod344")

@@ -25,6 +25,19 @@ describe("LSP failure reasons (XCOD-257)", () => {
     expect(LSP.spawnReason(new Error("EACCES"))).toBe("EACCES")
   })
 
+  test("the command a server was started with, past node and Windows' cmd.exe wrapper", () => {
+    expect(LSP.commandOf("node", ["node", "/srv/eslintServer.js", "--stdio"])).toBe("/srv/eslintServer.js")
+    expect(LSP.commandOf("gopls", ["gopls"])).toBe("gopls")
+    // XCOD-257 on Windows: "/d" is an absolute path there, and was reported as the command.
+    const comspec = "C:\\Windows\\system32\\cmd.exe"
+    expect(LSP.commandOf(comspec, [comspec, "/d", "/s", "/c", '"lunos-no-such-lsp-binary --stdio"'])).toBe(
+      "lunos-no-such-lsp-binary",
+    )
+    expect(LSP.commandOf(comspec, [comspec, "/d", "/s", "/c", '""C:\\Program Files\\x\\srv.exe" --stdio"'])).toBe(
+      "C:\\Program Files\\x\\srv.exe",
+    )
+  })
+
   test("where a running server came from", () => {
     const bin = "/home/u/.cache/opencode/bin"
     expect(LSP.sourceOf("/p/node_modules/.bin/typescript-language-server", bin, false)).toBe(

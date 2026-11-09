@@ -138,7 +138,8 @@ describe("BackgroundShell", () => {
   }, 30_000)
 
   test("reports a command that exits before it is ready, at once rather than at the timeout", async () => {
-    const info = start(`echo boom; exit 3`)
+    // cmd.exe has no ";": its separator is "&".
+    const info = start(posix ? `echo boom; exit 3` : `echo boom & exit 3`)
     const started = Date.now()
     const ready = await BackgroundShell.waitReady(info, new URL("http://127.0.0.1:9/"), 30_000)
     expect(ready.ready).toBe(false)

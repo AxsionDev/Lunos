@@ -44,7 +44,8 @@ describe("docker templates", () => {
     })
     await MemoryTemplate.write(plan)
     const env = path.join(plan.dir, ".env")
-    expect((await fs.stat(env)).mode & 0o777).toBe(0o600)
+    // Windows has no POSIX permission bits (stat reports 0o666 whatever chmod was asked for).
+    if (process.platform !== "win32") expect((await fs.stat(env)).mode & 0o777).toBe(0o600)
     expect(await fs.readFile(env, "utf8")).toContain("POSTGRES_PASSWORD=pw-1234567890-abcdefghijkl")
     for (const name of ["docker-compose.yml", ".env.example"])
       expect(await fs.readFile(path.join(plan.dir, name), "utf8")).not.toContain("pw-1234567890")

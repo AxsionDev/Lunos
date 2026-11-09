@@ -4,3 +4,6 @@ packages/opencode/test/fixture/memory-import/** -text
 # XCOD-174: the published schemas are byte-for-byte what script/schemas.ts writes (LF), on every OS,
 # so `schemas.ts --check` passes on Windows checkouts too.
 schemas/*.json text eol=lf
+# Prompts are embedded in the build and sent to the model: LF on every OS, so the Windows build's
+# prompts are byte-for-byte the others' (a Windows checkout otherwise gives them CRLF).
+packages/opencode/src/session/prompt/*.txt text eol=lf

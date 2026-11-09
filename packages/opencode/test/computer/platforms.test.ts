@@ -9,6 +9,19 @@ const shell = Bun.which("powershell.exe") ?? Bun.which("pwsh")
 const windows = process.platform === "win32" ? describe : describe.skip
 
 describe("computer on Windows: scripts", () => {
+  // Multi-line scripts on stdin (`-Command -`) printed nothing and exited 0: every call returned null.
+  test.skipIf(!shell)("a multi-line script runs and prints its result", async () => {
+    const { powershellArgv } = await import("@/computer/windows")
+    const script =
+      '$x = if ($env:LUNOS_X) {\n  "got $env:LUNOS_X"\n} else {\n  "none"\n}\n$x | ConvertTo-Json -Compress\n'
+    const argv = powershellArgv(script)
+    argv[0] = shell!
+    const proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe", env: { ...process.env, LUNOS_X: "é ok" } })
+    const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited])
+    expect(code).toBe(0)
+    expect(JSON.parse(out.trim())).toBe("got é ok")
+  })
+
   test.skipIf(!shell)("every PowerShell script parses", async () => {
     const { SCRIPTS } = await import("@/computer/windows")
     for (const [name, script] of Object.entries(SCRIPTS)) {
@@ -47,10 +60,13 @@ windows("computer on Windows: the system", () => {
     const screen = await desktop.screen()
     expect(screen.width).toBeGreaterThan(0)
     expect(desktop.held(Desktop.parse("ctrl+alt+escape"))).toBe(false)
-    expect(desktop.lastMouseInput()).toBeLessThanOrEqual(Date.now())
+    // undefined until the mouse is seen to move (always so on a CI runner nobody uses).
+    const moved = desktop.lastMouseInput()
+    if (moved !== undefined) expect(moved).toBeLessThanOrEqual(Date.now())
     const front = await desktop.frontmost()
     if (front) expect(front.id).toMatch(/\.exe$/)
-    expect((await desktop.resolve("notepad"))?.id).toBe("notepad.exe")
+    // Found through PATH; cmd.exe is on every Windows (Server 2025 runners have no Notepad).
+    expect((await desktop.resolve("cmd"))?.id).toBe("cmd.exe")
   })
 })
 

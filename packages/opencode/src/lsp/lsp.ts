@@ -91,6 +91,28 @@ const builtins = () =>
   )
 const builtin = (id: string) => builtins().find((item) => item.id === id)
 
+/**
+ * The command a server was started with, for status and failure reasons. `node /…/eslintServer.js
+ * --stdio`: the script, not the interpreter, says where it came from. On Windows a command runs as
+ * `cmd.exe /d /s /c "<line>"`, and "/d" is an absolute path there: the command is the line's first word.
+ */
+export function commandOf(file: string, args: readonly string[]) {
+  if (/^cmd(\.exe)?$/i.test(path.win32.basename(file))) {
+    const at = args.findIndex((arg) => arg.toLowerCase() === "/c")
+    if (at >= 0) {
+      const line = args
+        .slice(at + 1)
+        .join(" ")
+        .trim()
+        .replace(/^"(.*)"$/, "$1")
+        .trim()
+      const first = line.match(/^"([^"]*)"|^(\S+)/)
+      if (first) return first[1] ?? first[2]
+    }
+  }
+  return args.find((arg, index) => index > 0 && path.isAbsolute(arg)) ?? file
+}
+
 /** "command not found: gopls" for a missing binary, otherwise the error's own message. */
 export function spawnReason(error: unknown, command?: string) {
   const err = error as { code?: string; message?: string; path?: string }
@@ -102,7 +124,8 @@ export function spawnReason(error: unknown, command?: string) {
 export function sourceOf(command: string | undefined, bin: string, custom: boolean) {
   if (custom) return "custom command"
   if (!command) return undefined
-  if (command.includes(`${path.sep}node_modules${path.sep}.bin${path.sep}`)) return "project node_modules/.bin"
+  // Either separator: on Windows a command can come from config or a resolver with forward slashes.
+  if (/[\\/]node_modules[\\/]\.bin[\\/]/.test(command)) return "project node_modules/.bin"
   if (command.startsWith(bin)) return `downloaded (${command})`
   if (command === process.execPath) return "bundled with Lunos"
   return path.isAbsolute(command) ? `PATH (${command})` : command
@@ -313,11 +336,9 @@ const layer = Layer.effect(
             })
 
           if (!handle) return undefined
-          // `node /…/eslintServer.js --stdio`: the script, not the interpreter, says where it came from.
-          const args = handle.process.spawnargs ?? []
           const proc = {
             pid: handle.process.pid,
-            command: args.find((arg, index) => index > 0 && path.isAbsolute(arg)) ?? handle.process.spawnfile,
+            command: commandOf(handle.process.spawnfile, handle.process.spawnargs ?? []),
             started: Date.now(),
             log: [] as string[],
           }

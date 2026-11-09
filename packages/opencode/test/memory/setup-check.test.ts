@@ -1,9 +1,13 @@
 import { expect, test } from "bun:test"
+import path from "node:path"
 import { MemorySetupCheck } from "../../src/memory/setup-check"
 import { checkFix } from "../../src/cli/cmd/memory-setup"
 
+// The worker's path is resolved: on Windows "/r/src/index.ts" is "D:\r\src\index.ts".
+const index = path.resolve("/r/src/index.ts")
+
 test("XCOD-249: the check runs lunos, not the TUI worker the server lives in", () => {
-  expect(MemorySetupCheck.entry(["/bun", "/r/src/cli/tui/worker.ts"])).toEqual(["/bun", "/r/src/index.ts"])
+  expect(MemorySetupCheck.entry(["/bun", "/r/src/cli/tui/worker.ts"])).toEqual(["/bun", index])
   expect(MemorySetupCheck.entry(["/bun", "/r/src/index.ts", "x"])).toEqual(["/bun", "/r/src/index.ts", "x"])
   expect(MemorySetupCheck.entry(["/lunos", "/$bunfs/root/lunos"])).toEqual(["/lunos", "/$bunfs/root/lunos"])
 })
@@ -18,7 +22,7 @@ test("XCOD-249: a failing check says what to do for the errors a first start hit
 test("XCOD-263: a dev run's --cwd is not passed on, so the check runs in the project", () => {
   const dev = (execArgv: string[]) =>
     MemorySetupCheck.argv({ execPath: "/bun", argv: ["/bun", "/r/src/cli/tui/worker.ts"], execArgv })
-  const expected = ["/bun", "/r/src/index.ts", "memory", "check", "--json"]
+  const expected = ["/bun", index, "memory", "check", "--json"]
   expect(dev(["--cwd", "/r"])).toEqual(expected)
   expect(dev(["--cwd=/r"])).toEqual(expected)
   expect(dev(["--smol", "--cwd", "packages/opencode"])).toEqual(["/bun", "--smol", ...expected.slice(1)])
