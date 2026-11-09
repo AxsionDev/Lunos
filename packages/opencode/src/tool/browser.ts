@@ -7,6 +7,7 @@ import { Permission } from "@/permission"
 import { Control } from "@/control"
 import { ControlApproval } from "@/control/approval"
 import { Browser } from "@/browser"
+import { Computer } from "@/computer"
 import { BrowserDriver } from "@/browser/driver"
 import { BrowserLaunch } from "@/browser/launch"
 import { ConfigBrowser } from "@opencode-ai/core/config/browser"
@@ -182,6 +183,8 @@ export const BrowserTool = Tool.define(
           }
 
           const run = Control.begin("browser", ctx.abort)
+          // The stop key also works from any other app while the agent drives the browser (XCOD-327).
+          void Computer.watchBrowserKey(settings?.stop_key)
           const wait = <T>(promise: () => Promise<T>) => Effect.promise(() => race(promise(), run.signal))
           return yield* Effect.gen(function* () {
             const driver = yield* wait(() => Browser.get(settings))

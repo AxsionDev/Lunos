@@ -104,7 +104,7 @@ Everything the agent reads from a page is marked as untrusted content. Text on a
 ## Stop
 
 - **Stop** on the "Lunos is controlling this browser" indicator, in the corner of every page it controls.
-- The **stop key**, pressed in the controlled browser: `ctrl+alt+escape` by default (`browser.stop_key`).
+- The **stop key**: `ctrl+alt+escape` by default (`browser.stop_key`). It works in the controlled browser, and on macOS and Windows also from any other app while the agent is driving the browser. Lunos checks it every 40 ms (on macOS this may need **Input Monitoring** for the app Lunos runs in, on some versions). On Linux and inside a sandbox it works in the controlled browser only.
 - In My browser: **Stop** in the extension's popup, or **Cancel** on Chrome's debugging bar.
 - `Esc` in Lunos interrupts the session as usual.
 

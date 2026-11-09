@@ -40,7 +40,7 @@ export const Info = Schema.Struct({
   }),
   stop_key: Schema.String.pipe(Schema.optional).annotate({
     description:
-      'The key that stops browser control at once, pressed in the controlled browser (default "ctrl+alt+escape")',
+      'The key that stops browser control at once: in the controlled browser, and on macOS and Windows from any app while the agent drives the browser (default "ctrl+alt+escape")',
   }),
   headless: Schema.Boolean.pipe(Schema.optional).annotate({
     description: "Run the Lunos browser without a window (default false; always headless inside a sandbox)",
