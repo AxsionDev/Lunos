@@ -60,6 +60,9 @@ describe("XCOD-332 tools of a session bound to a worktree", () => {
   it.live("write, edit and shell run in the worktree; the user's tree stays as it was", () =>
     Effect.gen(function* () {
       const dir = yield* tmpdirScoped({ git: true })
+      // Line endings as written: a global core.autocrlf=true (the GitHub Windows image, Git for
+      // Windows' default) checks worktrees out as CRLF. isolation.test.ts covers that case.
+      yield* Effect.promise(() => SubagentIsolation.git(["config", "core.autocrlf", "false"], { cwd: dir }))
       yield* Effect.promise(() => Bun.write(path.join(dir, "a.txt"), "one\n"))
       yield* Effect.promise(() => SubagentIsolation.git(["add", "-A"], { cwd: dir }))
       yield* Effect.promise(() => SubagentIsolation.git(["commit", "-qm", "a"], { cwd: dir }))
@@ -90,7 +93,14 @@ describe("XCOD-332 tools of a session bound to a worktree", () => {
           yield* isolated(
             "bash",
             sessionID,
-            { command: `echo ran > ${path.join(dir, "c.txt")} && pwd > where.txt`, description: "write" },
+            {
+              // On Windows the shell tool prefers PowerShell, whose `pwd` prints a table.
+              command:
+                process.platform === "win32"
+                  ? `echo ran > ${path.join(dir, "c.txt")} && (Get-Location).Path > where.txt`
+                  : `echo ran > ${path.join(dir, "c.txt")} && pwd > where.txt`,
+              description: "write",
+            },
             (args) => shell.execute(args as never, ctx),
           )
           // Not a worktree tool: the instance is the user's.
@@ -101,7 +111,10 @@ describe("XCOD-332 tools of a session bound to a worktree", () => {
 
       expect(yield* Effect.promise(() => Bun.file(path.join(wt, "b.txt")).text())).toBe("new\n")
       expect(yield* Effect.promise(() => Bun.file(path.join(wt, "a.txt")).text())).toBe("two\n")
-      expect(yield* Effect.promise(() => Bun.file(path.join(wt, "c.txt")).text())).toBe("ran\n")
+      // PowerShell's redirection writes CRLF.
+      expect((yield* Effect.promise(() => Bun.file(path.join(wt, "c.txt")).text())).replace(/\r\n/g, "\n")).toBe(
+        "ran\n",
+      )
       expect((yield* Effect.promise(() => Bun.file(path.join(wt, "where.txt")).text())).trim()).toBe(
         yield* Effect.promise(() => fs.realpath(wt)),
       )

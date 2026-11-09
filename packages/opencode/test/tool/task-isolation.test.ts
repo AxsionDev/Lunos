@@ -181,6 +181,9 @@ const read = (file: string) =>
 /** A repository with `src/a.ts` committed, as the user's tree. */
 const setup = Effect.fn("TaskIsolationTest.setup")(function* () {
   const test = yield* TestInstance
+  // Line endings as written: a global core.autocrlf=true (the GitHub Windows image, Git for Windows'
+  // default) checks worktrees out as CRLF. isolation.test.ts covers that case.
+  yield* git(test.directory, "config", "core.autocrlf", "false")
   yield* Effect.promise(() => Bun.write(path.join(test.directory, "src/a.ts"), "export const a = 1\n"))
   yield* git(test.directory, "add", "-A")
   yield* git(test.directory, "commit", "-qm", "a")

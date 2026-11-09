@@ -27,9 +27,12 @@ const PACKAGE = {
   dependencies: { base: "file:./libs/base" },
 }
 
-async function repo(files: Record<string, string> = {}) {
+// Pinned so the expectations below hold whatever the machine's global git config says (the GitHub
+// Windows image and Git for Windows' installer default set core.autocrlf=true); the CRLF test sets it.
+async function repo(files: Record<string, string> = {}, autocrlf = "false") {
   const root = await tmp("lunos-iso-repo-")
   await sh(root, "init", "-q", "-b", "main")
+  await sh(root, "config", "core.autocrlf", autocrlf)
   await sh(root, "config", "user.email", "me@example.com")
   await sh(root, "config", "user.name", "Me")
   await sh(root, "config", "commit.gpgSign", "false")
@@ -193,6 +196,44 @@ describe("SubagentIsolation", () => {
     expect((await SubagentIsolation.merge(steps[1]!.handle)).state).toBe("merged")
     expect(await Bun.file(path.join(root, "src/index.ts")).text()).toBe(
       'export * from "./math"\nexport * from "./x"\nexport * from "./y"\n',
+    )
+    await Promise.all(steps.map((step) => SubagentIsolation.discard(step.handle)))
+  })
+
+  test("with core.autocrlf=true (Git for Windows' default), merged files keep CRLF, also when both sides added lines", async () => {
+    const crlf = (text: string) => text.replaceAll("\n", "\r\n")
+    const root = await repo(
+      {
+        "src/index.ts": crlf('export * from "./math"\n'),
+        "src/math.ts": crlf("export function add(a: number, b: number) {\n  return a + b\n}\n"),
+      },
+      "true",
+    )
+    const data = await tmp("lunos-iso-data-")
+    const steps = await Promise.all(
+      ["x", "y"].map((name) => SubagentIsolation.create({ root, dataDir: data, session: "ses_crlf", step: name })),
+    )
+    // The worktree is checked out the way the user's tree is.
+    expect(await Bun.file(path.join(steps[0]!.handle.directory, "src/index.ts")).text()).toBe(
+      crlf('export * from "./math"\n'),
+    )
+    // A subagent writing LF, as the write tool does, and one keeping the file's CRLF.
+    await edit(
+      steps[0]!.handle.directory,
+      "src/index.ts",
+      (text) => text.replaceAll("\r\n", "\n") + 'export * from "./x"\n',
+    )
+    await edit(steps[0]!.handle.directory, "src/math.ts", (text) => text.replace("a + b", "b + a"))
+    await edit(steps[1]!.handle.directory, "src/index.ts", (text) => text + 'export * from "./y"\r\n')
+    for (const step of steps) await SubagentIsolation.finalize(step.handle)
+    expect((await SubagentIsolation.merge(steps[0]!.handle)).state).toBe("merged")
+    // The second merge goes through the additive (union) resolution.
+    expect((await SubagentIsolation.merge(steps[1]!.handle)).state).toBe("merged")
+    expect(await Bun.file(path.join(root, "src/index.ts")).text()).toBe(
+      crlf('export * from "./math"\nexport * from "./x"\nexport * from "./y"\n'),
+    )
+    expect(await Bun.file(path.join(root, "src/math.ts")).text()).toBe(
+      crlf("export function add(a: number, b: number) {\n  return b + a\n}\n"),
     )
     await Promise.all(steps.map((step) => SubagentIsolation.discard(step.handle)))
   })
