@@ -404,6 +404,11 @@ export async function launch(options: Options = {}) {
       if (exited !== undefined) break
       await Bun.sleep(100)
     }
+    if (process.env.LUNOS_PTY_RAW_DIR) {
+      const { writeFileSync, mkdirSync } = await import("fs")
+      mkdirSync(process.env.LUNOS_PTY_RAW_DIR, { recursive: true })
+      writeFileSync(path.join(process.env.LUNOS_PTY_RAW_DIR, `raw-${Date.now()}.json`), JSON.stringify(raw))
+    }
     throw new Error(`Timed out waiting for ${match}. Screen:\n${screen.text()}`)
   }
 

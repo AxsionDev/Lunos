@@ -1,0 +1,58 @@
+name: win-debug
+
+# Throwaway (never merged): runs each Windows-failing opencode test file on its own on windows-2025,
+# to tell real Windows failures from ones caused by an earlier file in the full suite.
+
+on:
+  push:
+    branches: [win-debug]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  files:
+    name: files (${{ matrix.group }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: "batch2"
+            files: "test/cli/failure-log.test.ts test/cli/project-pty.test.ts test/cli/startup-pty.test.ts test/cli/tui-signin-pty.test.ts test/cloud/run-cloud.test.ts"
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+      - uses: ./.github/actions/setup-bun
+      - name: Configure git identity
+        run: |
+          git config --global user.email "bot@opencode.ai"
+          git config --global user.name "opencode"
+      - name: Each file alone
+        working-directory: packages/opencode
+        env:
+          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "true"
+          GITHUB_ACTIONS: "false"
+          LUNOS_PTY_RAW_DIR: ${{ github.workspace }}/win-logs/raw
+        run: |
+          mkdir -p ../../win-logs
+          for f in ${{ matrix.files }}; do
+            name=$(echo "$f" | tr '/' '_')
+            start=$(date +%s)
+            if timeout 600 bun test --timeout 30000 "$f" > "../../win-logs/$name.log" 2>&1; then r=PASS; else r=FAIL; fi
+            echo "RESULT $r $f ($(($(date +%s)-start))s)"
+            grep -a "(fail)" "../../win-logs/$name.log" | sed 's/^/    /' || true
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: win-logs-${{ matrix.group }}
+          path: win-logs
+          retention-days: 3
