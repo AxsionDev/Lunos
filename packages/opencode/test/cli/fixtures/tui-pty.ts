@@ -18,17 +18,44 @@ export class Screen {
   private cells: string[][] = []
   private row = 0
   private col = 0
+  private saved: [number, number] = [0, 0]
   constructor(
     readonly cols = COLS,
     readonly rows = ROWS,
   ) {
+    this.bottom = this.rows - 1
     this.clear()
   }
+  // The scroll region (DECSTBM), 0-based and inclusive. ConPTY scrolls with it and with LF.
+  private top = 0
+  private bottom = 0
   private clear() {
     this.cells = Array.from({ length: this.rows }, () => Array(this.cols).fill(" "))
   }
+  private blank() {
+    return Array<string>(this.cols).fill(" ")
+  }
+  /** Moves lines `top..bottom` up by `n` (down for a negative `n`), blanking what comes in. */
+  private scroll(n: number, top = this.top, bottom = this.bottom) {
+    const region = this.cells.slice(top, bottom + 1)
+    const count = Math.min(Math.abs(n), region.length)
+    const moved =
+      n > 0
+        ? [...region.slice(count), ...Array.from({ length: count }, () => this.blank())]
+        : [...Array.from({ length: count }, () => this.blank()), ...region.slice(0, region.length - count)]
+    this.cells.splice(top, region.length, ...moved)
+  }
+  private lineFeed() {
+    if (this.row === this.bottom) this.scroll(1)
+    else this.row = Math.min(this.rows - 1, this.row + 1)
+  }
   private put(char: string) {
-    if (this.col >= this.cols) return
+    // Auto-wrap, as a terminal does once a row is full (deferred: only when the next character
+    // comes). ConPTY relies on it: it writes whole rows back to back without a line break.
+    if (this.col >= this.cols) {
+      this.col = 0
+      this.lineFeed()
+    }
     if (this.row >= 0 && this.row < this.rows) this.cells[this.row]![this.col] = char
     this.col++
   }
@@ -68,11 +95,16 @@ export class Screen {
           i = data[j] === "\x07" ? j + 1 : j + 2
           continue
         }
+        if (next === "M") {
+          if (this.row === this.top) this.scroll(-1)
+          else this.row = Math.max(0, this.row - 1)
+        } else if (next === "7") this.saved = [this.row, this.col]
+        else if (next === "8") [this.row, this.col] = this.saved
         i += 2
         continue
       }
       if (ch === "\r") this.col = 0
-      else if (ch === "\n") this.row = Math.min(this.rows - 1, this.row + 1)
+      else if (ch === "\n") this.lineFeed()
       else if (ch === "\b") this.col = Math.max(0, this.col - 1)
       else if (ch >= " ") this.put(ch)
       i++
@@ -114,9 +146,57 @@ export class Screen {
         for (let c = from; c < to; c++) line[c] = " "
         return
       }
-      case "J":
-        if (n(0, 0) === 2 || n(0, 0) === 3) this.clear()
+      case "J": {
+        const mode = n(0, 0)
+        if (mode === 2 || mode === 3) return this.clear()
+        const line = this.cells[this.row]
+        if (mode === 0) {
+          if (line) for (let c = this.col; c < this.cols; c++) line[c] = " "
+          for (let r = this.row + 1; r < this.rows; r++) this.cells[r] = this.blank()
+        } else if (mode === 1) {
+          for (let r = 0; r < this.row; r++) this.cells[r] = this.blank()
+          if (line) for (let c = 0; c <= this.col && c < this.cols; c++) line[c] = " "
+        }
         return
+      }
+      case "s":
+        this.saved = [this.row, this.col]
+        return
+      case "u":
+        ;[this.row, this.col] = this.saved
+        return
+      case "r":
+        this.top = n(0, 1) - 1
+        this.bottom = Math.min(this.rows, n(1, this.rows)) - 1
+        this.row = 0
+        this.col = 0
+        return
+      case "S":
+        return this.scroll(n(0, 1))
+      case "T":
+        return this.scroll(-n(0, 1))
+      case "L":
+        if (this.row >= this.top && this.row <= this.bottom) this.scroll(-n(0, 1), this.row, this.bottom)
+        return
+      case "M":
+        if (this.row >= this.top && this.row <= this.bottom) this.scroll(n(0, 1), this.row, this.bottom)
+        return
+      case "P": {
+        const line = this.cells[this.row]
+        if (!line) return
+        const count = Math.min(n(0, 1), this.cols - this.col)
+        line.splice(this.col, count)
+        line.push(...Array<string>(count).fill(" "))
+        return
+      }
+      case "@": {
+        const line = this.cells[this.row]
+        if (!line) return
+        const count = Math.min(n(0, 1), this.cols - this.col)
+        line.splice(this.col, 0, ...Array<string>(count).fill(" "))
+        line.length = this.cols
+        return
+      }
       case "X": {
         const line = this.cells[this.row]
         for (let c = this.col; c < Math.min(this.cols, this.col + n(0, 1)); c++) if (line) line[c] = " "
@@ -264,6 +344,9 @@ export async function prepare(options: Options = {}) {
     // clearing it), so a CI runner's CI=true would exempt every start from the Welcome screen and
     // change what the TUI asks. A test of the CI exemption sets it itself.
     CI: "",
+    // Likewise the test preload's OPENCODE_DB=:memory: (test/preload.ts): the TUI keeps its
+    // sessions in its own database file, as a user's does.
+    OPENCODE_DB: "",
     ...options.env,
   }
   if (process.platform === "win32")

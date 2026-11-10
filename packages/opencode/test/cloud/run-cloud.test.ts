@@ -153,7 +153,9 @@ describe("lunos run --cloud (XCOD-236)", () => {
     TIMEOUT,
   )
 
-  cliIt.live(
+  // Windows has no SIGINT to send another process: `kill("SIGINT")` terminates it, so it can't print
+  // the results line. A Ctrl+C typed in its console arrives as a console control event instead.
+  ;(process.platform === "win32" ? cliIt.skip : cliIt.live)(
     "Ctrl+C ends the worker, prints the results line and no stack trace, and exits 130",
     (input) =>
       Effect.gen(function* () {

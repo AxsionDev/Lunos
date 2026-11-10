@@ -23,7 +23,8 @@ beforeAll(async () => {
 })
 afterAll(async () => {
   await proxy.close()
-  for (const home of homes) await fs.rm(home, { recursive: true, force: true })
+  // Windows can hold a just-exited process's folder for a moment (EBUSY): retried.
+  for (const home of homes) await fs.rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 afterEach(async () => {
   await run?.stop()

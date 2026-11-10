@@ -14,7 +14,8 @@ let run: Awaited<ReturnType<typeof Pty.launch>> | undefined
 const homes: string[] = []
 
 afterAll(async () => {
-  for (const home of homes) await fs.rm(home, { recursive: true, force: true })
+  // Windows can hold a just-exited process's folder for a moment (EBUSY): retried.
+  for (const home of homes) await fs.rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 afterEach(async () => {
   await run?.stop()
@@ -106,14 +107,15 @@ describe("/projects", () => {
         while ((await stored()).groups[0].folders.length !== count && Date.now() < until) await Bun.sleep(100)
       }
       await settle(2)
-      await run.waitFor(/Folders[\s\S]*~\/axsion-api[\s\S]*Add a folder…/)
+      // Shown with the platform's separator: ~\axsion-api on Windows.
+      await run.waitFor(/Folders[\s\S]*~[\\/]axsion-api[\s\S]*Add a folder…/)
       expect((await stored()).groups[0].folders).toEqual([here, path.join(run.home, "axsion-api")])
 
       // Enter on a folder removes it, after asking.
       await run.type("axsion-api")
       await Bun.sleep(200)
       run.press(KEY.enter)
-      await run.waitFor("Remove ~/axsion-api from Axsion web?")
+      await run.waitFor(/Remove ~[\\/]axsion-api from Axsion web\?/)
       run.press(KEY.enter)
       await run.waitFor("Projects › Axsion web")
       await settle(1)
