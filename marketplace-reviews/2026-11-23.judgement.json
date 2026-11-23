@@ -1,0 +1,54 @@
+{
+  "model": "openai/gpt-5.3-codex",
+  "date": "2026-11-23",
+  "judgements": [
+    {
+      "name": "opencode-devcontainers",
+      "recommendation": "delist",
+      "reasons": [
+        "Criterion 3 warning: repository is archived (no active maintainer), so it does not meet the maintained-source requirement.",
+        "Criterion 5 info: no egress is declared, so network access cannot be verified."
+      ],
+      "user_note": "This plugin is archived and its network egress is undeclared, so it is not eligible for continued listing."
+    },
+    {
+      "name": "opencode-dynamic-context-pruning",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 1 warning: license is AGPL-3.0-or-later (OSI-approved copyleft), so copyleft terms should be clearly disclosed to users.",
+        "Criterion 7 info: version is pinned to 3.2.0 with integrity match, while npm latest is 3.2.1.",
+        "Criterion 5 info: no egress is declared, so network behavior cannot be verified yet."
+      ],
+      "user_note": "This plugin remains listed, but users should be informed it is AGPL-licensed copyleft software."
+    },
+    {
+      "name": "opencode-conductor",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 6 warning: runs a postinstall script on install (`node scripts/postinstall.cjs`), so script review is required before verification.",
+        "Criterion 5 info: no egress is declared, so network behavior cannot be verified yet."
+      ],
+      "user_note": "This plugin can remain community-listed, but verify the postinstall script and publish explicit egress declarations before considering verified status."
+    },
+    {
+      "name": "opencode-sentry-monitor",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 2 warning: no public source repository found, so public/maintained-source requirement is not satisfied.",
+        "Criterion 5 info: no egress declared, which is required before network behavior can be verified."
+      ],
+      "user_note": "This plugin can remain listed with a warning until the maintainer publishes source and declares egress for verification."
+    },
+    {
+      "name": "opencode-goal-plugin",
+      "recommendation": "keep-with-warning",
+      "reasons": [
+        "Criterion 3 warning: npm package is deprecated and superseded by 0.11.4 (final release).",
+        "Criterion 7 info: version is pinned to 0.10.0 while latest is 0.11.4.",
+        "Criterion 5 info: no egress is declared, so network behavior cannot be verified yet."
+      ],
+      "user_note": "This plugin can remain listed for now, but users should upgrade the pin to 0.11.4 or use the built-in /goal in OpenCode 2.2.1+."
+    }
+  ],
+  "dropped": []
+}
